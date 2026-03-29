@@ -1,0 +1,16 @@
+{
+  "publishes": {
+    "bright-falcon-2ynw": {
+      "siteUrl": "https://bright-falcon-2ynw.here.now/",
+      "claimToken": "a0b48b8d4c90ac49e3221df78c47d1ef4498b5d1bafaef0246efc93b935077e7",
+      "claimUrl": "https://here.now/claim?slug=bright-falcon-2ynw&token=a0b48b8d4c90ac49e3221df78c47d1ef4498b5d1bafaef0246efc93b935077e7",
+      "expiresAt": "2026-03-29T22:18:49.462Z"
+    },
+    "earthy-atlas-nvjk": {
+      "siteUrl": "https://earthy-atlas-nvjk.here.now/",
+      "claimToken": "6d03671bad2fa11ff8bba35eaf50a867e3c58810159d9ef0045d3563eb06987c",
+      "claimUrl": "https://here.now/claim?slug=earthy-atlas-nvjk&token=6d03671bad2fa11ff8bba35eaf50a867e3c58810159d9ef0045d3563eb06987c",
+      "expiresAt": "2026-03-30T13:07:29.186Z"
+    }
+  }
+}

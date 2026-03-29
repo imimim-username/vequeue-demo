@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>Governance Hall — veQueue Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#06000f;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:'Press Start 2P',monospace}
+#wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%}
+#screen{position:relative;line-height:0}
+canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+#gamepad{display:none;width:100%;max-width:640px;height:152px;flex-direction:row;align-items:center;justify-content:space-between;padding:8px 24px;background:#080818;border-top:2px solid #1a2a66}
+body.touch #gamepad{display:flex}
+#dpad{position:relative;width:112px;height:112px}
+.dp{position:absolute;width:36px;height:36px;background:#111830;border:2px solid #2a3a88;border-radius:5px;color:#6688cc;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dp:active,.dp.on{background:#1e3aaa;border-color:#5577ee;color:#fff}
+#dp-u{top:0;left:38px}#dp-l{top:38px;left:0}#dp-r{top:38px;left:76px}#dp-d{top:76px;left:38px}
+#dp-c{top:38px;left:38px;background:#0a1020;border-color:#141e44;cursor:default;pointer-events:none}
+#abtns{display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.abtn{border-radius:50%;font-size:10px;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;border:3px solid}
+#btn-a{width:62px;height:62px;background:#5a1440;border-color:#bb3388;font-size:11px}
+#btn-a:active,#btn-a.on{background:#993366;border-color:#ff66bb}
+#btn-b{width:46px;height:46px;background:#182240;border-color:#2e4a99}
+#btn-b:active,#btn-b.on{background:#2255aa;border-color:#5588ff}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="screen"><canvas id="c" width="640" height="416"></canvas></div>
+  <div id="gamepad">
+    <div id="dpad">
+      <div class="dp" id="dp-u">▲</div>
+      <div class="dp" id="dp-l">◀</div>
+      <div class="dp" id="dp-c"></div>
+      <div class="dp" id="dp-r">▶</div>
+      <div class="dp" id="dp-d">▼</div>
+    </div>
+    <div id="abtns">
+      <div class="abtn" id="btn-a">ACT</div>
+      <div class="abtn" id="btn-b">ESC</div>
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+const C=document.getElementById('c'),ctx=C.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const BW=640,BH=416,TS=32,GW=20,GH=13;
+
+// ── Tile constants ───────────────────────────────────────
+const FL=0,WA=1,DR=2,CH=3,MA=4,WN=5,SF=6,SH=7,SI=8,PL=9,RG=10,VD=11,CO=12,CF=13;
+const SOLID=new Set([WA,CH,MA,WN,SF,SH,SI,PL,VD,CO,CF]);
+const r=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x,y,w,h)};
+
+// ── ROOM DATA ────────────────────────────────────────────
+const ROOMS={
+
+  lobby:{
+    label:'GOVERNANCE HALL — LOBBY',
+    floor:'marble',
+    // map built dynamically by getLobbyMap()
+    npcs:[
+      {id:'recv',x:10,y:4,sprite:'gov',facing:'down',dialog:[
+        "WELCOME TO\nGOVERNANCE HALL.",
+        "This building models the\nveQueue protocol —\nrate-limited governance\ntoken locking.",
+        "Head NORTH first.\nComplete your intake at\nthe Entry Queue to receive\nyour access badge.",
+        "Once processed, all four\ndepartments open to you.\nTalk to clerks in each\nroom to learn more.",
+      ]},
+    ],
+    doors:[
+      {x:9, y:0, to:'entryQueue',sx:9, sy:11,always:true},
+      {x:10,y:0, to:'entryQueue',sx:10,sy:11,always:true},
+      {x:19,y:6, to:'vault',     sx:1, sy:6, always:false},
+      {x:0, y:6, to:'watermark', sx:18,sy:6, always:false},
+      {x:9, y:12,to:'exitQueue', sx:9, sy:2, always:false},
+      {x:10,y:12,to:'exitQueue', sx:10,sy:2, always:false},
+    ],
+  },
+
+  entryQueue:{
+    label:'DEPT. OF ENTRY — QUEUE PROCESSING',
+    floor:'carpet',
+    map:[
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WN,WN,WN,WN,WN,WN,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,CH,CH,FL,CH,CH,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,CH,CH,FL,CH,CH,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,MA,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,DR,DR,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+    ],
+    machine:{x:16,y:6,startServing:38,playerNum:42,tickFrames:110},
+    npcs:[
+      {id:'clerk_intake',x:10,y:1,sprite:'clerk',facing:'down',dialog:['__WINDOW__']},
+      {id:'w1',x:1, y:5,sprite:'citizen', facing:'right',dialog:["Been waiting since epoch 42.\nStill at position 7 of 23.\nNot complaining — the principal\nprotection is worth it."]},
+      {id:'w2',x:4, y:5,sprite:'citizen2',facing:'right',dialog:["The wait IS the security.\nIf anyone could dump in before\na big vote and dump out after,\neveryone's stake gets diluted."]},
+      {id:'w3',x:1, y:6,sprite:'citizen', facing:'right',dialog:["I hold a POSITION TOKEN.\nAn NFT for my spot in line.\nCould sell on secondary\nif I change my mind. Not bad."]},
+      {id:'w4',x:4, y:6,sprite:'citizen2',facing:'left', dialog:["Rate-limited entry prevents\ngovernance attacks.\nNo rushing a huge stake\nin right before a vote."]},
+    ],
+    doors:[
+      {x:9, y:12,to:'lobby',sx:9, sy:1,always:true},
+      {x:10,y:12,to:'lobby',sx:10,sy:1,always:true},
+    ],
+  },
+
+  vault:{
+    label:'THE VAULT — YIELD GENERATION',
+    floor:'tech',
+    map:[
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,SF,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,SF,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,VD,VD,VD,VD,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,VD,VD,VD,VD,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,DR,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+    ],
+    npcs:[
+      {id:'vk',x:10,y:9,sprite:'gov',facing:'up',dialog:[
+        "THE VAULT —\nwhere deposited tokens work.",
+        "Your tokens generate yield\nvia an ERC-4626 strategy.\nWatch the accrual counter\nin the corner.",
+        "ERC-4626 is the standard\ntokenized vault interface.\nSwappable by governance\nif a better option appears.",
+        "If governance migrates\nto a better vault, holders\nchoose: enter new vault,\nor receive a full refund.",
+        "No silent migrations.\nNo surprises. You always\nhave a say.",
+      ]},
+    ],
+    doors:[{x:10,y:12,to:'lobby',sx:18,sy:6,always:true}],
+  },
+
+  watermark:{
+    label:'WATERMARK OFFICE — PRINCIPAL PROTECTION',
+    floor:'office',
+    map:[
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,SH,SH,SH,FL,FL,FL,FL,FL,FL,FL,SH,SH,SH,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,DR,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+    ],
+    npcs:[
+      {id:'assr',x:7,y:9,sprite:'gov',facing:'down',dialog:[
+        "WATERMARK OFFICE —\nPrincipal Protection Division.",
+        "The WATERMARK (relativeSupply)\ntracks total shares issued\nper unit of asset deposited.",
+        "PROFITABLE VAULT:\nVault assets > watermark.\nUsers redeem 1:1.\nSurplus above line = DAO REVENUE.",
+        "UNDERWATER VAULT:\nVault assets < watermark.\nLosses shared pro-rata among\nall holders. Equal pain.",
+        "CORE RULE:\nThe DAO can NEVER extract\nprincipal — only surplus\nabove the watermark.",
+        "'You lose WITH the DAO,\nnever TO it.'",
+      ]},
+    ],
+    doors:[{x:10,y:12,to:'lobby',sx:1,sy:6,always:true}],
+  },
+
+  exitQueue:{
+    label:'DEPT. OF EXIT — SLOW DOOR',
+    floor:'carpet2',
+    map:[
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WN,WN,WN,WN,WN,WN,WA,WA,WA,WA,WA,WA,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,CH,CH,FL,CH,CH,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,CH,CH,FL,CH,CH,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,FL,WA],
+      [WA,WA,WA,WA,WA,WA,WA,WA,WA,DR,DR,WA,WA,WA,WA,WA,WA,WA,WA,WA],
+    ],
+    npcs:[
+      {id:'xclerk_win',x:10,y:1,sprite:'clerk2',facing:'down',dialog:['__EXITWINDOW__']},
+      {id:'xc2',x:14,y:1,sprite:'clerk',facing:'down',dialog:[
+        "WINDOW 2 — ALTERNATIVES",
+        "Don't want to wait?\nTwo options:",
+        "1. SELL YOUR POSITION TOKEN.\n   Transfer your vqShares on\n   secondary. Instant exit.",
+        "2. AUCTION FAST-LANE (soon)\n   Pay a premium for priority.\n   Premium = DAO revenue.",
+        "The protocol always has\nan exit path.\nJust not a free one.",
+      ]},
+      {id:'lv1',x:1,y:5,sprite:'citizen2',facing:'right',dialog:["Just submitted my exit request.\nEstimated wait: 3 epochs.\nMy position NFT is transferable\nif I need out sooner."]},
+      {id:'lv2',x:4,y:6,sprite:'citizen', facing:'left', dialog:["The exit wait mirrors entry.\nBy design. You can't move\nfaster than the protocol\nallows. Symmetric."]},
+    ],
+    doors:[
+      {x:9, y:12,to:'lobby',sx:9, sy:11,always:true},
+      {x:10,y:12,to:'lobby',sx:10,sy:11,always:true},
+    ],
+  },
+
+}; // end ROOMS
+
+// ── DYNAMIC LOBBY MAP ────────────────────────────────────
+function getLobbyMap(){
+  const p=G&&G.processed;
+  const m=[];
+  for(let y=0;y<GH;y++){
+    m[y]=[];
+    for(let x=0;x<GW;x++){
+      m[y][x]=(x===0||x===GW-1||y===0||y===GH-1)?WA:FL;
+    }
+  }
+  // North doors always open
+  m[0][9]=DR;m[0][10]=DR;
+  // Pillars
+  m[2][2]=PL;m[2][17]=PL;m[9][2]=PL;m[9][17]=PL;
+  // Reception desk
+  m[3][9]=SF;m[3][10]=SF;m[3][11]=SF;
+  m[4][9]=CO;m[4][10]=CO;m[4][11]=CO;
+  // Rug
+  for(let ry=6;ry<=8;ry++)for(let rx=8;rx<=12;rx++)m[ry][rx]=RG;
+  // Side/south doors locked until processed
+  if(p){m[6][0]=DR;m[6][19]=DR;m[12][9]=DR;m[12][10]=DR;}
+  return m;
+}
+
+// ── GAME STATE ───────────────────────────────────────────
+let G={
+  room:'lobby',tx:10,ty:7,px:10*TS,py:7*TS,dir:'down',frame:0,
+  moving:false,mTimer:0,mDur:8,mSx:0,mSy:0,mDx:0,mDy:0,
+  dialog:null,
+  fade:1,fadeDir:-1,fadeCb:null,
+  queue:{hasNumber:false,serving:38,playerNum:42,timer:0,tickFrames:110,called:false,processed:false},
+  processed:false,
+  unlockMsg:0,
+  tick:0,animTick:0,
+  titleScreen:true,
+  prev:{},
+};
+
+// ── INPUT ────────────────────────────────────────────────
+const held={};
+const KMAP={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',
+  w:'up',a:'left',s:'down',d:'right',W:'up',A:'left',S:'down',D:'right',
+  ' ':'act',Enter:'act',Escape:'esc'};
+window.addEventListener('keydown',e=>{
+  if(KMAP[e.key]){held[KMAP[e.key]]=true;e.preventDefault();}
+  if(G.titleScreen)dismissTitle();
+});
+window.addEventListener('keyup',e=>{if(KMAP[e.key])held[KMAP[e.key]]=false;});
+function just(k){return held[k]&&!G.prev[k];}
+
+// ── TOUCH INPUT ──────────────────────────────────────────
+function setupTouch(){
+  const map={'dp-u':'up','dp-l':'left','dp-r':'right','dp-d':'down','btn-a':'act','btn-b':'esc'};
+  Object.entries(map).forEach(([id,k])=>{
+    const el=document.getElementById(id);if(!el)return;
+    const on=e=>{e.preventDefault();held[k]=true;el.classList.add('on');if(G.titleScreen)dismissTitle();};
+    const off=e=>{e.preventDefault();held[k]=false;el.classList.remove('on');};
+    el.addEventListener('touchstart',on,{passive:false});
+    el.addEventListener('touchend',off,{passive:false});
+    el.addEventListener('touchcancel',off,{passive:false});
+  });
+  C.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(G.titleScreen){dismissTitle();return;}
+    if(G.dialog)advanceDialog();
+  },{passive:false});
+}
+if(window.matchMedia('(pointer:coarse)').matches){
+  document.body.classList.add('touch');
+  setupTouch();
+}
+
+// ── HELPERS ──────────────────────────────────────────────
+function roomData(){return ROOMS[G.room];}
+function getMap(){return G.room==='lobby'?getLobbyMap():roomData().map;}
+function tileAt(x,y){if(x<0||x>=GW||y<0||y>=GH)return WA;return getMap()[y][x];}
+function passable(x,y){
+  if(SOLID.has(tileAt(x,y)))return false;
+  for(const n of(roomData().npcs||[]))if(n.x===x&&n.y===y)return false;
+  return true;
+}
+function doorAt(x,y){
+  const map=getMap();
+  if(!map[y]||map[y][x]!==DR)return null;
+  return(roomData().doors||[]).find(d=>d.x===x&&d.y===y)||null;
+}
+function adjDir(){return{up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[G.dir];}
+function adjNpc(){
+  const[dx,dy]=adjDir();
+  const npcs=roomData().npcs||[];
+  return npcs.find(n=>n.x===G.tx+dx&&n.y===G.ty+dy)||null;
+}
+function adjMachine(){
+  if(G.room!=='entryQueue')return null;
+  const[dx,dy]=adjDir();
+  const m=roomData().machine;
+  return(m&&m.x===G.tx+dx&&m.y===G.ty+dy)?m:null;
+}
+function adjWindow(){
+  const[dx,dy]=adjDir();
+  return tileAt(G.tx+dx,G.ty+dy)===WN;
+}
+
+// ── DIALOG ───────────────────────────────────────────────
+function openDialog(pages,onClose){
+  G.dialog={pages,page:0,charProg:0,onClose:onClose||null};
+}
+function advanceDialog(){
+  if(!G.dialog)return;
+  const d=G.dialog;
+  if(d.charProg<d.pages[d.page].length){d.charProg=d.pages[d.page].length;return;}
+  if(d.page<d.pages.length-1){d.page++;d.charProg=0;}
+  else{const cb=d.onClose;G.dialog=null;if(cb)cb();}
+}
+
+// ── ROOM TRANSITION ──────────────────────────────────────
+function goRoom(id,sx,sy){
+  G.fadeDir=1;G.fade=0;
+  G.fadeCb=()=>{
+    G.room=id;G.tx=sx;G.ty=sy;G.px=sx*TS;G.py=sy*TS;
+    G.moving=false;G.dialog=null;G.dir='down';
+    G.fadeDir=-1;
+  };
+}
+
+// ── TITLE ────────────────────────────────────────────────
+function dismissTitle(){
+  G.titleScreen=false;G.fadeDir=-1;G.fade=1;
+  setTimeout(()=>{
+    openDialog([
+      "GOVERNANCE HALL",
+      "A veQueue Interactive Demo.",
+      "ARROWS / D-PAD: Move\nACT / SPACE: Interact\nESC / B: Close dialog",
+      "Head NORTH first.\nComplete intake at the\nEntry Queue to unlock\nall departments.",
+    ]);
+  },600);
+}
+
+// ── WINDOW INTERACTIONS ──────────────────────────────────
+function handleEntryWindow(){
+  const q=G.queue;
+  if(!q.hasNumber){
+    openDialog(["WINDOW 1 — INTAKE\n\nPlease take a number\nfrom the dispenser\non the right side\nof the room first."]);
+  } else if(!q.called){
+    openDialog(["WINDOW 1 — INTAKE\n\nNow serving:  #"+String(q.serving).padStart(3,'0')+"\nYour number:  #"+String(q.playerNum).padStart(3,'0')+"\n\nPlease wait until\nyour number is called."]);
+  } else if(!q.processed){
+    openDialog([
+      "WINDOW 1 — INTAKE\n\nWelcome! I'll process\nyour entry request now.",
+      "To lock your governance\ntokens, you join a\nRATE-LIMITED queue.\nOnly a fixed % enters each epoch.",
+      "You'll receive vqSHARES —\nyour governance stake,\nstored as an ERC-6909 NFT\nposition. Fully transferable.",
+      "While locked, tokens earn\nyield in THE VAULT.\nYour principal is protected\nby the WATERMARK system.",
+      "Exit is also rate-limited —\nsymmetric with entry.\nThis prevents bank-runs and\nallows safe vault deployment.",
+      "Processing complete!\n\nYour access badge has been\nactivated. All departments\nare now open to you.",
+    ],()=>{
+      q.processed=true;G.processed=true;G.unlockMsg=300;
+    });
+  } else {
+    openDialog(["Intake complete.\n\nAll departments are\nnow open to you.\nReturn to the lobby."]);
+  }
+}
+function handleExitWindow(){
+  openDialog([
+    "EXIT PROCESSING — Window 1\n\nLeaving so soon?",
+    "To exit, submit an EXIT\nREQUEST, burning your vqShares.\nYou join the exit queue.",
+    "Exit is ALSO rate-limited.\nSame policy governs both\nentry and exit flow rates.",
+    "WHY LIMIT EXIT?\n\nThis is the bank-run\nprevention mechanism.",
+    "Rate-limited exit means\nmax withdrawal at any horizon\nis always calculable.\nSafe vault deployment.",
+  ]);
+}
+
+// ── UPDATE ───────────────────────────────────────────────
+function update(){
+  G.tick++;
+  if(G.tick%5===0)G.animTick++;
+
+  if(G.fadeDir!==0){
+    G.fade+=G.fadeDir*0.07;
+    if(G.fade>=1){G.fade=1;if(G.fadeCb){G.fadeCb();G.fadeCb=null;}}
+    if(G.fade<=0){G.fade=0;G.fadeDir=0;}
+  }
+  if(G.unlockMsg>0)G.unlockMsg--;
+  if(G.titleScreen){G.prev={...held};return;}
+
+  if(G.dialog){
+    G.dialog.charProg=Math.min(G.dialog.charProg+1.6,G.dialog.pages[G.dialog.page].length);
+    if(just('act'))advanceDialog();
+    if(just('esc'))G.dialog=null;
+    G.prev={...held};return;
+  }
+
+  // Queue tick
+  const q=G.queue;
+  if(G.room==='entryQueue'&&q.hasNumber&&!q.called){
+    q.timer++;
+    q.serving=Math.min(38+Math.floor(q.timer/q.tickFrames),q.playerNum);
+    if(q.serving>=q.playerNum){
+      q.called=true;
+      openDialog([
+        "\uD83D\uDD14  NOW SERVING: #"+q.playerNum,
+        "Please proceed to\nWINDOW 1 at the\nnorth counter.",
+        "Walk up and press\nACT to speak with\nthe intake clerk.",
+      ]);
+    }
+  }
+
+  // Movement
+  if(G.moving){
+    G.mTimer++;
+    const t=G.mTimer/G.mDur;
+    G.px=G.mSx+G.mDx*TS*t;G.py=G.mSy+G.mDy*TS*t;
+    if(G.mTimer>=G.mDur){
+      G.tx+=G.mDx;G.ty+=G.mDy;G.px=G.tx*TS;G.py=G.ty*TS;
+      G.moving=false;G.frame=(G.frame+1)%4;
+      const door=doorAt(G.tx,G.ty);
+      if(door){
+        if(!door.always&&!G.processed){
+          openDialog(["ACCESS RESTRICTED\n\nComplete intake at the\nEntry Queue first.\n\nHead through the\nnorth door."]);
+          G.tx-=G.mDx;G.ty-=G.mDy;G.px=G.tx*TS;G.py=G.ty*TS;
+        } else {
+          goRoom(door.to,door.sx,door.sy);
+        }
+      }
+    }
+  } else {
+    let dx=0,dy=0;
+    if(held.up){dy=-1;G.dir='up';}
+    else if(held.down){dy=1;G.dir='down';}
+    else if(held.left){dx=-1;G.dir='left';}
+    else if(held.right){dx=1;G.dir='right';}
+    if((dx||dy)&&passable(G.tx+dx,G.ty+dy)){
+      G.moving=true;G.mTimer=0;G.mSx=G.px;G.mSy=G.py;G.mDx=dx;G.mDy=dy;
+    }
+    if(just('act')){
+      const npc=adjNpc();
+      if(npc){
+        if(npc.dialog[0]==='__WINDOW__'){handleEntryWindow();}
+        else if(npc.dialog[0]==='__EXITWINDOW__'){handleExitWindow();}
+        else{
+          const[ddx,ddy]=adjDir();
+          G.dir=Math.abs(npc.x-G.tx)>=Math.abs(npc.y-G.ty)?(npc.x>G.tx?'right':'left'):(npc.y>G.ty?'down':'up');
+          openDialog(npc.dialog);
+        }
+      } else if(adjWindow()){
+        if(G.room==='entryQueue')handleEntryWindow();
+        else if(G.room==='exitQueue')handleExitWindow();
+      } else {
+        const m=adjMachine();
+        if(m){
+          if(!q.hasNumber){
+            q.hasNumber=true;q.serving=38;q.timer=0;q.called=false;
+            openDialog([
+              "\uD83C\uDFAB  TAKE A NUMBER\n\nYour number:  #"+m.playerNum+"\nNow serving:  #"+m.startServing,
+              "Please wait in the\nseating area until\nyour number is called.",
+              "When called, walk north\nto WINDOW 1 and\npress ACT to speak\nwith the clerk.",
+            ]);
+          } else if(!q.called){
+            openDialog(["Already in queue.\n\nNow serving:  #"+q.serving+"\nYour number:  #"+q.playerNum+"\n\nPlease wait..."]);
+          } else {
+            openDialog(["Your number was called!\n\nPlease proceed to\nWINDOW 1 at the\nnorth counter."]);
+          }
+        }
+      }
+    }
+  }
+  G.prev={...held};
+}
+
+// ── TILE DRAWING ─────────────────────────────────────────
+function drawTile(t,x,y,floorType){
+  const bx=x*TS,by=y*TS,ck=(x+y)%2===0;
+  switch(t){
+    case FL:{
+      if(floorType==='marble'){
+        r(bx,by,TS,TS,ck?'#ece8dc':'#d8d0c4');
+        ctx.fillStyle='#a09070';ctx.fillRect(bx,by,TS,1);ctx.fillRect(bx,by,1,TS);
+        r(bx+1,by+1,TS>>1,1,'rgba(255,255,255,0.22)');
+        r(bx+1,by+1,1,TS>>1,'rgba(255,255,255,0.22)');
+      } else if(floorType==='tech'){
+        r(bx,by,TS,TS,'#101820');
+        ctx.fillStyle='#182830';ctx.fillRect(bx,by,TS,1);ctx.fillRect(bx,by,1,TS);
+        if(ck)r(bx+2,by+2,TS-4,TS-4,'#141c28');
+      } else if(floorType==='carpet'||floorType==='carpet2'){
+        const c=floorType==='carpet'?'#3e3c58':'#3e3238';
+        r(bx,by,TS,TS,c);
+        if((x*3+y*2)%5===0)r(bx+2,by+2,TS-4,TS-4,floorType==='carpet'?'#363454':'#36282e');
+      } else {
+        r(bx,by,TS,TS,ck?'#484840':'#404038');
+        ctx.fillStyle='#383830';ctx.fillRect(bx,by,TS,1);ctx.fillRect(bx,by,1,TS);
+      }
+      break;
+    }
+    case RG:{
+      r(bx,by,TS,TS,'#261648');r(bx+2,by+2,TS-4,TS-4,'#321a5c');
+      r(bx+5,by+5,TS-10,TS-10,'#2a1450');r(bx+7,by+7,TS-14,TS-14,'#38205e');
+      break;
+    }
+    case WA:{
+      const rail=Math.floor(TS*0.55);
+      r(bx,by,TS,TS,'#c4baa0');            // plaster
+      r(bx,by+rail,TS,TS-rail,'#7a6040'); // wood panel
+      r(bx,by+rail-2,TS,4,'#c8a040');     // gold rail
+      ctx.fillStyle='rgba(0,0,0,0.10)';
+      for(let i=0;i<4;i++)ctx.fillRect(bx+i*8+1,by+rail,2,TS-rail);
+      r(bx,by,TS,2,'rgba(255,255,255,0.15)');
+      ctx.fillStyle='rgba(0,0,0,0.08)';ctx.fillRect(bx,by,1,TS);
+      break;
+    }
+    case DR:{
+      // Draw floor underneath
+      const ck2=(x+y)%2===0;
+      r(bx,by,TS,TS,ck2?'#ece8dc':'#d8d0c4');
+      r(bx,by,TS,3,'#c8a040');r(bx,by,3,TS,'#c8a040');r(bx+TS-3,by,3,TS,'#c8a040');
+      r(bx+3,by+3,TS-6,TS-3,'#160606');
+      r(bx+3,by+3,TS-6,2,'rgba(255,180,80,0.2)');
+      r(bx+TS-8,by+TS/2-2,4,4,'#d4aa00');r(bx+TS-7,by+TS/2-1,2,2,'#ffee66');
+      break;
+    }
+    case CH:{
+      r(bx,by,TS,TS,ck?'#ece8dc':'#d8d0c4');
+      r(bx+5,by+20,5,11,'#221010');r(bx+TS-10,by+20,5,11,'#221010');
+      r(bx+3,by+14,TS-6,8,'#aa2020');r(bx+3,by+14,TS-6,2,'#cc3838');
+      r(bx+3,by+20,TS-6,2,'rgba(0,0,0,0.2)');
+      r(bx+4,by+4,TS-8,12,'#881818');r(bx+4,by+4,TS-8,2,'#aa2424');
+      break;
+    }
+    case MA:{
+      r(bx,by,TS,TS,ck?'#3e3c58':'#343254');
+      r(bx+3,by+1,TS-6,TS-2,'#162016');
+      r(bx+5,by+3,TS-10,11,'#001800');
+      ctx.fillStyle='#00ff44';ctx.font='bold 7px monospace';ctx.textAlign='center';
+      ctx.fillText('TAKE',bx+TS/2,by+10);ctx.fillText('#',bx+TS/2,by+20);
+      r(bx+6,by+TS-11,TS-12,4,'#0a0a0a');r(bx+7,by+TS-11,TS-14,2,'rgba(255,0,0,0.5)');
+      r(bx+3,by+1,2,TS-2,'rgba(255,255,255,0.06)');
+      break;
+    }
+    case WN:{
+      const active=G.queue&&G.queue.called&&!G.queue.processed&&G.room==='entryQueue';
+      r(bx,by,TS,TS,'#8a6030');
+      r(bx+3,by+2,TS-6,TS-16,active?'#002244':'#001020');
+      if(active){
+        r(bx+4,by+3,TS-8,TS-20,'#003366');
+        r(bx+3,by+2,TS-6,2,'rgba(80,180,255,0.4)');
+        ctx.fillStyle='#00ccff';ctx.font='bold 6px monospace';ctx.textAlign='center';
+        ctx.fillText('W.1',bx+TS/2,by+11);
+      } else {
+        r(bx+4,by+3,TS-8,TS-20,'#001122');
+      }
+      r(bx,by+TS-13,TS,13,'#b08840');r(bx,by+TS-13,TS,2,'#d4aa50');
+      break;
+    }
+    case SF:{
+      r(bx,by,TS,TS,ck?'#ece8dc':'#d8d0c4');
+      r(bx+3,by+4,TS-6,TS-8,'#4a6030');r(bx+5,by+6,TS-10,TS-14,'#3a5020');
+      r(bx+3,by+4,TS-6,2,'#6a8040');
+      r(bx+TS/2-3,by+TS/2-4,6,6,'#8a9a60');r(bx+TS/2-1,by+TS/2-6,2,10,'#6a7848');
+      break;
+    }
+    case SH:{
+      r(bx,by,TS,TS,'#3a2810');
+      const sc=['#aa2222','#2244aa','#22aa44','#aa8820','#882288'];
+      for(let i=0;i<5;i++){r(bx+1+i*6,by+2,5,TS-6,sc[i]);r(bx+2+i*6,by+3,3,TS-10,'rgba(255,255,255,0.11)');}
+      r(bx,by+TS-4,TS,4,'#2a1808');r(bx,by,TS,2,'rgba(255,255,255,0.09)');
+      break;
+    }
+    case PL:{
+      r(bx,by,TS,TS,ck?'#ece8dc':'#d8d0c4');
+      r(bx+8,by+20,16,12,'#7a4820');r(bx+10,by+18,12,4,'#6a3810');
+      r(bx+13,by+6,6,14,'#2a6a18');r(bx+9,by+10,6,8,'#228818');r(bx+17,by+10,6,8,'#228818');
+      r(bx+11,by+4,8,8,'#2a8a20');r(bx+8,by+16,6,4,'rgba(0,0,0,0.14)');
+      break;
+    }
+    case VD:{
+      r(bx,by,TS,TS,'#181820');r(bx+1,by+1,TS-2,TS-2,'#202030');
+      r(bx+3,by+3,TS-6,TS-6,'#282840');r(bx+6,by+6,TS-12,TS-12,'#0a0a18');
+      const cc='#383858';
+      r(bx+1,by+1,4,4,cc);r(bx+TS-5,by+1,4,4,cc);r(bx+1,by+TS-5,4,4,cc);r(bx+TS-5,by+TS-5,4,4,cc);
+      if(G.animTick%20<10)r(bx+TS/2-1,by+5,2,2,'#00ff44');
+      else r(bx+TS/2-1,by+5,2,2,'#004400');
+      break;
+    }
+    case CO:{
+      r(bx,by,TS,TS,'#8a6010');r(bx+1,by+1,TS-2,TS-8,'#aa8020');
+      r(bx,by+TS-8,TS,8,'#604008');r(bx+1,by+1,TS-2,3,'rgba(255,255,255,0.14)');
+      break;
+    }
+    case CF:{
+      r(bx,by,TS,TS,'#5a4008');r(bx+2,by+4,TS-4,TS-8,'#6a5010');
+      r(bx+2,by+4,TS-4,2,'rgba(255,255,255,0.09)');
+      break;
+    }
+    default: r(bx,by,TS,TS,'#080810');
+  }
+}
+
+// ── PLAYER SPRITE ────────────────────────────────────────
+// 12×16 logical px drawn at 2px per px → 24×32 on canvas
+const PS=2;
+function pp(lx,ly,ox,oy,c){ctx.fillStyle=c;ctx.fillRect(ox+lx*PS,oy+ly*PS,PS,PS);}
+
+function drawPlayer(wpx,wpy){
+  const ox=Math.round(wpx)+4,oy=Math.round(wpy);
+  const wk=G.moving,f=G.frame%4;
+  const lo=wk?[0,3,0,-3][f]:0,ao=wk?[2,-2,2,-2][f]:0;
+
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath();ctx.ellipse(ox+12,oy+32,10,3,0,0,Math.PI*2);ctx.fill();
+
+  const H='#1133aa',Hi='#3a5aee',V='#080e38',Vi='#1f30aa',
+        Sk='#f0c880',Sd='#c8a060',
+        B='#2244cc',Bh='#3666ff',Bd='#162888',
+        L='#1a3399',D='#111133',
+        Ga='#aaaacc',Gb='#6666aa';
+
+  if(G.dir==='up'){
+    for(let lx=1;lx<11;lx++)pp(lx,0,ox,oy,H);
+    for(let lx=0;lx<12;lx++)pp(lx,1,ox,oy,H);
+    for(let lx=0;lx<12;lx++)pp(lx,2,ox,oy,lx===0||lx===11?H:Hi);
+    for(let lx=0;lx<12;lx++)pp(lx,3,ox,oy,H);
+    for(let lx=0;lx<12;lx++)pp(lx,4,ox,oy,H);
+    for(let lx=2;lx<10;lx++)pp(lx,5,ox,oy,H);
+    for(let lx=3;lx<9;lx++)pp(lx,6,ox,oy,Sd);
+    for(let ly=7;ly<12;ly++)for(let lx=1;lx<11;lx++)pp(lx,ly,ox,oy,ly===7||ly===11?Bd:B);
+    pp(0,9,ox,oy+ao,B);pp(11,9,ox,oy-ao,B);pp(0,10,ox,oy+ao,B);pp(11,10,ox,oy-ao,B);
+  } else {
+    // Front/side
+    for(let lx=1;lx<11;lx++)pp(lx,0,ox,oy,H);
+    for(let lx=0;lx<12;lx++)pp(lx,1,ox,oy,H);
+    pp(0,1,ox,oy,H);pp(11,1,ox,oy,H);
+    // Visor row 2-3
+    for(let lx=1;lx<11;lx++)pp(lx,2,ox,oy,V);
+    pp(0,2,ox,oy,H);pp(11,2,ox,oy,H);
+    for(let lx=1;lx<11;lx++)pp(lx,3,ox,oy,V);
+    pp(0,3,ox,oy,H);pp(11,3,ox,oy,H);
+    // Visor glint
+    pp(2,2,ox,oy,Vi);pp(3,2,ox,oy,Vi);pp(2,3,ox,oy,Vi);
+    // Helmet bottom
+    for(let lx=0;lx<12;lx++)pp(lx,4,ox,oy,H);
+    // Face
+    for(let lx=2;lx<10;lx++)pp(lx,5,ox,oy,Sk);
+    for(let lx=2;lx<10;lx++)pp(lx,6,ox,oy,Sk);
+    pp(2,5,ox,oy,'rgba(255,220,170,0.7)');// face hi
+    // Eyes
+    const ex=G.dir==='left'?-1:G.dir==='right'?1:0;
+    pp(3+ex,5,ox,oy,'#222244');pp(4+ex,5,ox,oy,'#222244');
+    pp(7+ex,5,ox,oy,'#222244');pp(8+ex,5,ox,oy,'#222244');
+    pp(3+ex,5,ox,oy,'rgba(255,255,255,0.65)');pp(7+ex,5,ox,oy,'rgba(255,255,255,0.65)');
+    // Neck
+    for(let lx=4;lx<8;lx++)pp(lx,7,ox,oy,Sk);
+    // Body
+    for(let ly=8;ly<13;ly++)
+      for(let lx=1;lx<11;lx++)
+        pp(lx,ly,ox,oy,ly===8?Bh:lx===1||lx===10?Bd:B);
+    pp(5,9,ox,oy,Bh);pp(6,9,ox,oy,Bh);pp(5,10,ox,oy,Bh);pp(6,10,ox,oy,Bh);
+    // Arms
+    for(let ly=9;ly<13;ly++)pp(0,ly,ox,oy+ao,B);
+    for(let ly=9;ly<12;ly++)pp(11,ly,ox,oy-ao,B);
+    // Arm cannon right
+    pp(11,12,ox,oy-ao,Ga);pp(12,11,ox,oy-ao,Ga);pp(12,12,ox,oy-ao,Gb);
+    pp(11,13,ox,oy-ao,Ga);
+    // Hand left
+    pp(0,12,ox,oy+ao,Sk);pp(0,13,ox,oy+ao,Sk);
+  }
+  // Legs both directions
+  for(let lx=1;lx<5;lx++){pp(lx,13,ox,oy+lo,L);pp(lx,14,ox,oy+lo,L);}
+  for(let lx=7;lx<11;lx++){pp(lx,13,ox,oy-lo,L);pp(lx,14,ox,oy-lo,L);}
+  for(let lx=0;lx<6;lx++)pp(lx,15,ox,oy+lo,D);
+  for(let lx=6;lx<12;lx++)pp(lx,15,ox,oy-lo,D);
+}
+
+// ── NPC SPRITES ──────────────────────────────────────────
+const NPC_PAL={
+  clerk:  {sh:'#e8e8e8',tie:'#cc2222',hair:'#332200',pants:'#334466',sk:'#f0c880'},
+  clerk2: {sh:'#e8e8e8',tie:'#2244cc',hair:'#111111',pants:'#223344',sk:'#f4d090'},
+  citizen:{sh:'#4a8844',tie:null,     hair:'#664422',pants:'#2a4422',sk:'#f0c880'},
+  citizen2:{sh:'#884488',tie:null,    hair:'#221100',pants:'#332244',sk:'#eeaa80'},
+  gov:    {sh:'#886622',tie:'#aa4422',hair:'#ccaa88',pants:'#443300',sk:'#f8d098'},
+};
+function drawNPC(npc){
+  const bx=npc.x*TS,by=npc.y*TS,bob=G.animTick%80<40?0:-1;
+  const p=NPC_PAL[npc.sprite]||NPC_PAL.clerk;
+  ctx.fillStyle='rgba(0,0,0,0.20)';
+  ctx.beginPath();ctx.ellipse(bx+TS/2,by+30,11,3,0,0,Math.PI*2);ctx.fill();
+  // Legs + shoes
+  r(bx+6, by+20,7,10,p.pants);r(bx+18,by+20,7,10,p.pants);
+  r(bx+5, by+28,9,4,'#111111'); r(bx+17,by+28,9,4,'#111111');
+  // Body
+  r(bx+3, by+9, 26,12,p.sh);
+  r(bx+3, by+9, 26,2,'rgba(255,255,255,0.22)');
+  if(p.tie){r(bx+13,by+10,6,10,p.tie);r(bx+14,by+10,4,8,p.tie);}
+  r(bx+11,by+7,10,4,'#ffffff');
+  // Neck + head
+  r(bx+11,by+5, 10,4,p.sk);
+  r(bx+6, by+bob-2,20,10,p.sk);
+  r(bx+6, by+bob-2,20,2,'rgba(255,220,180,0.45)');
+  r(bx+5, by+bob-6,22,6,p.hair);
+  // Eyes + glasses
+  r(bx+8, by+bob+1,4,3,'#222233');r(bx+19,by+bob+1,4,3,'#222233');
+  r(bx+9, by+bob+1,2,2,'rgba(255,255,255,0.65)');r(bx+20,by+bob+1,2,2,'rgba(255,255,255,0.65)');
+  if(npc.sprite==='clerk'||npc.sprite==='clerk2'||npc.sprite==='gov'){
+    ctx.strokeStyle='#555';ctx.lineWidth=1.5;
+    ctx.strokeRect(bx+7,by+bob,6,5);ctx.strokeRect(bx+18,by+bob,6,5);
+    ctx.beginPath();ctx.moveTo(bx+13,by+bob+2);ctx.lineTo(bx+18,by+bob+2);ctx.stroke();
+  }
+  // Arms
+  r(bx+0,by+10,4,10,p.sh);r(bx+28,by+10,4,10,p.sh);
+  r(bx+0,by+19,5,4,p.sk); r(bx+27,by+19,5,4,p.sk);
+}
+
+// ── VAULT FX ─────────────────────────────────────────────
+function drawVaultFX(){
+  const t=G.animTick;
+  for(let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2+t*0.05,rad=30+Math.sin(t*0.08+i*0.5)*12;
+    const cx_=9.5*TS+Math.cos(a)*rad,cy_=5.5*TS+Math.sin(a)*rad;
+    const al=(0.4+0.6*Math.sin(t*0.11+i*0.7)).toFixed(2);
+    ctx.fillStyle=i%3===0?`rgba(255,200,0,${al})`:i%3===1?`rgba(100,255,130,${al})`:`rgba(80,200,255,${al})`;
+    ctx.fillRect(Math.round(cx_)-2,Math.round(cy_)-2,4,4);
+  }
+  ctx.fillStyle='rgba(0,5,0,0.93)';ctx.fillRect(2,2,220,46);
+  ctx.strokeStyle='#aa8800';ctx.lineWidth=2;ctx.strokeRect(2,2,220,46);
+  ctx.strokeStyle='#664400';ctx.lineWidth=1;ctx.strokeRect(5,5,214,40);
+  ctx.fillStyle='#cc9900';ctx.font='6px "Press Start 2P"';ctx.textAlign='left';
+  ctx.fillText('YIELD ACCRUED',10,20);
+  ctx.fillStyle='#ffdd44';ctx.font='7px "Press Start 2P"';
+  ctx.fillText((t*0.0027).toFixed(4)+' alUSD',10,36);
+}
+
+// ── WATERMARK FX ─────────────────────────────────────────
+function drawWatermarkFX(){
+  const px_=13*TS,py_=TS,pw=5*TS+20,ph=9*TS;
+  ctx.fillStyle='rgba(0,0,20,0.94)';ctx.fillRect(px_,py_,pw,ph);
+  ctx.strokeStyle='#4455cc';ctx.lineWidth=2;ctx.strokeRect(px_,py_,pw,ph);
+  ctx.strokeStyle='#2233aa';ctx.lineWidth=1;ctx.strokeRect(px_+3,py_+3,pw-6,ph-6);
+  ctx.fillStyle='#9999ff';ctx.font='6px "Press Start 2P"';ctx.textAlign='center';
+  ctx.fillText('VAULT STATUS',px_+pw/2,py_+17);
+  const bx_=px_+16,btop=py_+24,bw=pw-32,bh=ph-34;
+  r(bx_,btop,bw,bh,'#080818');
+  const wmark=0.58,surpPct=wmark+Math.sin(G.animTick*0.035)*0.07;
+  const surpH=Math.floor(bh*surpPct),princH=bh-surpH;
+  ctx.fillStyle='#6a5000';ctx.fillRect(bx_,btop,bw,surpH);
+  r(bx_,btop+Math.floor(surpH*0.5+Math.sin(G.animTick*0.07)*5),bw,2,'rgba(255,200,0,0.32)');
+  r(bx_,btop+surpH,bw,princH,'#1a3a7a');
+  r(bx_,btop+surpH,bw,2,'rgba(100,160,255,0.28)');
+  r(bx_-4,btop+Math.floor(bh*wmark),bw+8,2,'#ffff44');
+  ctx.fillStyle='#ffcc44';ctx.font='5px "Press Start 2P"';ctx.textAlign='center';
+  ctx.fillText('SURPLUS',px_+pw/2,btop+surpH/2-3);ctx.fillText('(DAO REV)',px_+pw/2,btop+surpH/2+7);
+  ctx.fillStyle='#5599ff';
+  ctx.fillText('PRINCIPAL',px_+pw/2,btop+surpH+princH/2-3);ctx.fillText('(PROTECTED)',px_+pw/2,btop+surpH+princH/2+7);
+  ctx.fillStyle='#ffff44';ctx.textAlign='left';ctx.font='5px "Press Start 2P"';
+  ctx.fillText('\u25C4 WMARK',bx_+bw+4,btop+Math.floor(bh*wmark)+4);
+}
+
+// ── QUEUE HUD ────────────────────────────────────────────
+function drawQueueHUD(){
+  if(G.room!=='entryQueue')return;
+  const q=G.queue;if(!q.hasNumber)return;
+  ctx.fillStyle='rgba(0,12,0,0.94)';ctx.fillRect(222,4,196,58);
+  ctx.strokeStyle=q.called?'#00ff88':'#00aa44';ctx.lineWidth=2;ctx.strokeRect(222,4,196,58);
+  ctx.strokeStyle='#004422';ctx.lineWidth=1;ctx.strokeRect(225,7,190,52);
+  ctx.fillStyle='#00bb44';ctx.font='6px "Press Start 2P"';ctx.textAlign='center';
+  ctx.fillText('NOW SERVING',320,22);
+  ctx.fillStyle=q.called?'#00ff88':'#00cc55';ctx.font='18px "Press Start 2P"';
+  ctx.fillText(String(q.serving).padStart(3,'0'),320,48);
+  if(!q.called){
+    ctx.fillStyle='#ffff44';ctx.font='5px "Press Start 2P"';
+    ctx.fillText('YOUR # : '+q.playerNum,320,64);
+  } else if(G.tick%50<30){
+    ctx.fillStyle='#ffff00';ctx.font='5px "Press Start 2P"';
+    ctx.fillText('\u2605 GO TO WINDOW 1 \u2605',320,64);
+  }
+}
+
+// ── LOBBY LABELS ─────────────────────────────────────────
+function drawLobbyLabels(){
+  if(G.room!=='lobby')return;
+  const labels=[
+    {cx:160, cy:18, text:'ENTRY QUEUE', locked:false, dir:'n'},
+    {cx:BW-10,cy:208,text:'VAULT',      locked:!G.processed,dir:'e'},
+    {cx:8,    cy:208,text:'WATERMARK',  locked:!G.processed,dir:'w'},
+    {cx:310,  cy:BH-10,text:'EXIT QUEUE',locked:!G.processed,dir:'s'},
+  ];
+  labels.forEach(lb=>{
+    ctx.font='5px "Press Start 2P"';
+    const tw=ctx.measureText(lb.text).width+14;
+    let bx=lb.cx-tw/2,by=lb.cy-12;
+    if(lb.dir==='e'){bx=BW-tw-14;by=lb.cy-6;}
+    if(lb.dir==='w'){bx=6;by=lb.cy-6;}
+    if(lb.dir==='s'){bx=lb.cx-tw/2;by=BH-26;}
+    ctx.fillStyle=lb.locked?'rgba(50,0,0,0.88)':'rgba(0,0,0,0.78)';
+    ctx.fillRect(bx,by,tw,lb.locked?24:16);
+    ctx.strokeStyle=lb.locked?'#441100':'#443300';ctx.lineWidth=1;ctx.strokeRect(bx,by,tw,lb.locked?24:16);
+    ctx.fillStyle=lb.locked?'#ff5533':'#ffdd44';ctx.textAlign='left';
+    ctx.fillText(lb.text,bx+7,by+11);
+    if(lb.locked){ctx.fillStyle='#ff4422';ctx.fillText('\uD83D\uDD12',bx+7,by+22);}
+  });
+}
+
+// ── DIALOG BOX ───────────────────────────────────────────
+const DLG_H=118,DLG_Y=BH-DLG_H-2;
+function drawDialog(){
+  if(!G.dialog){
+    const npc=adjNpc(),m=adjMachine(),win=adjWindow();
+    if((npc||m||win)&&!G.moving){
+      r(0,BH-28,BW,28,'rgba(0,0,0,0.72)');
+      ctx.fillStyle='#ffff88';ctx.font='7px "Press Start 2P"';ctx.textAlign='center';
+      ctx.fillText('[ ACT / SPACE ]  INTERACT',BW/2,BH-9);
+    }
+    return;
+  }
+  const d=G.dialog;
+  const grd=ctx.createLinearGradient(0,DLG_Y,0,DLG_Y+22);
+  grd.addColorStop(0,'#1c2c72');grd.addColorStop(1,'#0e1a4e');
+  ctx.fillStyle=grd;ctx.fillRect(2,DLG_Y,BW-4,22);
+  r(2,DLG_Y+22,BW-4,DLG_H-22,'rgba(2,2,16,0.97)');
+  ctx.strokeStyle='#5566cc';ctx.lineWidth=2;ctx.strokeRect(2,DLG_Y,BW-4,DLG_H);
+  ctx.strokeStyle='#222f88';ctx.lineWidth=1;ctx.strokeRect(5,DLG_Y+25,BW-10,DLG_H-28);
+  const full=d.pages[d.page],vis=full.substring(0,Math.floor(d.charProg));
+  ctx.fillStyle='#dde8ff';ctx.font='8px "Press Start 2P"';ctx.textAlign='left';
+  vis.split('\n').forEach((line,i)=>{if(line)ctx.fillText(line,16,DLG_Y+42+i*16);});
+  const done=d.charProg>=full.length;
+  if(G.tick%44<28){
+    ctx.font='6px "Press Start 2P"';ctx.textAlign='right';
+    if(!done){ctx.fillStyle='#ffff44';ctx.fillText('\u25BA\u25BA\u25BA',BW-10,DLG_Y+DLG_H-8);}
+    else if(d.page<d.pages.length-1){ctx.fillStyle='#ffff00';ctx.fillText('[ ACT ] NEXT \u25BC',BW-10,DLG_Y+DLG_H-8);}
+    else{ctx.fillStyle='#8888ff';ctx.fillText('[ ACT ] CLOSE',BW-10,DLG_Y+DLG_H-8);}
+  }
+  if(d.pages.length>1){ctx.fillStyle='#334488';ctx.font='5px "Press Start 2P"';ctx.textAlign='right';ctx.fillText((d.page+1)+'/'+d.pages.length,BW-10,DLG_Y+14);}
+}
+
+// ── UNLOCK MESSAGE ────────────────────────────────────────
+function drawUnlockMsg(){
+  if(!G.unlockMsg)return;
+  const a=Math.min(1,G.unlockMsg/30);
+  r(0,0,BW,42,`rgba(0,18,0,${(a*0.9).toFixed(2)})`);
+  ctx.strokeStyle=`rgba(0,255,100,${a.toFixed(2)})`;ctx.lineWidth=2;ctx.strokeRect(0,0,BW,42);
+  ctx.fillStyle=`rgba(0,255,100,${a.toFixed(2)})`;ctx.font='8px "Press Start 2P"';ctx.textAlign='center';
+  ctx.fillText('\u2713  ALL DEPARTMENTS UNLOCKED  \u2713',BW/2,26);
+}
+
+// ── TITLE SCREEN ─────────────────────────────────────────
+function drawTitleScreen(){
+  r(0,0,BW,BH,'#06000f');
+  for(let i=0;i<60;i++){
+    const sx=(i*137+i*i*7)%BW,sy=(i*93+i*i*3)%BH;
+    const a=(0.3+0.7*Math.sin(G.animTick*0.04+i*0.4)).toFixed(2);
+    ctx.fillStyle=`rgba(255,255,255,${a})`;ctx.fillRect(sx,sy,i%4===0?2:1,i%4===0?2:1);
+  }
+  const gr=ctx.createRadialGradient(320,208,50,320,208,280);
+  gr.addColorStop(0,'rgba(18,8,60,0.7)');gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,BW,BH);
+  r(60,100,520,200,'rgba(4,4,24,0.93)');
+  ctx.strokeStyle='#4455cc';ctx.lineWidth=3;ctx.strokeRect(60,100,520,200);
+  ctx.strokeStyle='#2233aa';ctx.lineWidth=1;ctx.strokeRect(64,104,512,192);
+  const gr2=ctx.createLinearGradient(60,100,580,100);
+  gr2.addColorStop(0,'#5a3800');gr2.addColorStop(0.5,'#c89020');gr2.addColorStop(1,'#5a3800');
+  ctx.fillStyle=gr2;ctx.fillRect(60,100,520,6);
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffee44';ctx.font='22px "Press Start 2P"';
+  ctx.shadowColor='#ff8800';ctx.shadowBlur=14;
+  ctx.fillText('GOVERNANCE',320,164);ctx.fillText('HALL',320,196);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#8899cc';ctx.font='7px "Press Start 2P"';ctx.fillText('A veQueue Interactive Demo',320,228);
+  if(G.tick%60<38){ctx.fillStyle='#ffffff';ctx.font='7px "Press Start 2P"';ctx.fillText('PRESS ANY KEY TO START',320,268);}
+  // Mini Blue Helmet Guy on title
+  const mx=296,my=290;
+  [[1,0,10,2,'#1133aa'],[0,2,12,2,'#1133aa'],[1,4,10,2,'#080e38'],[0,6,12,2,'#1133aa'],
+   [2,8,8,2,'#f0c880'],[1,10,10,8,'#2244cc'],[1,18,4,8,'#1a3399'],[7,18,4,8,'#1a3399'],
+   [0,24,6,4,'#111133'],[6,24,6,4,'#111133']].forEach(([x,y,w,h,c])=>r(mx+x*2,my+y,w*2,h,c));
+}
+
+// ── SCANLINES ────────────────────────────────────────────
+function drawScanlines(){
+  ctx.fillStyle='rgba(0,0,0,0.07)';
+  for(let y=0;y<BH;y+=2)ctx.fillRect(0,y,BW,1);
+}
+
+// ── RENDER ───────────────────────────────────────────────
+function render(){
+  r(0,0,BW,BH,'#06000f');
+  if(G.titleScreen){
+    drawTitleScreen();
+    if(G.fade>0){r(0,0,BW,BH,`rgba(0,0,0,${G.fade})`);}
+    return;
+  }
+  const rd=roomData(),ft=rd.floor||'marble',map=getMap();
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)drawTile(map[y][x],x,y,ft);
+  drawLobbyLabels();
+  if(G.room==='vault')     drawVaultFX();
+  if(G.room==='watermark') drawWatermarkFX();
+  (rd.npcs||[]).forEach(drawNPC);
+  drawPlayer(G.px,G.py);
+  drawQueueHUD();
+  drawUnlockMsg();
+  drawDialog();
+  drawScanlines();
+  if(G.fade>0)r(0,0,BW,BH,`rgba(0,0,0,${G.fade})`);
+}
+
+// ── LOOP ─────────────────────────────────────────────────
+function loop(){update();render();requestAnimationFrame(loop);}
+
+// ── RESIZE ───────────────────────────────────────────────
+function resize(){
+  const isTch=document.body.classList.contains('touch');
+  const gpH=isTch?152:0;
+  const aw=window.innerWidth,ah=window.innerHeight-gpH;
+  const sc=Math.min(aw/BW,ah/BH,2);
+  C.style.width=(BW*sc)+'px';C.style.height=(BH*sc)+'px';
+  const gp=document.getElementById('gamepad');
+  if(gp&&isTch)gp.style.width=(BW*sc)+'px';
+}
+window.addEventListener('resize',resize);
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
