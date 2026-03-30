@@ -43,6 +43,58 @@ Silly pop-culture-inspired units rather than generic "gold" or "tokens". Inspira
 
 ---
 
+## Visual Style — Mega Man X (SNES) Quality Target
+
+Reference: Mega Man X (Capcom, 1993) on SNES. This is the visual bar to hit.
+
+### Key characteristics to replicate in canvas
+
+**Backgrounds — multi-layer parallax**
+- 3–4 distinct depth layers scrolling at different speeds (far sky, mid architecture, near foreground)
+- Each layer uses its own distinct color palette range (cooler/desaturated in back, warmer/saturated in front)
+- Backgrounds have rich environmental detail: machinery, pipes, foliage, windows, structural elements
+- Animated background elements: blinking lights, moving platforms, falling rain, flowing water, smoke
+
+**Sprites — large, detailed, heavily shaded**
+- Player and enemy sprites are large (32×32 px minimum) — not tiny 8×8 characters
+- Every sprite has at minimum 3 shading levels: highlight, midtone, shadow
+- Strong dark outlines around sprites to pop them off the background
+- Smooth multi-frame animation: walk cycle (6–8 frames), attack, jump, hurt, death sequences
+- Color-coded per character — each adversary type has a distinct hue so they're immediately readable
+
+**Tiles — rich and layered**
+- Floor tiles have texture and depth — not flat solid colors
+- Wall tiles have foreground/background separation: e.g. structural frame in front, detail behind
+- Decorative elements (pipes, conduits, vines, banners) layered over base tiles
+- Some foreground tiles the player walks *behind*, creating depth illusion
+
+**Color palette — bold and zone-themed**
+- Each zone/building has a dominant color theme (e.g. Governance Hall = deep blue + gold; Tavern = warm amber + wood brown; Treasury = cool green + steel)
+- Saturated, punchy colors with strong contrast between sprite and background
+- SNES-style: no more than ~16 colors per sprite, but backgrounds can use full 256-color range
+- Dithering patterns used to simulate gradients (e.g. sky gradients, cave lighting falloff)
+
+**UI — minimal but pixel-perfect**
+- Health bar: vertical or horizontal row of segmented pixel blocks (heart containers or HP bar)
+- Token/currency counter with a small coin icon
+- Weapon/item slots: small icon grid in corner
+- No floating text clutter — everything is iconographic
+- HUD elements have a subtle dark border or panel behind them to stay readable
+
+**Camera**
+- Camera leads the player slightly in movement direction (not just centered)
+- Smooth lerp, never jarring
+- Screen locks at zone boundaries
+
+### Implementation approach for canvas
+- Draw background layers on separate off-screen canvases, composite at render time
+- Use larger tile size (e.g. 16×16 or 32×32 logical px before scaling) instead of current tiny tiles
+- Pre-render static tile layers to a buffer; only redraw when camera moves
+- Sprite sheets for animation frames — each character direction × action has its own strip
+- Scale factor ×2 or ×3 for crisp pixel-perfect rendering on modern screens (`image-rendering: pixelated`)
+
+---
+
 ## World & Exploration
 
 ### Overall Feel
