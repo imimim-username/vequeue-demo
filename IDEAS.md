@@ -213,6 +213,38 @@ Inspired by classic BBS door games (Trade Wars, Legend of the Red Dragon). Playe
 
 ---
 
+## Audio — SNES-Style Sound & Procedural Music
+
+### Sound Effects
+- SNES-style synthesized sound effects for all actions: footsteps, sword swing, hit, enemy death, coin pickup, queue ticket dispense, door open, vote cast, etc.
+- Generated via Web Audio API (no audio file downloads needed) — short oscillator bursts shaped to mimic SNES SPC700 chip sound characteristics
+- Each zone/building could have its own ambient sound layer (e.g. tavern crowd murmur, governance hall echo, marketplace bustle)
+
+### Music
+- Procedurally generated chiptune music — different track per zone, generated at runtime via Web Audio API
+- Tracks should feel thematically distinct: town overworld (adventurous), governance hall (stately), tavern (upbeat), black market (tense)
+- Procedural generation means no licensing issues and subtle variation each playthrough so it never feels like a loop
+- Could use a simple chord progression + melody generator constrained to SNES-appropriate scales and instrument patches
+
+### User Controls
+- Volume sliders (or toggle buttons) for music and SFX independently — accessible from pause/character screen
+- Mute all option
+- Settings persist in localStorage
+
+---
+
+## Cookie / Session Integrity — Anti-Cheat
+
+- Server should sign cookies with a secret key (HMAC) so tampered values are rejected on load
+- Player state (tokens, inventory, queue position) stored in cookie as a signed payload — server verifies the signature on every reconnect; mismatched signature = cookie rejected, player starts fresh
+- Secret key lives only on the server (env variable), never sent to client
+- Prevents players from manually editing their localStorage/cookie to give themselves infinite tokens or fake items
+- Does not need a database — the signed cookie IS the auth token; stateless verification
+- Could also include a server-side "sanity check" layer: even a valid signed cookie gets rejected if values are implausible (e.g. token balance increased between sessions without a server-recorded earning event)
+- **Implementation:** `HMAC-SHA256(JSON.stringify(playerState), SERVER_SECRET)` appended to the cookie; verified on `join` event before accepting state
+
+---
+
 ## Core Design Tension — Time vs. Flexibility
 
 The central feeling to create: **the queue isn't a punishment, it's the mechanism that makes everything else work.** If the game hits that, the veQueue whitepaper becomes intuitive.
