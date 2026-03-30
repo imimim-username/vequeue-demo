@@ -48,6 +48,8 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 .stat-pip.filled{background:#FFD700;border-color:#CC9900}
 .stat-pip.capped{background:#252535;border-color:#404060;cursor:default}
 .stat-pip.filled.capped{background:#3A3000;border-color:#555000}
+.stat-pip.class-lock{background:#CC6600;border-color:#FF8C00;cursor:default}
+.stat-pip.class-lock.capped{background:#6A3300;border-color:#8B4400;cursor:default}
 .stat-pts{color:#FFD700;font-size:.8rem;min-width:60px;text-align:right}
 #btn-create{background:#FFD700;border:none;color:#000;font-family:inherit;font-weight:bold;
   font-size:1.1rem;letter-spacing:.15em;padding:.6rem 2.5rem;cursor:pointer;margin-top:1rem}
@@ -312,29 +314,29 @@ const SPECIES = {
 const CLASSES = {
   warrior: {
     label:'Warrior', icon:'⚔',
-    statBonus:{str:2,end:1},
+    classFloor:{str:2,end:2},   // locked minimums — identity you can't remove
     startWeapon:{name:'Iron Sword',icon:'⚔',dmg:4,type:'melee'},
     startShield:{name:'Kite Shield',icon:'🛡'},
-    desc:'Frontline fighter. High attack, solid defense.',
+    desc:'Frontline fighter. STR+END locked in — spend free pts on the rest.',
   },
   mage: {
     label:'Mage', icon:'🔮',
-    statBonus:{lck:2,agi:1},
+    classFloor:{lck:2,agi:1},
     startWeapon:{name:'Arcane Staff',icon:'🔮',dmg:3,type:'magic'},
-    desc:'Casts powerful spells. Fragile in direct combat.',
+    desc:'Spellcaster. LCK+AGI locked in — high crit ceiling, low durability.',
   },
   rogue: {
     label:'Rogue', icon:'🗡',
-    statBonus:{agi:2,lck:1},
+    classFloor:{agi:2,lck:1},
     startWeapon:{name:'Twin Daggers',icon:'🗡',dmg:3,type:'melee'},
-    desc:'High speed + high crit. Hits hard, hits first.',
+    desc:'Swift striker. AGI+LCK locked in — hits first, hits often.',
   },
   paladin: {
     label:'Paladin', icon:'✝',
-    statBonus:{vit:2,end:1},
+    classFloor:{vit:2,end:1},
     startWeapon:{name:'Holy Mace',icon:'⚒',dmg:3,type:'holy'},
     startShield:{name:'Sacred Shield',icon:'🛡'},
-    desc:'Blessed warrior. Bonus HP and divine protection.',
+    desc:'Holy tank. VIT+END locked in — outlasts everything.',
   },
 };
 
@@ -1577,12 +1579,15 @@ function animateTitle(){
 function buildCreateScreen(){
   const statNames=['str','vit','agi','end','lck'];
   const statLabels={str:'STR  (Attack)',vit:'VIT  (Max HP)',agi:'AGI  (Speed)',end:'END  (Defense)',lck:'LCK  (Drop)'};
-  // seed alloc from G.stats (pre-populated by loadState or defaults)
-  let alloc={str:G.stats.str,vit:G.stats.vit,agi:G.stats.agi,end:G.stats.end,lck:G.stats.lck};
-  // clamp alloc values so they don't exceed species caps (in case species changed)
-  const clampAlloc=()=>Object.keys(alloc).forEach(k=>{alloc[k]=Math.min(alloc[k],SPECIES[G.species||'human'].statCaps[k]);});
-  clampAlloc();
   const BASE_PTS=10;
+  // floor() returns the class-locked minimums for current class
+  function floor(){return CLASSES[G.class_||'warrior'].classFloor||{};}
+  // build fresh alloc seeded from class floor
+  function freshAlloc(){
+    const f=floor();
+    return {str:f.str||0,vit:f.vit||0,agi:f.agi||0,end:f.end||0,lck:f.lck||0};
+  }
+  let alloc=freshAlloc();
 
   // ── Preview canvas — init FIRST so updatePreview can reference it ──
   const previewCv=document.getElementById('preview-canvas');
@@ -1601,11 +1606,11 @@ function buildCreateScreen(){
     document.getElementById('preview-stats').innerHTML=
       `<b style="color:#FFD700">${document.getElementById('inp-name').value||'Hero'}</b><br>`+
       `${sp2.label} ${cl.label}<br>`+
-      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str+(cl.statBonus.str||0)}<br>`+
+      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str}<br>`+
       `${cl.startWeapon.name}`;
   }
 
-  function ptsUsed(){return Object.values(alloc).reduce((a,b)=>a+b,0)-10;}
+  function ptsUsed(){return Object.values(alloc).reduce((a,b)=>a+b,0);}
   function ptsLeft(){return BASE_PTS-ptsUsed();}
   function caps(){return SPECIES[G.species||'human'].statCaps;}
 
@@ -1641,7 +1646,10 @@ function buildCreateScreen(){
       document.querySelectorAll('.class-btn').forEach(x=>x.classList.remove('selected'));
       b.classList.add('selected');G.class_=key;
       document.getElementById('class-desc').textContent=c.desc;
-      updatePreview();
+      // reset alloc to new class floor, clamp to species caps
+      alloc=freshAlloc();
+      Object.keys(alloc).forEach(k=>{alloc[k]=Math.min(alloc[k],caps()[k]);});
+      rebuildStats();updatePreview();
     });
     cp2.appendChild(b);
   });
@@ -1675,39 +1683,50 @@ function buildCreateScreen(){
 
   // ── Stat allocation ──
   const sa=document.getElementById('stat-alloc');
-  const MAX_PIPS=20; // full growth ceiling — species cap shows what you start with, rest earned in-game
+  const MAX_PIPS=20; // full growth ceiling — species cap shows creation max, rest earned in-game
   function rebuildStats(){
     sa.innerHTML='';
     const remaining=ptsLeft();
     document.getElementById('pts-left').textContent=`(${remaining} pts left)`;
+    const f=floor();
     statNames.forEach(s=>{
       const cap=caps()[s];
+      const floorVal=f[s]||0;
       const row=document.createElement('div');row.className='stat-row';
       const lbl=document.createElement('div');lbl.className='stat-name';
       lbl.textContent=statLabels[s];lbl.style.width='110px';lbl.style.fontSize='.72rem';
       const bar=document.createElement('div');bar.className='stat-bar';
       for(let p=1;p<=MAX_PIPS;p++){
         const pip=document.createElement('div');
-        const isFilled=p<=alloc[s];
-        const isCapped=p>cap;
-        pip.className='stat-pip'+(isFilled?' filled':'')+(isCapped?' capped':'');
-        if(!isCapped){
-          pip.title=`Set ${s.toUpperCase()} to ${p}`;
-          pip.addEventListener('click',()=>{
-            const spend=p-alloc[s];
-            if(spend>0&&ptsLeft()<spend)return;
-            alloc[s]=p;rebuildStats();updatePreview();
-          });
+        const isLocked=p<=floorVal;          // 🟠 class identity — can't remove
+        const isFilled=p<=alloc[s];          // 🟡 your free allocation
+        const isCapped=p>cap;                // ⬛ beyond species cap (in-game growth)
+        if(isLocked){
+          pip.className='stat-pip class-lock'+(isCapped?' capped':'');
+          pip.title=`${s.toUpperCase()} ${p}: locked by class`;
+        } else if(isFilled){
+          pip.className='stat-pip filled'+(isCapped?' capped':'');
+          pip.title=`${s.toUpperCase()} ${p}: click to set`;
         } else {
-          pip.title=`${s.toUpperCase()} cap: ${cap} for this species (unlock more in-game)`;
+          pip.className='stat-pip'+(isCapped?' capped':'');
+          pip.title=isCapped?`${s.toUpperCase()} cap ${cap} — unlock more in-game`:`${s.toUpperCase()} ${p}: click to set`;
+        }
+        if(!isLocked&&!isCapped){
+          pip.addEventListener('click',()=>{
+            // clicking a pip sets alloc to that value; can't go below floor
+            const target=Math.max(floorVal,p);
+            const spend=target-alloc[s];
+            if(spend>0&&ptsLeft()<spend)return;
+            alloc[s]=target;rebuildStats();updatePreview();
+          });
         }
         bar.appendChild(pip);
       }
-      // species cap label
-      const capLbl=document.createElement('span');
-      capLbl.style.cssText='color:#555;font-size:.65rem;margin-left:5px;white-space:nowrap';
-      capLbl.textContent=`/${cap}`;
-      row.appendChild(lbl);row.appendChild(bar);row.appendChild(capLbl);
+      // labels: class floor lock + species cap
+      const meta=document.createElement('span');
+      meta.style.cssText='font-size:.62rem;margin-left:5px;white-space:nowrap;color:#555';
+      meta.textContent=floorVal?`🔒${floorVal} cap${cap}`:`cap${cap}`;
+      row.appendChild(lbl);row.appendChild(bar);row.appendChild(meta);
       sa.appendChild(row);
     });
     updatePreview();
@@ -1723,9 +1742,7 @@ function buildCreateScreen(){
     G.nickname=document.getElementById('inp-name').value.trim()||'Hero';
     G.stats=Object.fromEntries(statNames.map(s=>[s,alloc[s]]));
     G.persist=document.getElementById('chk-persist').checked;
-    // apply class bonuses
     const cl=CLASSES[G.class_||'warrior'];
-    Object.entries(cl.statBonus).forEach(([k,v])=>{G.stats[k]=Math.min((SPECIES[G.species].statCaps[k]||5),G.stats[k]+v);});
     // apply species HP
     const sp2=SPECIES[G.species||'human'];
     G.maxHp=sp2.baseHp+Math.max(0,Math.floor((G.stats.vit-2)*0.5));
