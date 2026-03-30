@@ -2501,8 +2501,8 @@ function renderBattleScreen(){
       ctxUI.fillStyle='#FF8080';ctxUI.font='13px monospace';
       ctxUI.fillText('Respawning in town...',W/2,H/2+6);
     }
-    ctxUI.fillStyle='#666';ctxUI.font='11px monospace';
-    ctxUI.fillText('[ click or press Space to continue ]',W/2,H/2+36);
+    ctxUI.fillStyle='#888';ctxUI.font='12px monospace';
+    ctxUI.fillText('[ Space / Enter / Click to continue ]',W/2,H/2+40);
     ctxUI.textAlign='left';
   }
 }
@@ -2518,7 +2518,6 @@ function doBattleAction(action){
     if(Math.random()<chance){
       bt.log.push('You dashed away!');
       bt.result='flee';
-      setTimeout(endBattle,1600);
     } else {
       bt.log.push("Couldn't escape!");
       bt.phase='enemy_turn';bt.animTimer=72;
@@ -2567,7 +2566,7 @@ function doBattleAction(action){
     bt.goldGained=bt.enemy.gold;
     G.schmeckles+=bt.goldGained;
     chatLog(`Battle won! +${bt.goldGained} ₴`,'#FFD700');
-    setTimeout(endBattle,2000);
+    // Wait for player input — do NOT auto-advance
     return;
   }
   bt.phase='enemy_turn';bt.animTimer=75;
@@ -2589,7 +2588,7 @@ function doEnemyTurn(){
       G.hp=0;
       bt.log.push('You have been defeated...');
       bt.result='lose';
-      setTimeout(endBattle,2000);
+      // Wait for player input — do NOT auto-advance
       return;
     }
   }
@@ -3144,9 +3143,8 @@ document.getElementById('queue-leave-btn').addEventListener('click',()=>{
 // ── Battle canvas click / key handler ─────────────────────────────────────────
 document.getElementById('cv-ui').addEventListener('click',e=>{
   const bt=G.battle;if(!bt)return;
-  // Result overlay: click anywhere to continue (endBattle already queued via setTimeout,
-  // but allow early dismiss with Space/click)
-  if(bt.result)return;
+  // Result overlay: click anywhere to dismiss and continue
+  if(bt.result){endBattle();return;}
   if(bt.phase!=='player_turn')return;
   const rect=e.target.getBoundingClientRect();
   const scale=W/rect.width;
@@ -3159,9 +3157,17 @@ document.getElementById('cv-ui').addEventListener('click',e=>{
   }
 });
 
-// Keyboard shortcuts during battle (1/2/3 = attack/special/flee)
+// Keyboard shortcuts during battle
 window.addEventListener('keydown',e=>{
-  if(!G.battle||G.battle.phase!=='player_turn'||G.battle.result)return;
+  const bt=G.battle;if(!bt)return;
+  // If result screen is up: Space / Enter / E dismisses it
+  if(bt.result){
+    if(e.key===' '||e.key==='Enter'||e.key==='e'||e.key==='E'){
+      endBattle();e.preventDefault();
+    }
+    return;
+  }
+  if(bt.phase!=='player_turn')return;
   if(e.key==='1')doBattleAction('attack');
   if(e.key==='2')doBattleAction('special');
   if(e.key==='3')doBattleAction('flee');
