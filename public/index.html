@@ -44,7 +44,7 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 .stat-row{display:flex;gap:.5rem;align-items:center}
 .stat-name{color:#ccc;font-size:.8rem;width:80px}
 .stat-bar{display:flex;gap:2px}
-.stat-pip{width:12px;height:14px;border:1px solid #444;cursor:pointer;border-radius:1px}
+.stat-pip{width:8px;height:14px;border:1px solid #444;cursor:pointer;border-radius:1px}
 .stat-pip.filled{background:#FFD700;border-color:#CC9900}
 .stat-pip.capped{background:#1A1A1A;border-color:#2A2A2A;cursor:default;opacity:0.35}
 .stat-pip.filled.capped{background:#4A3A00;border-color:#332800;opacity:0.35}
@@ -1675,7 +1675,7 @@ function buildCreateScreen(){
 
   // ── Stat allocation ──
   const sa=document.getElementById('stat-alloc');
-  const MAX_PIPS=10; // total bar = game growth ceiling (species caps what you start with)
+  const MAX_PIPS=20; // full growth ceiling — species cap shows what you start with, rest earned in-game
   function rebuildStats(){
     sa.innerHTML='';
     const remaining=ptsLeft();
