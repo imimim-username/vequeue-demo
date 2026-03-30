@@ -139,6 +139,21 @@ body.touch #mobile-act{display:flex}
 #queue-leave-btn{margin:4px 8px 8px;padding:3px;background:#1a0000;
   border:1px solid #440000;color:#664444;font-family:inherit;font-size:.6rem;
   cursor:pointer;width:calc(100% - 16px);letter-spacing:.05em}
+
+/* ── NPC DIALOG ── */
+#npc-dialog{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  width:88%;max-width:540px;background:#07071a;border:3px solid #4a90d9;
+  border-radius:3px;z-index:20;font-family:'Courier New',monospace;
+  box-shadow:0 0 28px #4a90d944}
+#npc-dialog-inner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px 6px}
+#npc-portrait-cv{border:2px solid #4a90d9;background:#0a0a1a;flex-shrink:0;
+  image-rendering:pixelated}
+#npc-dialog-body{flex:1;min-width:0}
+#npc-dialog-name{color:#FFD700;font-size:.72rem;font-weight:bold;
+  letter-spacing:.08em;margin-bottom:4px}
+#npc-dialog-text{color:#d8d8ee;font-size:.75rem;line-height:1.55;min-height:36px}
+#npc-dialog-hint{text-align:right;color:#445;font-size:.6rem;
+  padding:3px 12px 6px;border-top:1px solid #1a1a3a;margin-top:3px}
 </style>
 </head>
 <body>
@@ -251,6 +266,17 @@ body.touch #mobile-act{display:flex}
 <div id="godmode-badge">★ GOD MODE</div>
 
 <!-- ═══════════════ QUEUE PANEL ═══════════════ -->
+<div id="npc-dialog">
+  <div id="npc-dialog-inner">
+    <canvas id="npc-portrait-cv" width="56" height="64"></canvas>
+    <div id="npc-dialog-body">
+      <div id="npc-dialog-name"></div>
+      <div id="npc-dialog-text"></div>
+    </div>
+  </div>
+  <div id="npc-dialog-hint">[ E / Space ] Continue</div>
+</div>
+
 <div id="queue-panel">
   <div id="queue-header">QUEUE</div>
   <div id="queue-ticket-num">🎫</div>
@@ -1166,6 +1192,100 @@ const ZONES = {
 };
 
 // Zone entrance/exit connections
+// ── NPC DEFINITIONS ───────────────────────────────────────────────────────────
+// Each NPC: {id, x, y (tile coords), type (sprite), name, face (direction 0-3), dialog[]}
+const NPCS = {
+  town:[
+    { id:'town_crier', x:20, y:10, type:'guard', face:2, name:'Town Crier',
+      dialog:[
+        "Hear ye, hear ye! Welcome to Victory Quest, brave adventurer!",
+        "Our town is a safe haven — no monsters dare enter these gates.",
+        "To the south lies the Wilderness. The deeper you go, the deadlier it gets.",
+        "The Marketplace and Treasury use the veQueue system — join the queue and wait your turn.",
+        "While in queue, 20% of your Schmeckles are held as a deposit. You get them back!",
+        "Build up your stats before venturing too far south. Dark Knights don't play nice.",
+      ]
+    },
+    { id:'merchant_ned', x:13, y:14, type:'merchant', face:0, name:'Merchant Ned',
+      dialog:[
+        "Psst! Looking to make a deal, friend?",
+        "The Marketplace has the finest wares this side of the Wilderness.",
+        "Join the entry queue and wait to be called — it's fair for everyone.",
+        "The more you adventure, the better gear I'll have waiting for you.",
+      ]
+    },
+    { id:'guard_west', x:6, y:12, type:'guard', face:1, name:'Town Guard',
+      dialog:[
+        "The Tavern's open for business. Mind your manners inside.",
+        "We keep the peace in this town. Monsters stay out — that's the deal.",
+      ]
+    },
+    { id:'guard_east', x:33, y:12, type:'guard', face:3, name:'Town Guard',
+      dialog:[
+        "The Governance Hall handles all official matters of state.",
+        "If you have a complaint, file it through proper channels.",
+        "...No, I don't know what 'proper channels' means exactly. Ask the clerk.",
+      ]
+    },
+  ],
+  tavern:[
+    { id:'barkeep', x:10, y:2, type:'barkeep', face:2, name:'Barkeep Moe',
+      dialog:[
+        "Welcome to The Rusty Flagon! Pull up a stool, traveller.",
+        "You look like you've seen some wilderness action. Eyes of a survivor.",
+        "The wilderness south of the river gets nastier the deeper you go.",
+        "I've seen adventurers stumble in here shaking after a Dark Knight encounter.",
+        "My advice: invest in Endurance. It's quiet insurance until you really need it.",
+        "Another round? ...Oh, we don't actually serve drinks yet. Sorry.",
+      ]
+    },
+    { id:'tavern_regular', x:4, y:8, type:'merchant', face:1, name:'Grizzled Regular',
+      dialog:[
+        "I've been coming here thirty years. The ale's still terrible.",
+        "You're heading south? Respect. Most folks don't come back from the deep zone.",
+        "Tip: Goblins have low defense but hit fast. Take them out first.",
+      ]
+    },
+  ],
+  governance:[
+    { id:'clerk', x:10, y:3, type:'clerk', face:2, name:'Senior Clerk Praxis',
+      dialog:[
+        "Welcome to the Governance Hall. All records and civic matters are kept here.",
+        "The veQueue protocol was established to ensure fair access to shared resources.",
+        "No cutting in line. No back-door dealings. Every citizen waits their turn.",
+        "It sounds simple, but you'd be amazed how revolutionary that idea actually is.",
+      ]
+    },
+  ],
+  marketplace:[
+    { id:'vendor', x:5, y:5, type:'merchant', face:1, name:'Vendor Zelda',
+      dialog:[
+        "You made it through the queue! Welcome to my stall.",
+        "I stock weapons, potions, and curiosities sourced from across the realm.",
+        "Come back when you've leveled up — the good stuff is reserved for veterans.",
+        "Hint: high STR means harder hits. High AGI means you dodge more often.",
+      ]
+    },
+    { id:'vendor2', x:15, y:8, type:'barkeep', face:3, name:'Armorer Flint',
+      dialog:[
+        "Armor's my trade. Defense is underrated by the young adventurers.",
+        "Endurance stat? That's your armor stat. Don't neglect it.",
+        "A dead hero can't spend their gold. Just saying.",
+      ]
+    },
+  ],
+  treasury:[
+    { id:'treasurer', x:10, y:3, type:'clerk', face:2, name:'Treasurer Vox',
+      dialog:[
+        "The Treasury manages all Schmeckle deposits and fiscal records.",
+        "Schmeckles locked while in queue are held in escrow — completely safe.",
+        "No funds leave the Treasury without proper queue clearance. It's protocol.",
+        "The 20% lock is a skin-in-the-game mechanism. Keeps queue-hoppers out.",
+      ]
+    },
+  ],
+};
+
 const ZONE_DOORS = {
   // {zone, tileRow, tileCol} -> {targetZone, spawnX, spawnY}
   town_tavern:     {tileRows:[11],tileCols:[7,8,9], to:'tavern',    sx:10,sy:11},
@@ -1585,7 +1705,8 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
 }
 
 // ── NPC SPRITE ────────────────────────────────────────────────────────────────
-function drawNPCSprite(ctx,ox,oy,type){
+// face: 0=up 1=right 2=down 3=left (affects eye/hair rendering for portrait clarity)
+function drawNPCSprite(ctx,ox,oy,type,face=2){
   // type: 'clerk'|'barkeep'|'guard'|'merchant'
   const palettes={
     clerk:  {body:'#1A3A5E',hi:'#2A5A8E',skin:'#FFCC99',hair:'#222'},
@@ -1610,18 +1731,25 @@ function drawNPCSprite(ctx,ox,oy,type){
   ctx.fillStyle=p.skin;ctx.fillRect(px+10,py+10,4,4);
   ctx.fillStyle=p.skin;ctx.fillRect(px+6,py+0,12,12);
   ctx.fillStyle=lighten(p.skin,20);ctx.fillRect(px+6,py+0,12,4);
-  // hair
+  // hair (visible when facing down or sides)
   ctx.fillStyle=p.hair;ctx.fillRect(px+6,py+0,12,3);ctx.fillRect(px+6,py+0,3,6);
-  // eyes
-  ctx.fillStyle='#1A1A2A';ctx.fillRect(px+8,py+5,3,2);ctx.fillRect(px+14,py+5,3,2);
-  ctx.fillStyle='#FFFFFF';ctx.fillRect(px+8,py+5,1,1);ctx.fillRect(px+14,py+5,1,1);
+  // eyes — only when facing down or sideways
+  if(face!==0){
+    ctx.fillStyle='#1A1A2A';ctx.fillRect(px+8,py+5,3,2);ctx.fillRect(px+14,py+5,3,2);
+    ctx.fillStyle='#FFFFFF';ctx.fillRect(px+8,py+5,1,1);ctx.fillRect(px+14,py+5,1,1);
+  }
   // type-specific details
   if(type==='clerk'){// tie
     ctx.fillStyle='#CC2222';ctx.fillRect(px+11,py+14,3,10);ctx.fillRect(px+10,py+21,5,4);
-  } else if(type==='guard'){// badge
+  } else if(type==='guard'){// badge + helmet brim
     ctx.fillStyle='#D4AF37';ctx.fillRect(px+13,py+16,4,4);
-  } else if(type==='merchant'){// hat
-    ctx.fillStyle=p.body;ctx.fillRect(px+5,py-4,14,5);ctx.fillRect(px+4,py+0,16,3);
+    ctx.fillStyle=darken(p.body,40);ctx.fillRect(px+5,py-1,14,4);
+  } else if(type==='merchant'){// wide-brim hat
+    ctx.fillStyle=p.body;ctx.fillRect(px+5,py-5,14,6);ctx.fillRect(px+3,py+0,18,3);
+    ctx.fillStyle=p.hi;ctx.fillRect(px+5,py-5,14,2);
+  } else if(type==='barkeep'){// apron
+    ctx.fillStyle='#EEE8CC';ctx.fillRect(px+7,py+16,10,14);
+    ctx.fillStyle='#CCC4AA';ctx.fillRect(px+7,py+16,10,2);
   }
 }
 
@@ -1650,6 +1778,7 @@ const G = {
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedSchmeckles:0,   // schmeckles locked while in entry queue
   battle:null,          // active battle state or null
+  npcDialog:null,       // {npc, lineIdx} — active NPC conversation
 };
 
 // Cache of server-broadcast queue states
@@ -1683,15 +1812,27 @@ window.addEventListener('keydown',e=>{
     document.getElementById('godmode-badge').className=G.godMode?'on':'';
     chatLog('★ GOD MODE '+(G.godMode?'ON':'OFF'),'#FFD700');
   }
+  // NPC interaction
+  if(e.key==='e'||e.key==='E'){
+    if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
+    else if(!G.battle&&!G.paused){ tryInteract(); e.preventDefault(); }
+  }
+  // Space advances dialog when it's open
+  if(e.key===' '&&G.npcDialog){ advanceDialog(); e.preventDefault(); }
   // chat
   if(e.key==='t'||e.key==='T'){
-    const ci=document.getElementById('chat-input');
-    if(document.activeElement!==ci){ci.style.display='block';ci.focus();e.preventDefault();}
+    if(!G.npcDialog){
+      const ci=document.getElementById('chat-input');
+      if(document.activeElement!==ci){ci.style.display='block';ci.focus();e.preventDefault();}
+    }
   }
   if(e.key==='Escape'){
-    const ci=document.getElementById('chat-input');
-    if(document.activeElement===ci){ci.blur();ci.style.display='none';}
-    else togglePause();
+    if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
+    else {
+      const ci=document.getElementById('chat-input');
+      if(document.activeElement===ci){ci.blur();ci.style.display='none';}
+      else togglePause();
+    }
   }
   if(e.key==='p'||e.key==='P') togglePause();
 });
@@ -1737,6 +1878,55 @@ function tryMove(dx,dy){
   // direction
   if(Math.abs(dx)>Math.abs(dy)){G.dir=dx>0?1:3;}
   else if(dy!==0){G.dir=dy>0?2:0;}
+}
+
+// ── NPC INTERACTION ────────────────────────────────────────────────────────────
+function tryInteract(){
+  if(G.battle||G.npcDialog)return;
+  const npcs=NPCS[G.zone];if(!npcs)return;
+  const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
+  // Find the nearest NPC within 1.5 tiles
+  let nearest=null,bestDist=2;
+  for(const npc of npcs){
+    const d=Math.abs(npc.x-px)+Math.abs(npc.y-py);
+    if(d<=bestDist){bestDist=d;nearest=npc;}
+  }
+  if(!nearest)return;
+  G.npcDialog={npc:nearest,lineIdx:0};
+  G.paused=true;
+  showNpcDialog();
+}
+
+function advanceDialog(){
+  if(!G.npcDialog)return;
+  G.npcDialog.lineIdx++;
+  if(G.npcDialog.lineIdx>=G.npcDialog.npc.dialog.length){
+    G.npcDialog=null;
+    G.paused=false;
+    document.getElementById('npc-dialog').style.display='none';
+  } else {
+    showNpcDialog();
+  }
+}
+
+function showNpcDialog(){
+  const nd=G.npcDialog;if(!nd)return;
+  const npc=nd.npc;
+  // Portrait canvas
+  const pcv=document.getElementById('npc-portrait-cv');
+  const pctx=pcv.getContext('2d');
+  pctx.clearRect(0,0,56,64);
+  pctx.save();pctx.scale(2.2,2.2);
+  drawNPCSprite(pctx,3,2,npc.type,npc.face??2);
+  pctx.restore();
+  // Text
+  document.getElementById('npc-dialog-name').textContent=npc.name;
+  document.getElementById('npc-dialog-text').textContent=npc.dialog[nd.lineIdx];
+  const total=npc.dialog.length;
+  const idx=nd.lineIdx+1;
+  const hint=idx<total?`[ E / Space ] Continue  (${idx}/${total})`:`[ E / Space ] Close  (${idx}/${total})`;
+  document.getElementById('npc-dialog-hint').textContent=hint;
+  document.getElementById('npc-dialog').style.display='block';
 }
 
 // ── ZONE TRANSITION ───────────────────────────────────────────────────────────
@@ -2384,7 +2574,33 @@ function renderTileLayer(){
 // ── SPRITE LAYER ──────────────────────────────────────────────────────────────
 function renderSpriteLayer(ctx){
   ctx.clearRect(0,0,W,H);
-  // other players
+
+  // ── NPCs ──
+  const zoneNpcs=NPCS[G.zone]||[];
+  const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
+  for(const npc of zoneNpcs){
+    const sx=npc.x*TS-G.camX-12, sy=npc.y*TS-G.camY-20;
+    // Skip if off-screen
+    if(sx<-40||sx>W+20||sy<-40||sy>H+20)continue;
+    drawNPCSprite(ctx,sx,sy,npc.type,npc.face??2);
+    // Name bubble — show when player is within 2 tiles
+    const dist=Math.abs(npc.x-px)+Math.abs(npc.y-py);
+    if(dist<=2){
+      const label=npc.name;
+      const lw=label.length*6+6;
+      ctx.fillStyle='#000000BB';ctx.fillRect(sx+12-lw/2,sy-16,lw,11);
+      ctx.fillStyle='#FFD700';ctx.font='8px monospace';ctx.textAlign='center';
+      ctx.fillText(label,sx+12,sy-7);
+      ctx.textAlign='left';
+      // "Press E" hint
+      ctx.fillStyle='#00000099';ctx.fillRect(sx+12-22,sy-28,44,10);
+      ctx.fillStyle='#88BBFF';ctx.font='7px monospace';ctx.textAlign='center';
+      ctx.fillText('[E] Talk',sx+12,sy-20);
+      ctx.textAlign='left';
+    }
+  }
+
+  // ── Other players ──
   for(const[id,p] of Object.entries(others)){
     const sx=p.x-G.camX-12,sy=p.y-G.camY-20;
     drawPlayerSprite(ctx,sx,sy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1]);
@@ -2392,7 +2608,8 @@ function renderSpriteLayer(ctx){
     ctx.fillStyle='#00000088';ctx.fillRect(sx+2,sy-14,p.nickname?.length*6||40,12);
     ctx.fillStyle='#fff';ctx.font='9px monospace';ctx.fillText(p.nickname||'',sx+4,sy-5);
   }
-  // local player
+
+  // ── Local player ──
   const sx=G.x-G.camX-12,sy=G.y-G.camY-20;
   drawPlayerSprite(ctx,sx,sy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor);
 }
