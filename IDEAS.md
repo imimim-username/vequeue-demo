@@ -213,6 +213,114 @@ Inspired by classic BBS door games (Trade Wars, Legend of the Red Dragon). Playe
 
 ---
 
+## Core Design Tension — Time vs. Flexibility
+
+The central feeling to create: **the queue isn't a punishment, it's the mechanism that makes everything else work.** If the game hits that, the veQueue whitepaper becomes intuitive.
+
+### Balance targets
+- **Auction bypass** — make it genuinely expensive but visually satisfying; players who pay to skip should feel like they spent something real, not just clicked through a fee
+- **Queue seniority advantage** — meaningful but not overwhelming; a 10–15% edge is noticeable and motivating; a 10× advantage breaks the game and feels unfair
+- **The exit decision** — the most emotionally resonant moment in the game; design it so players feel the genuine weight of leaving vs. staying; this is where the mechanic becomes felt rather than explained
+
+### What to avoid
+- Don't punish casual players so hard that the queue feels like a wall
+- Don't make patience so dominant that spending feels stupid
+- Don't let any single strategy (lock forever, bypass always, specialize early) be strictly dominant
+
+### The internalization goal
+Players should finish a session feeling: *"I understand why you'd want a queue like this. I felt what it does."* That's the moment the whitepaper clicks.
+
+---
+
+## Watermark Line on the Queue Visualization — Principal Protection
+
+- The queue visualization shows players waiting; add a visible watermark line — a marker showing "this is where your locked tokens are protected"
+- Players can see their principal is safe even while waiting
+- When a governance event affects players in queue, the watermark makes it visually obvious their tokens can't be touched
+- **Balance:** purely informational/educational, no gameplay impact; makes an abstract concept legible
+- **Teaches:** watermark principal protection
+
+---
+
+## Idle Treasury — Tax Loop Viability
+
+- Live treasury counter in the Governance Hall: a running total of the % of economic activity flowing back to queue members
+- All revenue sources feed it visibly: rare item auction premiums, fast-lane bypass fees, exit donations, Black Market parent tax
+- Queue members see their "passive share" tick upward in real time even while just exploring the world — no action required
+- **Balance:** reinforces that staying in the queue has low-friction reward; not game-breaking, just a constant small drip; keeps the veQueue from feeling like pure cost/friction
+- **Teaches:** tax loop — protocol revenue automatically funding the cooperative, without governance votes required
+
+---
+
+## NPC "Whale Arrival" Event — Flow-Rate Dilution Resistance
+
+- Occasionally an NPC whale announces they're entering the queue with a massive token stake
+- Players can see the projected impact on queue wait times *before* it happens (entry is rate-limited, so the math is visible)
+- Players already in queue have time to react: stay for the seniority advantage, or exit now before wait times extend?
+- The whale cannot skip the queue — even with 100× tokens they enter at the same rate as everyone else; their presence changes dynamics but can't harm existing players
+- **Balance:** creates emergent strategic moments without the whale actually being able to harm existing players; the rate limit is the protection
+- **Teaches:** flow-rate dilution resistance — you can see the threat coming, principal is protected, orderly entry even for large capital
+
+---
+
+## Queue Seniority Decay — Passive Dilution Mechanic
+
+- Idle players in the queue see their queue seniority (priority score) slowly decay relative to active players — not slashing, just gentle erosion
+- Active players who vote and trade accumulate seniority faster
+- **Balance:** casual players aren't harshly punished — they can still participate; engaged players get a visible edge; soft incentive to log in and interact without making absence catastrophic
+- **Teaches:** passive dilution from inactivity vs. active governance compounding; no slashing — just opportunity cost
+
+---
+
+## Governance Vote via Token Weight — Proportional Governance
+
+- Periodically the Governance Hall holds votes on world events, e.g.:
+  - "Should the Tavern sell XP potions this week?"
+  - "Should adversary spawn rate increase for 24 hours (more loot, more danger)?"
+  - "Should the exit queue fee be lowered?"
+- Players vote with their locked token weight — more tokens locked = more vote weight
+- Players in the exit queue forfeit voting rights until they re-enter
+- Results display as a token-weighted tally in real time as votes come in
+- **Balance:** large lockers get governance power but outcomes affect everyone equally (economy-wide, not individual-targeted); players who care lock more, players who don't can freeload on the outcome
+- **Teaches:** proportional governance, exit queue = governance forfeit, why long-term commitment has value
+
+---
+
+## rvqALCX SubZones — Recursive veQueue / Specialized Revenue
+
+Specialized sub-zones inside the economic zone, each requiring you to commit your queue position (vqShares) to enter. Only one sub-zone at a time — you gave up your general queue position to specialize; you can return to the general queue later but must re-queue.
+
+| Sub-Zone | Cost | Upside | Tradeoff |
+|----------|------|--------|----------|
+| **The Armory** | Commit vqShares | Access to better weapon trades | Lose general marketplace access |
+| **The Alchemist** | Commit vqShares | Potion crafting | Lose Armory access |
+| **The Black Market** | Commit vqShares | Rare item drops, high reward | High risk; lose all other sub-zone access |
+
+- **Parent tax mechanic:** a % of Black Market profits flows into the general treasury, shared by all queue members — visible in real time so players feel it happening
+- **Balance:** specialization cost (giving up flexibility) is real but upside is genuine; creates distinct player archetypes (fighter, crafter, gambler)
+- **Teaches:** rvqALCX specialization — commit deeper, earn more in your niche, sacrifice breadth; parent protocol earns a tax on sub-zone activity
+
+---
+
+## Exit Queue Donations — Below-Peg Mechanic
+
+- When leaving the economic zone, if the exit queue is long/congested, players can optionally "donate" part of their tokens to jump ahead — donations go to the remaining players in the queue, enriching them
+- Alternatively framed as: an "early exit fee" paid by impatient leavers, distributed to remaining members
+- **Balance:** staying longer earns queue seniority + potentially receives donations from impatient exiters; exiting fast costs a bit; neither is wrong — depends what you're optimizing for
+- **Teaches:** exit queue below-peg donation mechanics — remaining holders are enriched when others leave early
+
+---
+
+## Auction Fast Lane — Queue Bypass Mechanic
+
+- Players who don't want to wait in the entry queue can bid in a live Queue Auction — pay above the current queue price to skip ahead
+- The premium goes into the treasury
+- Other players see the queue jump happening in real time
+- **Balance:** auction price scales with queue depth — crowded queue = expensive bypass; patient players benefit from accumulating queue seniority while spenders burn currency; neither strategy is strictly dominant
+- **Teaches:** entry queue premium capture — the mechanism earns from demand volatility
+
+---
+
 ## Dev Tools
 
 ### God Mode / Cheat Codes
