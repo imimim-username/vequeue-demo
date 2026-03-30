@@ -861,12 +861,171 @@ const TOWN_MAP=(()=>{
   set(25,7,T.QUEUE_OUT);set(25,8,T.QUEUE_OUT);set(25,9,T.QUEUE_OUT);
   set(25,28,T.QUEUE_OUT);set(25,29,T.QUEUE_OUT);set(25,30,T.QUEUE_OUT);
 
+  // ── SOUTH WILDERNESS GATE ──
+  // Open the south perimeter wall at the vertical road (cols 19-20)
+  set(MAP_H-1,19,T.ROAD);set(MAP_H-1,20,T.ROAD);
+  // Gate-post columns flanking the opening
+  set(MAP_H-1,18,T.COLUMN);set(MAP_H-1,21,T.COLUMN);
+
+  return m;
+})();
+
+// ── WILDERNESS MAP ────────────────────────────────────────────────────────────
+// 80 wide × 60 tall. Dangerous open world outside town's walls.
+// The north gate (cols 38-41, rows 0-4) connects back to town south gate.
+const WLD_W=80,WLD_H=60;
+const WILDERNESS_MAP=(()=>{
+  const m=Array.from({length:WLD_H},()=>new Array(WLD_W).fill(T.GRASS));
+  const set=(r,c,t)=>{if(r>=0&&r<WLD_H&&c>=0&&c<WLD_W)m[r][c]=t;};
+  const fill=(r1,c1,r2,c2,t)=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)set(r,c,t);};
+  const box=(r1,c1,r2,c2)=>{
+    for(let c=c1;c<=c2;c++){set(r1,c,T.WALL);set(r2,c,T.WALL);}
+    for(let r=r1;r<=r2;r++){set(r,c1,T.WALL);set(r,c2,T.WALL);}
+  };
+
+  // Perimeter walls
+  box(0,0,WLD_H-1,WLD_W-1);
+
+  // ── TOWN GATE (north, cols 38-41) ────────────────────────────────────────
+  // Open the north perimeter wall here (player arrives from town south gate)
+  for(let c=38;c<=41;c++)set(0,c,T.ROAD);
+  fill(1,38,4,41,T.ROAD);
+  // Gate pillars flanking the opening
+  set(0,37,T.COLUMN);set(0,42,T.COLUMN);
+  set(1,37,T.WALL);set(2,37,T.WALL);set(3,37,T.WALL);
+  set(1,42,T.WALL);set(2,42,T.WALL);set(3,42,T.WALL);
+
+  // ── MAIN NORTH–SOUTH ROAD (cols 38-41 → narrows to dirt path) ────────────
+  fill(0,38,20,41,T.ROAD);       // cobble road from gate to crossroads
+  fill(21,39,35,40,T.DIRT);      // narrows to 2-tile dirt after crossroads
+  fill(38,39,58,40,T.DIRT);      // continues south of river
+
+  // ── WEST FOREST WALL (rows 2-17, cols 2-36) ──────────────────────────────
+  fill(2,2,17,36,T.TREE);
+  // Carve NW glade (accessible via east spur from road)
+  fill(3,5,10,15,T.GRASS);
+  for(let c=5;c<=15;c++){set(3,c,T.SHRUB);set(10,c,T.SHRUB);}
+  for(let r=3;r<=10;r++){set(r,5,T.SHRUB);set(r,15,T.SHRUB);}
+  // Carve west mid-glade
+  fill(11,16,17,33,T.GRASS);
+  for(let c=16;c<=33;c++){set(11,c,T.SHRUB);set(17,c,T.SHRUB);}
+  for(let r=11;r<=17;r++){set(r,16,T.SHRUB);set(r,33,T.SHRUB);}
+  // Dirt spur from road into NW glade
+  fill(6,16,8,37,T.DIRT);
+
+  // ── EAST FOREST WALL (rows 2-17, cols 43-77) ─────────────────────────────
+  fill(2,43,17,77,T.TREE);
+  // Carve NE glade
+  fill(3,47,10,59,T.GRASS);
+  for(let c=47;c<=59;c++){set(3,c,T.SHRUB);set(10,c,T.SHRUB);}
+  for(let r=3;r<=10;r++){set(r,47,T.SHRUB);set(r,59,T.SHRUB);}
+  // Dirt spur from road into NE glade
+  fill(6,42,8,47,T.DIRT);
+
+  // ── ANCIENT RUINS (northeast clearing, rows 3-17, cols 61-77) ────────────
+  fill(3,61,17,77,T.GRASS); // clear the east forest for ruins
+  box(4,62,16,76);           // ruin outer walls
+  fill(5,63,15,75,T.STONE);  // ruin interior stone floor
+  // Gaps in ruin walls — north and south entrances
+  set(4,67,T.STONE);set(4,68,T.STONE);set(4,69,T.STONE);   // north gap
+  set(16,67,T.STONE);set(16,68,T.STONE);set(16,69,T.STONE); // south gap
+  // Interior features
+  fill(6,64,9,67,T.VAULT);fill(6,71,9,74,T.VAULT);
+  fill(11,64,14,67,T.VAULT);fill(11,71,14,74,T.VAULT);
+  set(10,68,T.COLUMN);set(10,70,T.COLUMN);
+  set(7,69,T.SHRUB);set(13,69,T.SHRUB); // moss growing through ruins
+  // Path from NE glade to ruins entrance
+  fill(10,59,12,62,T.DIRT);
+
+  // ── CROSSROADS (rows 18-22) ──────────────────────────────────────────────
+  fill(18,2,20,77,T.ROAD);   // E-W main road crossing wilderness
+  fill(17,37,21,41,T.ROAD);  // widen crossing area
+  // Waymarker well / campfire at crossroads
+  set(19,35,T.FOUNTAIN);set(19,36,T.FOUNTAIN);
+  set(20,35,T.FOUNTAIN);set(20,36,T.FOUNTAIN);
+  // Directional signs
+  set(17,32,T.SIGN);  // west: "Ruins"
+  set(17,44,T.SIGN);  // east: path marker
+  set(22,38,T.SIGN);  // south: "Danger Ahead"
+
+  // ── OPEN MIDDLE WILDERNESS (rows 22-35, scattered trees/shrubs) ──────────
+  // Wider dirt path heading east along south side of crossroads road
+  fill(21,2,21,77,T.DIRT);
+  // Scattered trees (not contiguous — player can weave between them)
+  [[23,5],[23,12],[23,20],[23,30],[23,50],[23,60],[23,70],
+   [25,8],[25,16],[25,25],[25,55],[25,65],[25,73],
+   [28,3],[28,14],[28,22],[28,45],[28,62],[28,74],
+   [30,10],[30,20],[30,32],[30,47],[30,58],[30,72],
+   [33,6],[33,18],[33,28],[33,50],[33,63],[33,74],
+   [35,11],[35,23],[35,44],[35,56],[35,68],
+  ].forEach(([r,c])=>set(r,c,T.TREE));
+  [[24,9],[24,17],[24,52],[24,68],
+   [26,4],[26,26],[26,52],[26,71],
+   [29,11],[29,22],[29,63],[29,75],
+   [31,8],[31,33],[31,56],[31,70],
+   [34,15],[34,30],[34,52],[34,65],
+  ].forEach(([r,c])=>set(r,c,T.SHRUB));
+
+  // ── RIVER (rows 36-37) ───────────────────────────────────────────────────
+  fill(36,1,37,78,T.WATER);
+  fill(36,38,37,41,T.ROAD); // main bridge
+  fill(36,18,37,20,T.ROAD); // west bridge
+  fill(36,58,37,60,T.ROAD); // east bridge
+
+  // Danger warning signs just before the river
+  set(35,35,T.SIGN);set(35,36,T.SIGN);set(35,43,T.SIGN);
+
+  // ── DANGER ZONE (rows 38-58) ─────────────────────────────────────────────
+  // Dense forest walls flanking the three paths
+  fill(38,2,57,16,T.TREE);    // far-west danger forest
+  fill(38,22,57,37,T.TREE);   // left-of-center danger forest
+  fill(38,43,57,56,T.TREE);   // right-of-center danger forest
+  fill(38,62,57,77,T.TREE);   // far-east danger forest
+
+  // Walkable corridors around paths
+  fill(38,17,57,21,T.GRASS);  fill(38,18,57,20,T.DIRT); // west corridor
+  fill(38,57,57,61,T.GRASS);  fill(38,57,57,60,T.DIRT); // east corridor
+
+  // Carved glades in inner danger forests (accessible from center path)
+  fill(40,22,56,37,T.GRASS);  // SW inner clearing
+  fill(40,43,56,56,T.GRASS);  // SE inner clearing
+
+  // ── SOUTH RUINS (within danger zone, SW clearing) ────────────────────────
+  box(42,24,53,35);
+  fill(43,25,52,34,T.STONE);
+  // North and south wall gaps (entrances)
+  set(42,28,T.STONE);set(42,29,T.STONE);set(42,30,T.STONE);
+  set(53,28,T.STONE);set(53,29,T.STONE);set(53,30,T.STONE);
+  // Interior
+  fill(45,26,50,28,T.VAULT);fill(45,31,50,33,T.VAULT);
+  set(48,29,T.COLUMN);set(48,30,T.COLUMN);
+  set(44,25,T.SHRUB);set(44,33,T.SHRUB);set(52,25,T.SHRUB);
+
+  // ── EAST DANGER RUINS (SE clearing) ──────────────────────────────────────
+  box(42,45,53,55);
+  fill(43,46,52,54,T.STONE);
+  set(42,48,T.STONE);set(42,49,T.STONE);set(42,50,T.STONE);
+  set(53,48,T.STONE);set(53,49,T.STONE);set(53,50,T.STONE);
+  fill(45,47,50,49,T.VAULT);fill(45,51,50,53,T.VAULT);
+  set(48,50,T.COLUMN);
+  set(44,46,T.SHRUB);set(52,54,T.SHRUB);
+
+  // ── DUNGEON ENTRANCE HINT (deep south, center) ───────────────────────────
+  fill(54,34,58,45,T.GRASS);   // clearing leading to dungeon
+  fill(55,36,57,43,T.VAULT);   // dark dungeon-mouth floor
+  set(53,37,T.SIGN);set(53,38,T.SIGN);set(53,39,T.SIGN); // "DUNGEON" markers
+
+  // ── PERIMETER PATHS (thin walkable strips along walls) ───────────────────
+  fill(2,3,35,4,T.DIRT);    // west wall path (safe zone only)
+  fill(2,75,35,76,T.DIRT);  // east wall path (safe zone only)
+
   return m;
 })();
 
 // ── BUILDING INTERIORS ────────────────────────────────────────────────────────
 const ZONE_MAPS = {
   town: null, // use TOWN_MAP
+  wilderness: null, // use WILDERNESS_MAP
   tavern: makeTavern(),
   governance: makeGovernance(),
   marketplace: makeMarketplace(),
@@ -954,8 +1113,10 @@ function makeTreasury(){
 
 // Zone metadata
 const ZONES = {
-  town:       {map:TOWN_MAP,      w:MAP_W,  h:MAP_H,  spawnX:20,spawnY:14,solid:SOLID_TILES,
+  town:       {map:TOWN_MAP,        w:MAP_W,  h:MAP_H,  spawnX:20,spawnY:14,solid:SOLID_TILES,
                name:'Town Square',bg:'town'},
+  wilderness: {map:WILDERNESS_MAP,  w:WLD_W,  h:WLD_H,  spawnX:39,spawnY:5, solid:SOLID_TILES,
+               name:'Wilderness',bg:'wilderness'},
   tavern:     {map:ZONE_MAPS.tavern,      w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
                name:'The Tavern',bg:'tavern'},
   governance: {map:ZONE_MAPS.governance,  w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
@@ -978,12 +1139,16 @@ const ZONE_DOORS = {
   governance_exit: {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:12},
   marketplace_exit:{tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:8,  sy:14},
   treasury_exit:   {tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:29, sy:14},
+  // Wilderness exits (town south gate → wilderness north gate)
+  town_wilderness: {tileRows:[27],           tileCols:[19,20],           to:'wilderness', sx:39, sy:5},
+  wilderness_town: {tileRows:[0,1,2,3,4],    tileCols:[38,39,40,41],     to:'town',       sx:19, sy:26},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
 function drawBackground(ctx,zone,camPx,camPy,W,H,tick){
-  if(zone==='town') drawTownBG(ctx,camPx,camPy,W,H,tick);
-  else drawInteriorBG(ctx,zone,W,H);
+  if(zone==='town')           drawTownBG(ctx,camPx,camPy,W,H,tick);
+  else if(zone==='wilderness') drawWildernessBG(ctx,camPx,camPy,W,H,tick);
+  else                        drawInteriorBG(ctx,zone,W,H);
 }
 
 function drawTownBG(ctx,cx,cy,W,H,tick){
@@ -1060,6 +1225,75 @@ function drawCloud(ctx,x,y,w,h){
   ctx.fillRect(x+w*0.3,y,w*0.5,h);
   ctx.fillStyle='#FFFFFF15';
   ctx.fillRect(x+w,y+h*0.4,w*0.5,h*0.5);
+}
+
+function drawWildernessBG(ctx,cx,cy,W,H,tick){
+  // Dark, ominous sky — twilight or perpetual overcast
+  const sky=ctx.createLinearGradient(0,0,0,H*0.58);
+  sky.addColorStop(0,'#080C14');
+  sky.addColorStop(0.45,'#131E2E');
+  sky.addColorStop(1,'#1E2E3A');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.58);
+
+  // Stars (static — they don't move with the camera for distance effect)
+  ctx.fillStyle='#FFFFFF';
+  [[0.08,0.05],[0.19,0.11],[0.34,0.04],[0.51,0.09],[0.63,0.03],
+   [0.72,0.13],[0.85,0.07],[0.93,0.15],[0.28,0.16],[0.44,0.14]].forEach(([fx,fy])=>{
+    ctx.fillRect(Math.floor(fx*W),Math.floor(fy*H),1,1);
+  });
+  // Crescent moon (top-right area)
+  ctx.fillStyle='#D8CFA0';
+  ctx.beginPath();ctx.arc(W*0.82,H*0.1,11,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#131E2E';
+  ctx.beginPath();ctx.arc(W*0.85,H*0.09,9,0,Math.PI*2);ctx.fill();
+
+  // Far mountains (very dark, slow parallax)
+  const mx=-(cx*0.05)%W;
+  drawMountainRange(ctx,mx,H*0.40,W,H*0.25,'#0F1820','#182030');
+
+  // Treeline silhouette (mid parallax) — dark pine wall
+  const tx2=-(cx*0.18)%(W*2);
+  drawWildTreeline(ctx,tx2,H*0.34,W,H*0.28);
+
+  // Slow drifting mist patches
+  ctx.fillStyle='#2A3A2A30';
+  const mist=(-tick*0.04-cx*0.03)%(W*1.5);
+  ctx.fillRect(mist,H*0.50,W*0.4,12);
+  ctx.fillRect(mist+W*0.55,H*0.53,W*0.35,8);
+  ctx.fillRect(mist+W*1.0,H*0.51,W*0.3,10);
+
+  // Dark ground fill (moss/dirt)
+  const groundY=Math.max(0,H*0.58-cy*0.45);
+  ctx.fillStyle='#141E10';ctx.fillRect(0,groundY,W,H-groundY);
+
+  // Ground fog
+  const fogG=ctx.createLinearGradient(0,groundY,0,groundY+28);
+  fogG.addColorStop(0,'#2E4030AA');fogG.addColorStop(1,'#2E403000');
+  ctx.fillStyle=fogG;ctx.fillRect(0,groundY,W,28);
+}
+
+function drawWildTreeline(ctx,ox,baseY,W,H){
+  // Pine tree silhouettes in two passes for depth
+  [['#0A140A',1.0],['#0D1A0D',0.75]].forEach(([col,scale],pass)=>{
+    ctx.fillStyle=col;
+    const offX=pass*W*0.6;
+    const count=22;
+    for(let i=0;i<count;i++){
+      const x=ox+offX+i*(W/18);
+      const treeH=H*(0.45+0.4*((Math.sin(i*1.9+pass*3.7)+1)/2));
+      const treeW=treeH*0.38*scale;
+      // Pine layers
+      ctx.beginPath();
+      ctx.moveTo(x-treeW/2,baseY);ctx.lineTo(x,baseY-treeH);ctx.lineTo(x+treeW/2,baseY);
+      ctx.fill();
+      // Second canopy layer
+      ctx.beginPath();
+      ctx.moveTo(x-treeW*0.4,baseY-treeH*0.4);
+      ctx.lineTo(x,baseY-treeH*0.9);
+      ctx.lineTo(x+treeW*0.4,baseY-treeH*0.4);
+      ctx.fill();
+    }
+  });
 }
 
 function drawInteriorBG(ctx,zone,W,H){
@@ -1384,8 +1618,9 @@ const serverQueues={};
 
 // ── CAMERA ────────────────────────────────────────────────────────────────────
 function updateCamera(){
-  if(G.zone==='town'){
-    const z=ZONES.town;
+  const z=ZONES[G.zone];
+  if(z&&(z.w*TS>W||z.h*TS>H)){
+    // Scrolling zone: camera follows player, clamped to map bounds
     const maxCX=Math.max(0,(z.w*TS)-W),maxCY=Math.max(0,(z.h*TS)-H);
     const targetX=Math.max(0,Math.min(maxCX,G.x-W/2));
     const targetY=Math.max(0,Math.min(maxCY,G.y-H/2));
