@@ -114,6 +114,29 @@ body.touch #mobile-act{display:flex}
 #godmode-badge{display:none;position:fixed;top:40px;right:8px;background:#FFD700;
   color:#000;font-size:.65rem;padding:2px 8px;z-index:15;letter-spacing:.1em}
 #godmode-badge.on{display:block}
+
+/* ── QUEUE PANEL ── */
+#queue-panel{display:none;position:fixed;bottom:90px;right:10px;z-index:15;
+  background:#050510;border:2px solid #FFD700;min-width:185px;max-width:210px;
+  font-family:'Courier New',monospace;box-shadow:0 0 24px #FFD70044}
+#queue-header{background:#FFD700;color:#000;font-size:.63rem;letter-spacing:.15em;
+  padding:4px 8px;font-weight:bold}
+#queue-ticket-num{font-size:2.2rem;color:#FFD700;text-align:center;
+  padding:8px 0 2px;line-height:1;letter-spacing:.05em}
+#queue-serving-line{color:#aaa;font-size:.67rem;text-align:center;padding:1px 0}
+#queue-ahead-line{color:#888;font-size:.65rem;text-align:center;padding-bottom:5px}
+#queue-locked-line{color:#FF8C00;font-size:.65rem;text-align:center;
+  padding:3px 8px;border-top:1px solid #1a1a30}
+#queue-list{max-height:80px;overflow-y:auto;padding:4px 8px;
+  border-top:1px solid #1a1a30;font-size:.61rem}
+#queue-list div{padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#queue-enter-btn{display:none;margin:6px 8px 2px;padding:6px;background:#002A14;
+  border:2px solid #00DD77;color:#00DD77;font-family:inherit;font-size:.7rem;
+  letter-spacing:.1em;cursor:pointer;width:calc(100% - 16px);
+  animation:blink .7s step-end infinite}
+#queue-leave-btn{margin:4px 8px 8px;padding:3px;background:#1a0000;
+  border:1px solid #440000;color:#664444;font-family:inherit;font-size:.6rem;
+  cursor:pointer;width:calc(100% - 16px);letter-spacing:.05em}
 </style>
 </head>
 <body>
@@ -224,6 +247,18 @@ body.touch #mobile-act{display:flex}
   </div>
 </div>
 <div id="godmode-badge">★ GOD MODE</div>
+
+<!-- ═══════════════ QUEUE PANEL ═══════════════ -->
+<div id="queue-panel">
+  <div id="queue-header">QUEUE</div>
+  <div id="queue-ticket-num">🎫</div>
+  <div id="queue-serving-line"></div>
+  <div id="queue-ahead-line"></div>
+  <div id="queue-locked-line"></div>
+  <div id="queue-list"></div>
+  <button id="queue-enter-btn">▶ ENTER NOW</button>
+  <button id="queue-leave-btn">✕ Leave Queue</button>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -936,13 +971,13 @@ const ZONE_DOORS = {
   // {zone, tileRow, tileCol} -> {targetZone, spawnX, spawnY}
   town_tavern:     {tileRows:[11],tileCols:[7,8,9], to:'tavern',    sx:10,sy:11},
   town_governance: {tileRows:[11],tileCols:[28,29,30],to:'governance',sx:10,sy:11},
-  town_marketplace:{tileRows:[15],tileCols:[7,8,9], to:'marketplace',sx:10,sy:1},
-  town_treasury:   {tileRows:[15],tileCols:[28,29,30],to:'treasury', sx:10,sy:1},
+  town_marketplace:{tileRows:[15],tileCols:[7,8,9], to:'marketplace',sx:10,sy:1, queue:true},
+  town_treasury:   {tileRows:[15],tileCols:[28,29,30],to:'treasury', sx:10,sy:1, queue:true},
   // exits: spawn just outside the door the player entered from
   tavern_exit:     {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:8,  sy:12},
   governance_exit: {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:12},
-  marketplace_exit:{tileRows:[12],tileCols:[9,10,11], to:'town',     sx:8,  sy:14},
-  treasury_exit:   {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:14},
+  marketplace_exit:{tileRows:[12],tileCols:[9,10,11], to:'town',     sx:8,  sy:14, queue:true},
+  treasury_exit:   {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:14, queue:true},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
@@ -1340,7 +1375,12 @@ const G = {
   paused:false,
   tick:0,
   camX:0,camY:0,
+  queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
+  lockedSchmeckles:0,   // schmeckles locked while in entry queue
 };
+
+// Cache of server-broadcast queue states
+const serverQueues={};
 
 // ── CAMERA ────────────────────────────────────────────────────────────────────
 function updateCamera(){
@@ -1431,10 +1471,91 @@ function checkDoorTrigger(){
   for(const[key,door] of Object.entries(ZONE_DOORS)){
     const fromZone=key.split('_')[0]==='town'?'town':key.split('_')[0];
     if(G.zone===fromZone&&door.tileRows.includes(ty)&&door.tileCols.includes(tx)){
-      changeZone(door.to,door.sx,door.sy);
+      if(door.queue){handleQueueDoor(key,door);}
+      else{changeZone(door.to,door.sx,door.sy);}
       return;
     }
   }
+}
+
+// ── Queue door handler ────────────────────────────────────────────────────────
+function queueInfoFromKey(key){
+  return({
+    'town_marketplace':{zone:'marketplace',type:'entry'},
+    'town_treasury':   {zone:'treasury',   type:'entry'},
+    'marketplace_exit':{zone:'marketplace',type:'exit'},
+    'treasury_exit':   {zone:'treasury',   type:'exit'},
+  })[key]||null;
+}
+
+function handleQueueDoor(key,door){
+  const qi=queueInfoFromKey(key);if(!qi)return;
+  if(!G.queueState){
+    joinQueue(qi.zone,qi.type);
+  } else if(G.queueState.zone===qi.zone&&G.queueState.type===qi.type){
+    if(G.queueState.served){
+      // Served — pass through
+      socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type});
+      G.lockedSchmeckles=0;G.queueState=null;
+      updateQueuePanel();
+      changeZone(door.to,door.sx,door.sy);
+    }
+    // else: still waiting — panel already visible, do nothing
+  }
+  // Different queue active: don't interfere
+}
+
+function joinQueue(zone,type){
+  if(G.queueState)return; // already in a queue
+  const lockAmt=type==='entry'?Math.max(10,Math.floor(G.schmeckles*0.2)):0;
+  G.lockedSchmeckles=lockAmt;
+  G.queueState={zone,type,ticket:null,served:false};
+  socket?.emit('queue_join',{zone,queueType:type,locked:lockAmt});
+  const zl=zone[0].toUpperCase()+zone.slice(1);
+  chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' '+lockAmt+' ₴ locked.':''}`, '#FFD700');
+  updateQueuePanel();
+}
+
+function updateQueuePanel(){
+  const panel=document.getElementById('queue-panel');if(!panel)return;
+  if(!G.queueState){panel.style.display='none';return;}
+  panel.style.display='block';
+  const{zone,type,ticket,served}=G.queueState;
+  const zl=zone[0].toUpperCase()+zone.slice(1);
+  document.getElementById('queue-header').textContent=
+    `${zl} ${type==='entry'?'ENTRY':'EXIT'} QUEUE`;
+  document.getElementById('queue-ticket-num').textContent=ticket?`🎫 #${ticket}`:'🎫 …';
+
+  const sq=serverQueues[zone]?.[type];
+  if(sq&&ticket){
+    const ahead=sq.entries.filter(e=>e.ticket<ticket).length;
+    document.getElementById('queue-serving-line').textContent=
+      `Now serving: #${sq.serving||'—'}`;
+    document.getElementById('queue-ahead-line').textContent=
+      served?'✅ YOUR TURN!':(ahead===0?'You\'re next!':ahead+' ahead of you');
+    const listEl=document.getElementById('queue-list');
+    listEl.innerHTML=sq.entries.map(e=>{
+      const isYou=e.ticket===ticket;
+      const isDone=sq.serving>=e.ticket;
+      const col=isYou?'#FFD700':isDone?'#44AA66':'#444';
+      const mark=isYou?'▶ ':isDone?'✓ ':'  ';
+      return`<div style="color:${col}">${mark}#${e.ticket} ${e.nickname}</div>`;
+    }).join('')||'<div style="color:#333">—</div>';
+  } else {
+    document.getElementById('queue-serving-line').textContent='Connecting…';
+    document.getElementById('queue-ahead-line').textContent='';
+    document.getElementById('queue-list').innerHTML='';
+  }
+  const lockEl=document.getElementById('queue-locked-line');
+  if(G.lockedSchmeckles>0){
+    lockEl.textContent=`🔒 ${G.lockedSchmeckles} ₴ locked`;
+    lockEl.style.display='block';
+  } else {
+    lockEl.style.display='none';
+  }
+  const enterBtn=document.getElementById('queue-enter-btn');
+  enterBtn.style.display=served?'block':'none';
+  enterBtn.textContent=type==='entry'?'▶ ENTER NOW':'▶ LEAVE NOW';
 }
 
 function changeZone(zone,sx,sy){
@@ -1492,7 +1613,9 @@ function renderHUD(){
     span.style.fontSize='1rem';
     hearts.appendChild(span);
   }
-  document.getElementById('hud-gold').textContent=`${G.schmeckles} ₴`;
+  const locked=G.lockedSchmeckles;
+  document.getElementById('hud-gold').textContent=
+    locked>0?`${G.schmeckles} ₴  🔒${locked}`:`${G.schmeckles} ₴`;
 }
 
 // ── PAUSE / INVENTORY ─────────────────────────────────────────────────────────
@@ -1857,6 +1980,26 @@ function initSocket(){
   socket.on('chat',msg=>{chatLog(`[${msg.nickname}] ${msg.text}`,'#87CEEB');});
   socket.on('disconnect',()=>{others={};});
 
+  // ── Queue events ──
+  socket.on('queue_joined',data=>{
+    if(G.queueState)G.queueState.ticket=data.ticket;
+    updateQueuePanel();
+  });
+  socket.on('queue_served',data=>{
+    if(G.queueState&&G.queueState.zone===data.zone&&G.queueState.type===data.queueType){
+      G.queueState.served=true;
+      updateQueuePanel();
+      const zl=data.zone[0].toUpperCase()+data.zone.slice(1);
+      chatLog(`✅ ${zl} queue: it's your turn! Walk through or click ENTER NOW.`,'#00DD77');
+    }
+  });
+  socket.on('queue_state',data=>{
+    if(!serverQueues[data.zone])serverQueues[data.zone]={};
+    serverQueues[data.zone].entry=data.entry;
+    serverQueues[data.zone].exit=data.exit;
+    updateQueuePanel();
+  });
+
   // Emit position periodically
   setInterval(()=>{
     socket?.emit('move',{x:G.x,y:G.y,dir:G.dir,zone:G.zone,frame:G.frame,moving:G.moving});
@@ -1886,6 +2029,25 @@ document.getElementById('btn-start').addEventListener('click',()=>{
   loadState(); // pre-populate G from saved state before building create screen
   showScreen('screen-create');
   buildCreateScreen();
+});
+
+// ── Queue panel buttons ───────────────────────────────────────────────────────
+document.getElementById('queue-enter-btn').addEventListener('click',()=>{
+  if(!G.queueState?.served)return;
+  const{zone,type}=G.queueState;
+  socket?.emit('queue_leave',{zone,queueType:type});
+  G.lockedSchmeckles=0;G.queueState=null;
+  updateQueuePanel();
+  const key=type==='entry'?`town_${zone}`:`${zone}_exit`;
+  const door=ZONE_DOORS[key];
+  if(door)changeZone(door.to,door.sx,door.sy);
+});
+document.getElementById('queue-leave-btn').addEventListener('click',()=>{
+  if(!G.queueState)return;
+  socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
+  G.lockedSchmeckles=0;G.queueState=null;
+  updateQueuePanel();
+  chatLog('Left the queue.','#888');
 });
 
 animateTitle();
