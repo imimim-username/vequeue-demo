@@ -61,7 +61,9 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 #screen-game{background:#000;flex-direction:column}
 #game-wrap{position:relative;image-rendering:pixelated}
 #game-wrap canvas{position:absolute;top:0;left:0;image-rendering:pixelated}
-#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}#cv-ui{z-index:4}
+#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}
+#cv-ui{z-index:4;pointer-events:none}
+#cv-ui[style*="pointer-events: auto"]{cursor:pointer}
 
 /* ── HUD ── */
 #hud{position:fixed;top:0;left:0;right:0;height:36px;background:linear-gradient(#000a,#0006);
@@ -374,6 +376,42 @@ const CLASSES = {
     desc:'Holy tank. VIT+END locked in — outlasts everything.',
   },
 };
+
+// ── ENEMIES ───────────────────────────────────────────────────────────────────
+// Wilderness danger-zone encounter table (south of river, rows 38+)
+const ENEMIES = {
+  wolf: {
+    type:'wolf', name:'Dire Wolf', maxHp:12, atk:4, def:1, spd:5,
+    xp:12, gold:6,
+    msg:'A Dire Wolf lunges from the shadows!',
+  },
+  skeleton: {
+    type:'skeleton', name:'Skeleton', maxHp:16, atk:5, def:2, spd:2,
+    xp:20, gold:10,
+    msg:'A Skeleton rises from the ancient earth!',
+  },
+  goblin: {
+    type:'goblin', name:'Cave Goblin', maxHp:9, atk:3, def:1, spd:6,
+    xp:10, gold:18,
+    msg:'A Cave Goblin springs an ambush!',
+  },
+  darkKnight: {
+    type:'darkKnight', name:'Dark Knight', maxHp:28, atk:7, def:5, spd:2,
+    xp:40, gold:30,
+    msg:'A Dark Knight bars your path!',
+  },
+};
+
+// Offscreen canvases for the pixelation transition effect
+const _snapCanvas=document.createElement('canvas');
+_snapCanvas.width=W;_snapCanvas.height=H;
+const _snapCtx=_snapCanvas.getContext('2d');
+const _pixCanvas=document.createElement('canvas');
+const _pixCtx=_pixCanvas.getContext('2d');
+_pixCtx.imageSmoothingEnabled=false;
+
+// Battle button hit-boxes (populated each frame during renderBattleScreen)
+const BATTLE_BTNS={};
 
 // ── TILE CACHE ───────────────────────────────────────────────────────────────
 // Pre-render every tile type into an offscreen canvas for fast stamping
@@ -1611,6 +1649,7 @@ const G = {
   camX:0,camY:0,
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedSchmeckles:0,   // schmeckles locked while in entry queue
+  battle:null,          // active battle state or null
 };
 
 // Cache of server-broadcast queue states
@@ -1799,6 +1838,497 @@ function changeZone(zone,sx,sy){
   // emit to server
   socket?.emit('zone_change',{zone,x:G.x,y:G.y});
   renderTileLayer();
+}
+
+// ── BATTLE SYSTEM ─────────────────────────────────────────────────────────────
+
+function checkEncounter(){
+  if(G.battle)return;
+  if(G.zone!=='wilderness')return;
+  const ty=Math.floor(G.y/TS);
+  if(ty<=38)return;          // safe — north of / at river
+  if(!G.moving)return;
+  if(G.tick%90!==0)return;   // check every ~1.5 s at 60 fps
+  if(Math.random()>0.12)return; // 12% chance per check
+  const depth=ty-38;
+  let key;
+  if(depth<8)       key=Math.random()<0.55?'wolf':'goblin';
+  else if(depth<16) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
+  else              key=Math.random()<0.35?'darkKnight':'skeleton';
+  triggerBattle(key);
+}
+
+function triggerBattle(key){
+  const tmpl=ENEMIES[key];if(!tmpl)return;
+  // Snapshot all rendered layers into _snapCanvas
+  _snapCtx.clearRect(0,0,W,H);
+  ['cv-bg','cv-tiles','cv-sprites'].forEach(id=>{
+    const cv=document.getElementById(id);if(cv)_snapCtx.drawImage(cv,0,0);
+  });
+  G.battle={
+    enemy:{...tmpl,currentHp:tmpl.maxHp},
+    phase:'transition_in',
+    animTimer:0,
+    hitShake:0,
+    log:[tmpl.msg,'What will you do?'],
+    result:null,
+    xpGained:0,goldGained:0,
+    savedX:G.x,savedY:G.y,
+  };
+  G.paused=true;
+  document.getElementById('cv-ui').style.pointerEvents='auto';
+  runPixelTransition('in',()=>{G.battle.phase='player_turn';});
+}
+
+function runPixelTransition(dir,onComplete){
+  const FRAMES=38;let tick=0;
+  function step(){
+    tick++;
+    const t=dir==='in'?tick/FRAMES:1-tick/FRAMES;
+    const blockSize=Math.max(1,Math.round(Math.pow(48,t)));
+    ctxUI.clearRect(0,0,W,H);
+    if(blockSize>1){
+      const dw=Math.max(1,Math.floor(W/blockSize));
+      const dh=Math.max(1,Math.floor(H/blockSize));
+      _pixCanvas.width=dw;_pixCanvas.height=dh;
+      _pixCtx.drawImage(_snapCanvas,0,0,dw,dh);
+      ctxUI.imageSmoothingEnabled=false;
+      ctxUI.drawImage(_pixCanvas,0,0,W,H);
+    } else {
+      ctxUI.imageSmoothingEnabled=true;
+      ctxUI.drawImage(_snapCanvas,0,0);
+    }
+    const fade=Math.max(0,Math.min(1,(t-0.42)/0.58));
+    if(fade>0){ctxUI.fillStyle=`rgba(0,0,0,${fade})`;ctxUI.fillRect(0,0,W,H);}
+    if(tick<FRAMES){requestAnimationFrame(step);}
+    else{
+      if(dir==='in'){ctxUI.fillStyle='#000';ctxUI.fillRect(0,0,W,H);}
+      else ctxUI.clearRect(0,0,W,H);
+      onComplete();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Enemy pixel-art sprites (S = px per "pixel", drawn facing left) ──────────
+
+function drawEnemySprite(ctx,type,x,y){
+  ctx.save();ctx.translate(Math.round(x),Math.round(y));
+  const S=3;
+  switch(type){
+    case'wolf':      drawBattleWolf(ctx,S);      break;
+    case'skeleton':  drawBattleSkeleton(ctx,S);  break;
+    case'goblin':    drawBattleGoblin(ctx,S);     break;
+    case'darkKnight':drawBattleDarkKnight(ctx,S); break;
+  }
+  ctx.restore();
+}
+
+function drawBattleWolf(ctx,S){
+  const body='#7A6848',dark='#3C2C14',light='#A09060',eye='#FFD700',nose='#180C08';
+  // shadow
+  ctx.fillStyle='#00000030';ctx.fillRect(S,S*15,S*22,S*2);
+  // tail
+  ctx.fillStyle=dark;ctx.fillRect(S*19,0,S*3,S*6);
+  ctx.fillStyle=body;ctx.fillRect(S*20,S,S*2,S*5);
+  ctx.fillStyle='#EEE8D0';ctx.fillRect(S*20,0,S*2,S*2);
+  // body
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*6,S*17,S*8);
+  ctx.fillStyle=body;ctx.fillRect(S*4,S*7,S*15,S*6);
+  ctx.fillStyle=light;ctx.fillRect(S*5,S*7,S*9,S*2);
+  // belly
+  ctx.fillStyle='#C8B080';ctx.fillRect(S*7,S*11,S*8,S*2);
+  // head
+  ctx.fillStyle=dark;ctx.fillRect(0,S*3,S*9,S*8);
+  ctx.fillStyle=body;ctx.fillRect(S,S*4,S*7,S*6);
+  // snout
+  ctx.fillStyle=dark;ctx.fillRect(0,S*7,S*4,S*4);
+  ctx.fillStyle='#9A8A6A';ctx.fillRect(S,S*8,S*3,S*2);
+  ctx.fillStyle=nose;ctx.fillRect(0,S*7,S*2,S*2);
+  // ear
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S,S*4,S*4);
+  ctx.fillStyle=body;ctx.fillRect(S*3,S*2,S*2,S*3);
+  ctx.fillStyle='#C06060';ctx.fillRect(S*3,S*2,S,S*2);
+  // eye
+  ctx.fillStyle=eye;ctx.fillRect(S*4,S*5,S*2,S*2);
+  ctx.fillStyle='#000';ctx.fillRect(S*5,S*5,S,S);
+  // legs (4)
+  [S*5,S*9,S*12,S*16].forEach(lx=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx,S*13,S*2,S*5);
+    ctx.fillStyle=body;ctx.fillRect(lx,S*14,S*2,S*3);
+    ctx.fillStyle='#1E0E06';ctx.fillRect(lx-S,S*17,S*4,S*2);
+  });
+}
+
+function drawBattleSkeleton(ctx,S){
+  const bone='#D8D8B8',dark='#888870',eye='#20C8FF',sw='#9090B0',swH='#C0C0E0';
+  // shadow
+  ctx.fillStyle='#00000030';ctx.fillRect(S*2,S*27,S*14,S*2);
+  // legs
+  [[S*3,S*20],[S*8,S*20]].forEach(([lx,ly])=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx-1,ly,S*2+2,S*7);
+    ctx.fillStyle=bone;ctx.fillRect(lx,ly,S*2,S*7);
+    ctx.fillStyle='#905030';ctx.fillRect(lx-1,ly+S*7,S*4,S*2);
+  });
+  // pelvis
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*18,S*10,S*3);
+  ctx.fillStyle=bone;ctx.fillRect(S*3,S*18,S*8,S*2);
+  // spine
+  ctx.fillStyle=bone;ctx.fillRect(S*6,S*10,S*2,S*9);
+  ctx.fillStyle=dark;ctx.fillRect(S*6,S*10,S,S*9);
+  // ribs
+  [S*10,S*12,S*14,S*16].forEach(ry=>{
+    ctx.fillStyle=dark;ctx.fillRect(S*2,ry,S*11,S);
+    ctx.fillStyle=bone;ctx.fillRect(S*3,ry,S*10,S);
+  });
+  // shoulders
+  ctx.fillStyle=bone;ctx.fillRect(S*2,S*9,S*11,S*2);
+  // left arm
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*11,S*2,S*8);
+  ctx.fillStyle=bone;ctx.fillRect(S*2,S*11,S*2,S*7);
+  // right arm (sword arm)
+  ctx.fillStyle=bone;ctx.fillRect(S*11,S*11,S*2,S*6);
+  // sword
+  ctx.fillStyle=sw;ctx.fillRect(S*12,S*3,S*2,S*12);
+  ctx.fillStyle=swH;ctx.fillRect(S*12,S*3,S,S*11);
+  ctx.fillStyle='#C0C040';ctx.fillRect(S*10,S*11,S*4,S);
+  ctx.fillStyle='#8B5A28';ctx.fillRect(S*12,S*14,S*2,S*3);
+  // skull
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S,S*9,S*9);
+  ctx.fillStyle=bone;ctx.fillRect(S*4,S*2,S*7,S*7);
+  // jaw
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*7,S*9,S*3);
+  ctx.fillStyle=bone;ctx.fillRect(S*4,S*7,S*7,S*2);
+  // teeth
+  ctx.fillStyle='#FFFFFF';
+  [S*4,S*6,S*8].forEach(tx=>ctx.fillRect(tx,S*8,S,S*2));
+  // eyes
+  ctx.fillStyle=eye;ctx.fillRect(S*4,S*3,S*2,S*2);ctx.fillRect(S*8,S*3,S*2,S*2);
+  ctx.fillStyle='#80FFFF60';ctx.fillRect(S*4,S*3,S*2,S);ctx.fillRect(S*8,S*3,S*2,S);
+}
+
+function drawBattleGoblin(ctx,S){
+  const skin='#5A8030',dark='#2A4010',light='#80B050',eye='#FF8000',cloth='#7A3020';
+  // shadow
+  ctx.fillStyle='#00000030';ctx.fillRect(S*2,S*21,S*12,S*2);
+  // legs
+  [[S*3,S*14],[S*8,S*14]].forEach(([lx,ly])=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx,ly,S*3,S*7);
+    ctx.fillStyle=skin;ctx.fillRect(lx,ly,S*2,S*6);
+    ctx.fillStyle='#4A1800';ctx.fillRect(lx-1,ly+S*6,S*4,S*2);
+  });
+  // body
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*8,S*12,S*7);
+  ctx.fillStyle=cloth;ctx.fillRect(S*3,S*9,S*10,S*6);
+  ctx.fillStyle='#501800';ctx.fillRect(S*3,S*12,S*10,S);
+  // arms
+  ctx.fillStyle=dark;ctx.fillRect(0,S*9,S*3,S*6);ctx.fillRect(S*13,S*9,S*3,S*6);
+  ctx.fillStyle=skin;ctx.fillRect(0,S*10,S*3,S*5);ctx.fillRect(S*13,S*10,S*3,S*5);
+  // dagger
+  ctx.fillStyle='#A0A0B0';ctx.fillRect(S*14,S*7,S*2,S*5);
+  ctx.fillStyle='#E0E0F0';ctx.fillRect(S*14,S*7,S,S*4);
+  ctx.fillStyle='#C08030';ctx.fillRect(S*14,S*12,S*2,S);
+  // head (oversized)
+  ctx.fillStyle=dark;ctx.fillRect(S,0,S*14,S*10);
+  ctx.fillStyle=skin;ctx.fillRect(S*2,S,S*12,S*8);
+  ctx.fillStyle=light;ctx.fillRect(S*3,S*2,S*6,S*2);
+  // ears (big, pointy)
+  ctx.fillStyle=dark;ctx.fillRect(0,S*3,S*3,S*5);ctx.fillRect(S*13,S*3,S*3,S*5);
+  ctx.fillStyle=skin;ctx.fillRect(0,S*3,S*2,S*4);ctx.fillRect(S*14,S*3,S*2,S*4);
+  ctx.fillStyle='#C05050';ctx.fillRect(0,S*4,S,S*2);ctx.fillRect(S*15,S*4,S,S*2);
+  // eyes
+  ctx.fillStyle='#1C1000';ctx.fillRect(S*2,S*3,S*4,S*3);ctx.fillRect(S*10,S*3,S*4,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*3,S*3,S*3,S*2);ctx.fillRect(S*11,S*3,S*3,S*2);
+  ctx.fillStyle='#000';ctx.fillRect(S*4,S*4,S,S);ctx.fillRect(S*12,S*4,S,S);
+  // nose + grin
+  ctx.fillStyle=dark;ctx.fillRect(S*6,S*5,S*4,S*3);ctx.fillRect(S*3,S*7,S*10,S*2);
+  ctx.fillStyle=skin;ctx.fillRect(S*6,S*5,S*4,S*2);
+  ctx.fillStyle='#FF3030';ctx.fillRect(S*4,S*7,S*8,S);
+  ctx.fillStyle='#FFF';[S*4,S*6,S*9].forEach(tx=>ctx.fillRect(tx,S*7,S,S));
+}
+
+function drawBattleDarkKnight(ctx,S){
+  const arm='#221828',dark='#0A080C',lit='#3C2844',eye='#FF1818',hi='#604070';
+  // shadow
+  ctx.fillStyle='#00000050';ctx.fillRect(0,S*30,S*18,S*2);
+  // cape (draw first — behind everything)
+  ctx.fillStyle=dark;
+  ctx.beginPath();ctx.moveTo(S*2,S*7);ctx.lineTo(0,S*32);ctx.lineTo(S*5,S*32);ctx.lineTo(S*6,S*7);ctx.fill();
+  ctx.beginPath();ctx.moveTo(S*14,S*7);ctx.lineTo(S*18,S*32);ctx.lineTo(S*13,S*32);ctx.lineTo(S*12,S*7);ctx.fill();
+  // boots
+  [[S*3,S*24],[S*9,S*24]].forEach(([bx,by])=>{
+    ctx.fillStyle=dark;ctx.fillRect(bx-1,by,S*5,S*7);
+    ctx.fillStyle=arm;ctx.fillRect(bx,by,S*4,S*6);
+    ctx.fillStyle=lit;ctx.fillRect(bx,by,S*4,S*2);
+  });
+  // legs
+  [[S*3,S*16],[S*9,S*16]].forEach(([lx,ly])=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx-1,ly,S*5,S*9);
+    ctx.fillStyle=arm;ctx.fillRect(lx,ly,S*4,S*8);
+    ctx.fillStyle=lit;ctx.fillRect(lx,ly,S*4,S*3);
+  });
+  // torso
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*9,S*14,S*8);
+  ctx.fillStyle=arm;ctx.fillRect(S*3,S*10,S*12,S*7);
+  ctx.fillStyle=lit;ctx.fillRect(S*4,S*10,S*10,S*3);
+  // chest gem
+  ctx.fillStyle='#700010';ctx.fillRect(S*7,S*12,S*4,S*3);
+  ctx.fillStyle='#FF0020';ctx.fillRect(S*8,S*12,S*2,S*2);
+  // shoulder plates
+  ctx.fillStyle=dark;ctx.fillRect(S,S*8,S*5,S*4);ctx.fillRect(S*12,S*8,S*5,S*4);
+  ctx.fillStyle=arm;ctx.fillRect(S,S*8,S*5,S*3);ctx.fillRect(S*12,S*8,S*5,S*3);
+  ctx.fillStyle=lit;ctx.fillRect(S,S*8,S*5,S);ctx.fillRect(S*12,S*8,S*5,S);
+  // arms
+  ctx.fillStyle=dark;ctx.fillRect(0,S*11,S*4,S*8);ctx.fillRect(S*14,S*11,S*4,S*8);
+  ctx.fillStyle=arm;ctx.fillRect(S,S*11,S*3,S*7);ctx.fillRect(S*14,S*11,S*3,S*7);
+  // sword (right side, angled up)
+  ctx.fillStyle='#0C0C10';ctx.fillRect(S*16,0,S*4,S*14);
+  ctx.fillStyle='#8888A8';ctx.fillRect(S*17,0,S*2,S*13);
+  ctx.fillStyle='#C0C0E0';ctx.fillRect(S*17,0,S,S*12);
+  ctx.fillStyle='#C08030';ctx.fillRect(S*15,S*12,S*4,S*2);
+  ctx.fillStyle='#8B5020';ctx.fillRect(S*16,S*14,S*2,S*3);
+  // helmet
+  ctx.fillStyle=dark;ctx.fillRect(S*2,0,S*14,S*9);
+  ctx.fillStyle=arm;ctx.fillRect(S*3,S,S*12,S*8);
+  ctx.fillStyle=lit;ctx.fillRect(S*3,S,S*12,S*2);
+  // visor slit
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*4,S*12,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*4,S*4,S*5,S*2);ctx.fillRect(S*11,S*4,S*3,S*2);
+  ctx.fillStyle='#FF8080';ctx.fillRect(S*4,S*4,S*2,S);ctx.fillRect(S*11,S*4,S,S);
+  // horns
+  ctx.fillStyle=arm;ctx.fillRect(S*4,-S*2,S*2,S*3);ctx.fillRect(S*12,-S*2,S*2,S*3);
+  ctx.fillStyle=lit;ctx.fillRect(S*4,-S,S*2,S*2);ctx.fillRect(S*12,-S,S*2,S*2);
+}
+
+// ── Battle screen renderer (drawn to ctxUI each frame) ────────────────────────
+
+function renderBattleScreen(){
+  if(!G.battle)return;
+  const bt=G.battle,e=bt.enemy;
+  ctxUI.clearRect(0,0,W,H);
+
+  // ── Battle-field background ──
+  const bgG=ctxUI.createLinearGradient(0,0,0,H*0.58);
+  bgG.addColorStop(0,'#05080F');bgG.addColorStop(1,'#0C1520');
+  ctxUI.fillStyle=bgG;ctxUI.fillRect(0,0,W,H*0.58);
+  // stars
+  ctxUI.fillStyle='#FFFFFF';
+  [[0.09,0.07],[0.22,0.14],[0.42,0.05],[0.58,0.11],[0.72,0.04],[0.87,0.17],[0.31,0.19]].forEach(([fx,fy])=>
+    ctxUI.fillRect(Math.floor(fx*W),Math.floor(fy*H*0.55),1,1));
+  // crescent moon
+  ctxUI.fillStyle='#D8CFA0';ctxUI.beginPath();ctxUI.arc(W*0.84,H*0.09,10,0,Math.PI*2);ctxUI.fill();
+  ctxUI.fillStyle='#0C1520';ctxUI.beginPath();ctxUI.arc(W*0.87,H*0.08,8,0,Math.PI*2);ctxUI.fill();
+  // ground platform
+  const gY=Math.floor(H*0.56);
+  ctxUI.fillStyle='#1C1208';ctxUI.fillRect(0,gY,W,4);
+  // fog
+  const fog=ctxUI.createLinearGradient(0,gY-20,0,gY+4);
+  fog.addColorStop(0,'rgba(30,20,8,0)');fog.addColorStop(1,'rgba(30,20,8,0.7)');
+  ctxUI.fillStyle=fog;ctxUI.fillRect(0,gY-20,W,24);
+
+  // ── Enemy sprite (shake if hit) ──
+  const shX=bt.hitShake>0?(Math.random()*8-4)|0:0;
+  if(bt.hitShake>0)bt.hitShake--;
+  drawEnemySprite(ctxUI,e.type,shX+70,20);
+
+  // ── Enemy name + HP bar ──
+  ctxUI.fillStyle='#EEE8C0';ctxUI.font='bold 14px monospace';
+  ctxUI.fillText(e.name,260,58);
+  const ehbX=260,ehbY=65,ehbW=250,ehbH=11;
+  ctxUI.fillStyle='#1E0000';ctxUI.fillRect(ehbX,ehbY,ehbW,ehbH);
+  const ef=Math.max(0,e.currentHp/e.maxHp);
+  ctxUI.fillStyle=ef>0.5?'#20A830':ef>0.25?'#C09000':'#C01020';
+  ctxUI.fillRect(ehbX,ehbY,Math.floor(ehbW*ef),ehbH);
+  ctxUI.strokeStyle='#604010';ctxUI.lineWidth=1;ctxUI.strokeRect(ehbX,ehbY,ehbW,ehbH);
+  ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
+  ctxUI.fillText(`${Math.max(0,e.currentHp)}/${e.maxHp}`,ehbX+ehbW+4,ehbY+9);
+
+  // ── Battle panel ──
+  const pY=Math.floor(H*0.58);
+  ctxUI.fillStyle='#0C0A06';ctxUI.fillRect(0,pY,W,H-pY);
+  ctxUI.fillStyle='#7A5020';ctxUI.fillRect(0,pY,W,2); // gold divider
+
+  // ── Battle log ──
+  ctxUI.fillStyle='#180E04';ctxUI.fillRect(4,pY+4,260,H-pY-8);
+  ctxUI.strokeStyle='#5A3A10';ctxUI.lineWidth=1;ctxUI.strokeRect(4,pY+4,260,H-pY-8);
+  ctxUI.font='11px monospace';
+  bt.log.slice(-4).forEach((line,i,arr)=>{
+    ctxUI.fillStyle=i===arr.length-1?'#FFD080':'#907050';
+    ctxUI.fillText(line,10,pY+20+i*22,250);
+  });
+
+  // ── Action buttons ──
+  const cls=G.class_||'warrior';
+  const specialLabel={warrior:'⚔  POWER STRIKE',mage:'🔮  ARCANE BOLT',rogue:'🗡  TWIN DAGGERS',paladin:'✨  HOLY LIGHT'}[cls]||'✦  SPECIAL';
+  const actions=[
+    {id:'attack', label:'⚔  ATTACK',   bg:'#6B1818',hi:'#A02020'},
+    {id:'special',label:specialLabel,  bg:'#183058',hi:'#2050A0'},
+    {id:'flee',   label:'💨  FLEE',    bg:'#183018',hi:'#286028'},
+  ];
+  const active=bt.phase==='player_turn'&&!bt.result;
+  const bX=274,bW=175,bH=30,bGap=9,bStartY=pY+14;
+  actions.forEach((a,i)=>{
+    const bx=bX,by=bStartY+i*(bH+bGap);
+    BATTLE_BTNS[a.id]={x:bx,y:by,w:bW,h:bH};
+    ctxUI.fillStyle='#000';ctxUI.fillRect(bx+2,by+2,bW,bH); // shadow
+    ctxUI.fillStyle=active?a.bg:'#1E1E1E';ctxUI.fillRect(bx,by,bW,bH);
+    ctxUI.fillStyle=active?a.hi:'#2E2E2E';ctxUI.fillRect(bx,by,bW,3);
+    ctxUI.strokeStyle=active?'#FFD080':'#3A3A3A';ctxUI.lineWidth=1;ctxUI.strokeRect(bx,by,bW,bH);
+    ctxUI.fillStyle=active?'#FFFFFF':'#555555';ctxUI.font='bold 12px monospace';
+    ctxUI.fillText(a.label,bx+8,by+19);
+  });
+
+  // ── Player info panel (bottom-right) ──
+  const piX=460,piY=pY+10;
+  ctxUI.fillStyle='#C0A050';ctxUI.font='bold 12px monospace';
+  ctxUI.fillText(G.nickname,piX,piY+12);
+  // HP bar
+  ctxUI.fillStyle='#1A0000';ctxUI.fillRect(piX,piY+16,155,10);
+  const pf=Math.max(0,G.hp/G.maxHp);
+  ctxUI.fillStyle=pf>0.5?'#20A830':pf>0.25?'#C09000':'#C01020';
+  ctxUI.fillRect(piX,piY+16,Math.floor(155*pf),10);
+  ctxUI.strokeStyle='#604010';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+16,155,10);
+  ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
+  ctxUI.fillText(`HP ${G.hp}/${G.maxHp}`,piX+158,piY+25);
+  // Mini stats
+  ctxUI.fillStyle='#7A5830';
+  ctxUI.fillText(`STR${G.stats.str} AGI${G.stats.agi} LCK${G.stats.lck}`,piX,piY+38);
+  // Turn indicator
+  if(!bt.result){
+    ctxUI.fillStyle=bt.phase==='player_turn'?'#FFD080':'#FF6060';
+    ctxUI.font='11px monospace';
+    ctxUI.fillText(bt.phase==='player_turn'?'▶ Your turn':`▶ ${e.name}...`,piX,piY+52);
+  }
+
+  // ── Result overlay ──
+  if(bt.result){
+    ctxUI.fillStyle='rgba(0,0,0,0.75)';ctxUI.fillRect(0,0,W,H);
+    const col=bt.result==='win'?'#FFD700':bt.result==='flee'?'#80FF80':'#FF3030';
+    const msg=bt.result==='win'?'VICTORY!':bt.result==='flee'?'ESCAPED!':'DEFEATED!';
+    ctxUI.fillStyle=col;ctxUI.font='bold 30px monospace';ctxUI.textAlign='center';
+    ctxUI.fillText(msg,W/2,H/2-24);
+    if(bt.result==='win'){
+      ctxUI.fillStyle='#C8B860';ctxUI.font='16px monospace';
+      ctxUI.fillText(`+${bt.xpGained} XP   +${bt.goldGained} ₴`,W/2,H/2+6);
+    } else if(bt.result==='lose'){
+      ctxUI.fillStyle='#FF8080';ctxUI.font='13px monospace';
+      ctxUI.fillText('Respawning in town...',W/2,H/2+6);
+    }
+    ctxUI.fillStyle='#666';ctxUI.font='11px monospace';
+    ctxUI.fillText('[ click or press Space to continue ]',W/2,H/2+36);
+    ctxUI.textAlign='left';
+  }
+}
+
+// ── Combat math ───────────────────────────────────────────────────────────────
+
+function doBattleAction(action){
+  const bt=G.battle;
+  if(!bt||bt.phase!=='player_turn'||bt.result)return;
+
+  if(action==='flee'){
+    const chance=Math.min(0.88,0.4+G.stats.agi*0.06-bt.enemy.spd*0.04);
+    if(Math.random()<chance){
+      bt.log.push('You dashed away!');
+      bt.result='flee';
+      setTimeout(endBattle,1600);
+    } else {
+      bt.log.push("Couldn't escape!");
+      bt.phase='enemy_turn';bt.animTimer=72;
+    }
+    return;
+  }
+
+  if(action==='attack'){
+    const weapon=G.inventory[0];
+    const baseDmg=(weapon?.dmg||2)+Math.floor(G.stats.str*0.9);
+    const crit=Math.random()<G.stats.lck*0.045;
+    const dmg=Math.max(1,Math.floor((baseDmg-bt.enemy.def*0.55)*(crit?1.6:1)+(Math.random()*2-1)));
+    bt.enemy.currentHp-=dmg;bt.hitShake=10;
+    bt.log.push(crit?`Critical hit! ${dmg} damage!`:`You attack for ${dmg} damage.`);
+  }
+
+  if(action==='special'){
+    let dmg=0,healAmt=0;
+    const cls=G.class_||'warrior';
+    if(cls==='mage'){
+      dmg=Math.max(2,Math.floor(G.stats.lck*1.6+G.stats.agi*0.5+Math.random()*4));
+      bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      bt.log.push(`Arcane Bolt! ${dmg} magic damage!`);
+    } else if(cls==='paladin'){
+      healAmt=Math.max(1,Math.floor(G.stats.vit*0.6)+2);
+      G.hp=Math.min(G.maxHp,G.hp+healAmt);
+      bt.log.push(`Holy Light! Restored ${healAmt} HP.`);
+    } else if(cls==='rogue'){
+      dmg=Math.max(1,Math.floor(G.stats.agi*1.3)-Math.floor(bt.enemy.def*0.3));
+      bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      bt.log.push(`Twin Daggers! ${dmg} piercing damage!`);
+    } else { // warrior
+      const weapon=G.inventory[0];
+      dmg=Math.max(1,Math.floor((weapon?.dmg||2)*1.9+G.stats.str*1.1-bt.enemy.def));
+      bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      bt.log.push(`Power Strike! ${dmg} massive damage!`);
+    }
+  }
+
+  // Check enemy death
+  if(bt.enemy.currentHp<=0){
+    bt.enemy.currentHp=0;
+    bt.log.push(`${bt.enemy.name} is defeated!`);
+    bt.result='win';
+    bt.xpGained=bt.enemy.xp;
+    bt.goldGained=bt.enemy.gold;
+    G.schmeckles+=bt.goldGained;
+    chatLog(`Battle won! +${bt.goldGained} ₴`,'#FFD700');
+    setTimeout(endBattle,2000);
+    return;
+  }
+  bt.phase='enemy_turn';bt.animTimer=75;
+}
+
+function doEnemyTurn(){
+  const bt=G.battle,e=bt.enemy;
+  const dodge=Math.random()<G.stats.agi*0.04;
+  if(dodge){
+    bt.log.push(`${e.name} attacks — you dodge!`);
+  } else {
+    const dmg=Math.max(1,e.atk-Math.floor(G.stats.agi*0.4)+((Math.random()*3)|0)-1);
+    G.hp=Math.max(0,G.hp-dmg);
+    bt.log.push(`${e.name} hits you for ${dmg}!`);
+    if(G.hp<=0){
+      G.hp=0;
+      bt.log.push('You have been defeated...');
+      bt.result='lose';
+      setTimeout(endBattle,2000);
+      return;
+    }
+  }
+  bt.phase='player_turn';
+}
+
+function endBattle(){
+  const bt=G.battle;if(!bt)return;
+  document.getElementById('cv-ui').style.pointerEvents='';
+  // Snapshot the current battle screen for transition-out
+  _snapCtx.clearRect(0,0,W,H);
+  _snapCtx.fillStyle='#000';_snapCtx.fillRect(0,0,W,H);
+  bt.phase='transition_out';
+  if(bt.result==='lose'){
+    const pen=Math.floor(G.schmeckles*0.10);
+    G.schmeckles=Math.max(0,G.schmeckles-pen);
+    G.hp=Math.max(1,Math.floor(G.maxHp*0.3));
+    runPixelTransition('out',()=>{
+      G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
+      changeZone('town',ZONES.town.spawnX,ZONES.town.spawnY);
+      chatLog(`Defeated! Lost ${pen} ₴. Respawned in town.`,'#FF4040');
+    });
+  } else {
+    runPixelTransition('out',()=>{
+      const sx=bt.savedX,sy=bt.savedY;
+      G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
+      G.x=sx;G.y=sy;
+    });
+  }
 }
 
 // ── TILE LAYER RENDERER ───────────────────────────────────────────────────────
@@ -2132,6 +2662,7 @@ function gameLoop(ts){
     if(G.moving){G.moveTimer++;G.frame=G.moveTimer;}
     else{G.moveTimer=0;}
     checkDoorTrigger();
+    checkEncounter();
     updateCamera();
     // scroll tile layer when camera moves
     renderTileLayer();
@@ -2144,6 +2675,14 @@ function gameLoop(ts){
     renderHUD();
     // persist
     if(G.persist&&G.tick%300===0)saveState();
+  }
+  // Battle screen renders while paused (transition phases handled by their own rAF)
+  if(G.battle&&(G.battle.phase==='player_turn'||G.battle.phase==='enemy_turn')){
+    if(G.battle.phase==='enemy_turn'){
+      G.battle.animTimer--;
+      if(G.battle.animTimer<=0)doEnemyTurn();
+    }
+    renderBattleScreen();
   }
   requestAnimationFrame(gameLoop);
 }
@@ -2284,6 +2823,32 @@ document.getElementById('queue-leave-btn').addEventListener('click',()=>{
   updateQueuePanel();
   chatLog('Left the queue.','#888');
 });
+
+// ── Battle canvas click / key handler ─────────────────────────────────────────
+document.getElementById('cv-ui').addEventListener('click',e=>{
+  const bt=G.battle;if(!bt)return;
+  // Result overlay: click anywhere to continue (endBattle already queued via setTimeout,
+  // but allow early dismiss with Space/click)
+  if(bt.result)return;
+  if(bt.phase!=='player_turn')return;
+  const rect=e.target.getBoundingClientRect();
+  const scale=W/rect.width;
+  const mx=(e.clientX-rect.left)*scale;
+  const my=(e.clientY-rect.top)*scale;
+  for(const[action,btn] of Object.entries(BATTLE_BTNS)){
+    if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){
+      doBattleAction(action);return;
+    }
+  }
+});
+
+// Keyboard shortcuts during battle (1/2/3 = attack/special/flee)
+window.addEventListener('keydown',e=>{
+  if(!G.battle||G.battle.phase!=='player_turn'||G.battle.result)return;
+  if(e.key==='1')doBattleAction('attack');
+  if(e.key==='2')doBattleAction('special');
+  if(e.key==='3')doBattleAction('flee');
+},{capture:false});
 
 animateTitle();
 </script>
