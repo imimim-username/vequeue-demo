@@ -1842,6 +1842,34 @@ function changeZone(zone,sx,sy){
 
 // ── BATTLE SYSTEM ─────────────────────────────────────────────────────────────
 
+// ── Combat scaling ─────────────────────────────────────────────────────────────
+// Player "power level" = average stat value + half weapon damage.
+// Enemies scale to this so fights are always proportionate to your build.
+function playerPowerLevel(){
+  const s=G.stats;
+  const avg=(s.str+s.vit+s.agi+s.end+s.lck)/5; // 2.0 at start; rises as you invest points
+  const wdmg=G.inventory[0]?.dmg||2;
+  return avg+wdmg*0.5; // ~4.0 for a fresh warrior with Iron Sword
+}
+
+// Build a scaled enemy: HP / ATK / DEF are calculated from player power.
+// Each enemy type has a difficulty multiplier (<1 = easier, >1 = harder).
+// Depth below the river adds a small bonus (deeper = slightly tougher).
+function makeScaledEnemy(key,depth){
+  const tmpl=ENEMIES[key];
+  const pl=playerPowerLevel();
+  const baseMult={wolf:0.65,goblin:0.55,skeleton:0.82,darkKnight:1.15}[key]||0.75;
+  const depthBonus=Math.min(0.15,depth/130); // up to +15% at the very bottom
+  const m=baseMult+depthBonus;
+  return{
+    ...tmpl,
+    maxHp:   Math.max(6, Math.round(pl*m*3.6)),
+    atk:     Math.max(1, Math.round(pl*m*0.70)),
+    def:     Math.max(0, Math.round(pl*m*0.28)),
+    currentHp:Math.max(6,Math.round(pl*m*3.6)),
+  };
+}
+
 function checkEncounter(){
   if(G.battle)return;
   if(G.zone!=='wilderness')return;
@@ -1855,10 +1883,10 @@ function checkEncounter(){
   if(depth<8)       key=Math.random()<0.55?'wolf':'goblin';
   else if(depth<16) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
   else              key=Math.random()<0.35?'darkKnight':'skeleton';
-  triggerBattle(key);
+  triggerBattle(key,depth);
 }
 
-function triggerBattle(key){
+function triggerBattle(key,depth=0){
   const tmpl=ENEMIES[key];if(!tmpl)return;
   // Snapshot all rendered layers into _snapCanvas
   _snapCtx.clearRect(0,0,W,H);
@@ -1866,7 +1894,7 @@ function triggerBattle(key){
     const cv=document.getElementById(id);if(cv)_snapCtx.drawImage(cv,0,0);
   });
   G.battle={
-    enemy:{...tmpl,currentHp:tmpl.maxHp},
+    enemy:makeScaledEnemy(key,depth),
     phase:'transition_in',
     animTimer:0,
     hitShake:0,
@@ -2288,11 +2316,14 @@ function doBattleAction(action){
 
 function doEnemyTurn(){
   const bt=G.battle,e=bt.enemy;
-  const dodge=Math.random()<G.stats.agi*0.04;
+  // AGI drives dodge chance (5% per point → 10% at agi=2, 25% at agi=5)
+  const dodge=Math.random()<G.stats.agi*0.05;
   if(dodge){
     bt.log.push(`${e.name} attacks — you dodge!`);
   } else {
-    const dmg=Math.max(1,e.atk-Math.floor(G.stats.agi*0.4)+((Math.random()*3)|0)-1);
+    // END provides natural armor (0.5 per point → 1 at end=2, 2.5 at end=5)
+    const endArmor=Math.floor(G.stats.end*0.5);
+    const dmg=Math.max(1,e.atk-endArmor+(((Math.random()*3)|0)-1));
     G.hp=Math.max(0,G.hp-dmg);
     bt.log.push(`${e.name} hits you for ${dmg}!`);
     if(G.hp<=0){
