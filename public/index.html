@@ -1577,7 +1577,11 @@ function animateTitle(){
 function buildCreateScreen(){
   const statNames=['str','vit','agi','end','lck'];
   const statLabels={str:'STR  (Attack)',vit:'VIT  (Max HP)',agi:'AGI  (Speed)',end:'END  (Defense)',lck:'LCK  (Drop)'};
-  let alloc={str:2,vit:2,agi:2,end:2,lck:2};
+  // seed alloc from G.stats (pre-populated by loadState or defaults)
+  let alloc={str:G.stats.str,vit:G.stats.vit,agi:G.stats.agi,end:G.stats.end,lck:G.stats.lck};
+  // clamp alloc values so they don't exceed species caps (in case species changed)
+  const clampAlloc=()=>Object.keys(alloc).forEach(k=>{alloc[k]=Math.min(alloc[k],SPECIES[G.species||'human'].statCaps[k]);});
+  clampAlloc();
   const BASE_PTS=10;
 
   // ── Preview canvas — init FIRST so updatePreview can reference it ──
@@ -1605,11 +1609,14 @@ function buildCreateScreen(){
   function ptsLeft(){return BASE_PTS-ptsUsed();}
   function caps(){return SPECIES[G.species||'human'].statCaps;}
 
+  // ── Name input ──
+  document.getElementById('inp-name').value=G.nickname||'Hero';
+
   // ── Species picker ──
   const sp=document.getElementById('species-picker');
   Object.entries(SPECIES).forEach(([key,s])=>{
     const b=document.createElement('button');
-    b.className='species-btn'+(key==='human'?' selected':'');
+    b.className='species-btn'+(key===G.species?' selected':'');
     b.textContent=s.label;
     b.addEventListener('click',()=>{
       document.querySelectorAll('.species-btn').forEach(x=>x.classList.remove('selected'));
@@ -1621,13 +1628,14 @@ function buildCreateScreen(){
     });
     sp.appendChild(b);
   });
-  document.getElementById('species-desc').textContent=`♥×${SPECIES.human.baseHp}  ${SPECIES.human.desc}`;
+  const curSp=SPECIES[G.species]||SPECIES.human;
+  document.getElementById('species-desc').textContent=`♥×${curSp.baseHp}  ${curSp.desc}`;
 
   // ── Class picker ──
   const cp2=document.getElementById('class-picker');
   Object.entries(CLASSES).forEach(([key,c])=>{
     const b=document.createElement('button');
-    b.className='class-btn'+(key==='warrior'?' selected':'');
+    b.className='class-btn'+(key===G.class_?' selected':'');
     b.textContent=`${c.icon} ${c.label}`;
     b.addEventListener('click',()=>{
       document.querySelectorAll('.class-btn').forEach(x=>x.classList.remove('selected'));
@@ -1637,13 +1645,13 @@ function buildCreateScreen(){
     });
     cp2.appendChild(b);
   });
-  document.getElementById('class-desc').textContent=CLASSES.warrior.desc;
+  document.getElementById('class-desc').textContent=(CLASSES[G.class_]||CLASSES.warrior).desc;
 
   // ── Armor color picker ──
   const cp=document.getElementById('color-picker');
   PLAYER_COLORS.forEach((c,i)=>{
     const b=document.createElement('div');
-    b.className='color-btn'+(i===0?' selected':'');
+    b.className='color-btn'+(c===G.color?' selected':'');
     b.style.background=c;
     b.addEventListener('click',()=>{
       document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('selected'));
@@ -1656,8 +1664,8 @@ function buildCreateScreen(){
   const hp=document.getElementById('hair-picker');
   HAIR_COLORS.forEach((c,i)=>{
     const b=document.createElement('div');
-    b.className='color-btn'+(i===1?' selected':'');
-    b.style.background=c;b.style.border='2px solid '+(i===1?'#FFD700':'#333');
+    b.className='color-btn'+(c===G.hairColor?' selected':'');
+    b.style.background=c;b.style.border='2px solid '+(c===G.hairColor?'#FFD700':'#333');
     b.addEventListener('click',()=>{
       document.querySelectorAll('#hair-picker .color-btn').forEach(x=>x.style.border='2px solid #333');
       b.style.border='2px solid #FFD700';G.hairColor=c;updatePreview();
@@ -1791,15 +1799,25 @@ window.addEventListener('resize',setupCanvases);
 // ── PERSISTENCE ───────────────────────────────────────────────────────────────
 function saveState(){
   if(!G.persist)return;
-  const s={nickname:G.nickname,color:G.color,schmeckles:G.schmeckles,stats:G.stats,hp:G.hp};
+  const s={
+    nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+    species:G.species,class_:G.class_,
+    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp
+  };
   localStorage.setItem('vq_state',JSON.stringify(s));
 }
 function loadState(){
   try{
     const s=JSON.parse(localStorage.getItem('vq_state'));
     if(!s)return;
-    G.nickname=s.nickname||G.nickname;G.color=s.color||G.color;
-    G.schmeckles=s.schmeckles??G.schmeckles;G.stats=s.stats||G.stats;G.hp=s.hp||G.hp;
+    G.nickname=s.nickname||G.nickname;
+    G.color=s.color||G.color;
+    G.hairColor=s.hairColor||G.hairColor;
+    G.species=s.species||G.species;
+    G.class_=s.class_||G.class_;
+    G.schmeckles=s.schmeckles??G.schmeckles;
+    G.stats=s.stats||G.stats;
+    G.hp=s.hp||G.hp;
   }catch(e){}
 }
 
@@ -1841,7 +1859,6 @@ function startGame(){
   showScreen('screen-game');
   setupCanvases();
   buildTileCache();
-  loadState();
   renderTileLayer();
   document.getElementById('hud-zone').textContent=ZONES[G.zone].name;
   initSocket();
@@ -1849,6 +1866,7 @@ function startGame(){
 }
 
 document.getElementById('btn-start').addEventListener('click',()=>{
+  loadState(); // pre-populate G from saved state before building create screen
   showScreen('screen-create');
   buildCreateScreen();
 });
