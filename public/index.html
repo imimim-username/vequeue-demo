@@ -320,6 +320,8 @@ const T={
 const SOLID_TILES = new Set([
   T.WALL,T.TREE,T.FENCE,T.COLUMN,T.DOOR_C,T.SIGN,T.SHRUB,T.STALL
 ]); // T.VAULT intentionally walkable — decorative floor plating
+// Wilderness adds water as solid (rivers/lakes must be crossed at bridges)
+const WILDERNESS_SOLID = new Set([...SOLID_TILES, T.WATER]);
 
 // ── COLORS ───────────────────────────────────────────────────────────────────
 const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
@@ -926,18 +928,34 @@ const TOWN_MAP=(()=>{
   set(25,28,T.QUEUE_OUT);set(25,29,T.QUEUE_OUT);set(25,30,T.QUEUE_OUT);
 
   // ── SOUTH WILDERNESS GATE ──
-  // Open the south perimeter wall at the vertical road (cols 19-20)
   set(MAP_H-1,19,T.ROAD);set(MAP_H-1,20,T.ROAD);
-  // Gate-post columns flanking the opening
   set(MAP_H-1,18,T.COLUMN);set(MAP_H-1,21,T.COLUMN);
+
+  // ── NORTH WILDERNESS GATE (mirror of south, top of vertical road) ──
+  set(0,19,T.ROAD);set(0,20,T.ROAD);
+  set(0,18,T.COLUMN);set(0,21,T.COLUMN);
+
+  // ── EAST WILDERNESS GATE (right end of horizontal road, rows 13-14) ──
+  set(13,MAP_W-1,T.ROAD);set(14,MAP_W-1,T.ROAD);
+  set(12,MAP_W-1,T.COLUMN);set(15,MAP_W-1,T.COLUMN);
+
+  // ── WEST WILDERNESS GATE (left end of horizontal road, rows 13-14) ──
+  set(13,0,T.ROAD);set(14,0,T.ROAD);
+  set(12,0,T.COLUMN);set(15,0,T.COLUMN);
 
   return m;
 })();
 
-// ── WILDERNESS MAP ────────────────────────────────────────────────────────────
-// 80 wide × 60 tall. Dangerous open world outside town's walls.
-// The north gate (cols 38-41, rows 0-4) connects back to town south gate.
-const WLD_W=80,WLD_H=60;
+// ── WILDERNESS MAP ─────────────────────────────────────────────────────────────
+// 160 wide × 100 tall. Accessible from all 4 sides of town.
+// Four portals:  N (cols 78-81, row 0)  from town south gate
+//                S (cols 78-81, row 99) from town north gate
+//                W (rows 48-51, col 0)  from town east gate
+//                E (rows 48-51, col 159)from town west gate
+// Main roads: N-S (cols 78-81) and E-W (rows 48-51) cross at the centre.
+// River #1 (rows 28-30): 3 bridges — centre, west, east.
+// River #2 (rows 70-72): centre bridge only — deep danger zone.
+const WLD_W=160,WLD_H=100;
 const WILDERNESS_MAP=(()=>{
   const m=Array.from({length:WLD_H},()=>new Array(WLD_W).fill(T.GRASS));
   const set=(r,c,t)=>{if(r>=0&&r<WLD_H&&c>=0&&c<WLD_W)m[r][c]=t;};
@@ -947,141 +965,170 @@ const WILDERNESS_MAP=(()=>{
     for(let r=r1;r<=r2;r++){set(r,c1,T.WALL);set(r,c2,T.WALL);}
   };
 
-  // Perimeter walls
+  // ── Perimeter walls ────────────────────────────────────────────────────────
   box(0,0,WLD_H-1,WLD_W-1);
 
-  // ── TOWN GATE (north, cols 38-41) ────────────────────────────────────────
-  // Open the north perimeter wall here (player arrives from town south gate)
-  for(let c=38;c<=41;c++)set(0,c,T.ROAD);
-  fill(1,38,4,41,T.ROAD);
-  // Gate pillars flanking the opening
-  set(0,37,T.COLUMN);set(0,42,T.COLUMN);
-  set(1,37,T.WALL);set(2,37,T.WALL);set(3,37,T.WALL);
-  set(1,42,T.WALL);set(2,42,T.WALL);set(3,42,T.WALL);
+  // ── Forest zones (large blocks — roads/clearings are carved after) ─────────
+  fill(5,2,27,76,T.TREE);      // NW forest (north safe zone, west of road)
+  fill(5,83,27,157,T.TREE);    // NE forest
+  fill(31,2,47,76,T.TREE);     // W upper danger forest (above E-W road)
+  fill(31,83,47,157,T.TREE);   // E upper danger forest
+  fill(54,2,69,76,T.TREE);     // W lower danger forest (below E-W road)
+  fill(54,83,69,157,T.TREE);   // E lower danger forest
+  fill(73,2,89,76,T.TREE);     // W deep danger forest (below river 2)
+  fill(73,83,89,157,T.TREE);   // E deep danger forest
+  fill(92,2,98,76,T.TREE);     // SW south safe zone forests
+  fill(92,83,98,157,T.TREE);   // SE south safe zone forests
 
-  // ── MAIN NORTH–SOUTH ROAD (cols 38-41 → narrows to dirt path) ────────────
-  fill(0,38,20,41,T.ROAD);       // cobble road from gate to crossroads
-  fill(21,39,35,40,T.DIRT);      // narrows to 2-tile dirt after crossroads
-  fill(38,39,58,40,T.DIRT);      // continues south of river
+  // ── Clearings carved within forest blocks ─────────────────────────────────
+  // NW glade (safe zone, accessible via dirt spur from road)
+  fill(7,5,20,32,T.GRASS);
+  for(let c=5;c<=32;c++){set(7,c,T.SHRUB);set(20,c,T.SHRUB);}
+  for(let r=7;r<=20;r++){set(r,5,T.SHRUB);set(r,32,T.SHRUB);}
+  // NE glade
+  fill(7,125,20,152,T.GRASS);
+  for(let c=125;c<=152;c++){set(7,c,T.SHRUB);set(20,c,T.SHRUB);}
+  for(let r=7;r<=20;r++){set(r,125,T.SHRUB);set(r,152,T.SHRUB);}
+  // W mid-danger clearing (between rivers, west side)
+  fill(33,5,68,34,T.GRASS);
+  // E mid-danger clearing
+  fill(33,124,68,153,T.GRASS);
+  // Deep-zone centre clearing (funnel to dungeon)
+  fill(73,60,89,99,T.GRASS);
 
-  // ── WEST FOREST WALL (rows 2-17, cols 2-36) ──────────────────────────────
-  fill(2,2,17,36,T.TREE);
-  // Carve NW glade (accessible via east spur from road)
-  fill(3,5,10,15,T.GRASS);
-  for(let c=5;c<=15;c++){set(3,c,T.SHRUB);set(10,c,T.SHRUB);}
-  for(let r=3;r<=10;r++){set(r,5,T.SHRUB);set(r,15,T.SHRUB);}
-  // Carve west mid-glade
-  fill(11,16,17,33,T.GRASS);
-  for(let c=16;c<=33;c++){set(11,c,T.SHRUB);set(17,c,T.SHRUB);}
-  for(let r=11;r<=17;r++){set(r,16,T.SHRUB);set(r,33,T.SHRUB);}
-  // Dirt spur from road into NW glade
-  fill(6,16,8,37,T.DIRT);
+  // ── Main roads (overwrite forest where they cross) ─────────────────────────
+  fill(1,78,98,81,T.ROAD);     // N-S road — full map height
+  fill(48,1,51,158,T.ROAD);    // E-W road — full map width
+  fill(46,76,53,83,T.ROAD);    // crossroads widening
 
-  // ── EAST FOREST WALL (rows 2-17, cols 43-77) ─────────────────────────────
-  fill(2,43,17,77,T.TREE);
-  // Carve NE glade
-  fill(3,47,10,59,T.GRASS);
-  for(let c=47;c<=59;c++){set(3,c,T.SHRUB);set(10,c,T.SHRUB);}
-  for(let r=3;r<=10;r++){set(r,47,T.SHRUB);set(r,59,T.SHRUB);}
-  // Dirt spur from road into NE glade
-  fill(6,42,8,47,T.DIRT);
+  // ── Side paths (dirt) through mid-zone clearings ──────────────────────────
+  fill(31,35,69,36,T.DIRT);    // W side corridor (edges clearings)
+  fill(31,122,69,123,T.DIRT);  // E side corridor
 
-  // ── ANCIENT RUINS (northeast clearing, rows 3-17, cols 61-77) ────────────
-  fill(3,61,17,77,T.GRASS); // clear the east forest for ruins
-  box(4,62,16,76);           // ruin outer walls
-  fill(5,63,15,75,T.STONE);  // ruin interior stone floor
-  // Gaps in ruin walls — north and south entrances
-  set(4,67,T.STONE);set(4,68,T.STONE);set(4,69,T.STONE);   // north gap
-  set(16,67,T.STONE);set(16,68,T.STONE);set(16,69,T.STONE); // south gap
-  // Interior features
-  fill(6,64,9,67,T.VAULT);fill(6,71,9,74,T.VAULT);
-  fill(11,64,14,67,T.VAULT);fill(11,71,14,74,T.VAULT);
-  set(10,68,T.COLUMN);set(10,70,T.COLUMN);
-  set(7,69,T.SHRUB);set(13,69,T.SHRUB); // moss growing through ruins
-  // Path from NE glade to ruins entrance
-  fill(10,59,12,62,T.DIRT);
+  // ── River 1 (rows 28-30) — three bridges ──────────────────────────────────
+  fill(28,1,30,158,T.WATER);
+  fill(28,78,30,81,T.ROAD);    // centre bridge
+  fill(28,35,30,38,T.ROAD);    // west bridge
+  fill(28,120,30,123,T.ROAD);  // east bridge
+  // Warning signs north of river
+  set(27,75,T.SIGN);set(27,82,T.SIGN);
+  set(27,33,T.SIGN);set(27,121,T.SIGN);
 
-  // ── CROSSROADS (rows 18-22) ──────────────────────────────────────────────
-  fill(18,2,20,77,T.ROAD);   // E-W main road crossing wilderness
-  fill(17,37,21,41,T.ROAD);  // widen crossing area
-  // Waymarker well / campfire at crossroads
-  set(19,35,T.FOUNTAIN);set(19,36,T.FOUNTAIN);
-  set(20,35,T.FOUNTAIN);set(20,36,T.FOUNTAIN);
-  // Directional signs
-  set(17,32,T.SIGN);  // west: "Ruins"
-  set(17,44,T.SIGN);  // east: path marker
-  set(22,38,T.SIGN);  // south: "Danger Ahead"
+  // ── River 2 (rows 70-72) — centre bridge only ─────────────────────────────
+  fill(70,1,72,158,T.WATER);
+  fill(70,78,72,81,T.ROAD);    // only the main bridge crosses
+  set(69,75,T.SIGN);set(69,82,T.SIGN);
 
-  // ── OPEN MIDDLE WILDERNESS (rows 22-35, scattered trees/shrubs) ──────────
-  // Wider dirt path heading east along south side of crossroads road
-  fill(21,2,21,77,T.DIRT);
-  // Scattered trees (not contiguous — player can weave between them)
-  [[23,5],[23,12],[23,20],[23,30],[23,50],[23,60],[23,70],
-   [25,8],[25,16],[25,25],[25,55],[25,65],[25,73],
-   [28,3],[28,14],[28,22],[28,45],[28,62],[28,74],
-   [30,10],[30,20],[30,32],[30,47],[30,58],[30,72],
-   [33,6],[33,18],[33,28],[33,50],[33,63],[33,74],
-   [35,11],[35,23],[35,44],[35,56],[35,68],
+  // ── NORTH PORTAL (from town south gate) — row 0, cols 78-81 ──────────────
+  for(let c=78;c<=81;c++)set(0,c,T.ROAD);
+  fill(1,78,6,81,T.ROAD);
+  set(0,77,T.COLUMN);set(0,82,T.COLUMN);
+  for(let r=1;r<=5;r++){set(r,77,T.WALL);set(r,82,T.WALL);}
+
+  // ── SOUTH PORTAL (from town north gate) — row 99, cols 78-81 ─────────────
+  for(let c=78;c<=81;c++)set(99,c,T.ROAD);
+  fill(93,78,98,81,T.ROAD);
+  set(99,77,T.COLUMN);set(99,82,T.COLUMN);
+  for(let r=94;r<=98;r++){set(r,77,T.WALL);set(r,82,T.WALL);}
+
+  // ── WEST PORTAL (from town east gate) — col 0, rows 48-51 ────────────────
+  for(let r=48;r<=51;r++)set(r,0,T.ROAD);
+  fill(48,1,51,6,T.ROAD);
+  set(47,0,T.COLUMN);set(52,0,T.COLUMN);
+  for(let c=1;c<=5;c++){set(47,c,T.WALL);set(52,c,T.WALL);}
+
+  // ── EAST PORTAL (from town west gate) — col 159, rows 48-51 ──────────────
+  for(let r=48;r<=51;r++)set(r,159,T.ROAD);
+  fill(48,153,51,158,T.ROAD);
+  set(47,159,T.COLUMN);set(52,159,T.COLUMN);
+  for(let c=154;c<=158;c++){set(47,c,T.WALL);set(52,c,T.WALL);}
+
+  // ── Crossroads features ───────────────────────────────────────────────────
+  set(46,76,T.FOUNTAIN);set(46,77,T.FOUNTAIN);
+  set(47,76,T.FOUNTAIN);set(47,77,T.FOUNTAIN);
+  set(45,74,T.SIGN);set(45,84,T.SIGN);  // direction markers
+  set(53,74,T.SIGN);set(53,84,T.SIGN);
+
+  // ── Dirt spurs connecting roads to glades ─────────────────────────────────
+  fill(13,33,15,77,T.DIRT);   // NW glade spur
+  fill(13,82,15,125,T.DIRT);  // NE glade spur
+
+  // ── NW GLADE RUINS (safe zone) ────────────────────────────────────────────
+  box(9,8,18,24);
+  fill(10,9,17,23,T.STONE);
+  set(9,14,T.STONE);set(9,15,T.STONE);set(9,16,T.STONE);   // N entrance
+  set(18,14,T.STONE);set(18,15,T.STONE);set(18,16,T.STONE); // S entrance
+  fill(11,10,15,13,T.VAULT);fill(11,19,15,22,T.VAULT);
+  set(13,15,T.COLUMN);set(13,16,T.COLUMN);
+  set(10,9,T.SHRUB);set(17,22,T.SHRUB);
+
+  // ── NE GLADE RUINS (safe zone) ────────────────────────────────────────────
+  box(9,132,18,148);
+  fill(10,133,17,147,T.STONE);
+  set(9,138,T.STONE);set(9,139,T.STONE);set(9,140,T.STONE);
+  set(18,138,T.STONE);set(18,139,T.STONE);set(18,140,T.STONE);
+  fill(11,134,15,137,T.VAULT);fill(11,143,15,146,T.VAULT);
+  set(13,139,T.COLUMN);set(13,140,T.COLUMN);
+  set(10,133,T.SHRUB);set(17,146,T.SHRUB);
+
+  // ── W DANGER RUINS (mid-zone clearing, rows 35-52) ────────────────────────
+  box(37,7,50,24);
+  fill(38,8,49,23,T.STONE);
+  set(37,14,T.STONE);set(37,15,T.STONE);set(37,16,T.STONE);
+  set(50,14,T.STONE);set(50,15,T.STONE);set(50,16,T.STONE);
+  fill(40,9,47,12,T.VAULT);fill(40,18,47,22,T.VAULT);
+  set(44,14,T.COLUMN);set(44,15,T.COLUMN);
+  set(38,8,T.SHRUB);set(38,22,T.SHRUB);set(49,8,T.SHRUB);set(49,22,T.SHRUB);
+  // Path from side corridor to ruins entrance
+  fill(37,25,51,35,T.DIRT);
+
+  // ── E DANGER RUINS (mid-zone clearing) ────────────────────────────────────
+  box(37,133,50,150);
+  fill(38,134,49,149,T.STONE);
+  set(37,140,T.STONE);set(37,141,T.STONE);set(37,142,T.STONE);
+  set(50,140,T.STONE);set(50,141,T.STONE);set(50,142,T.STONE);
+  fill(40,135,47,139,T.VAULT);fill(40,144,47,148,T.VAULT);
+  set(44,140,T.COLUMN);set(44,141,T.COLUMN);
+  set(38,134,T.SHRUB);set(38,148,T.SHRUB);set(49,134,T.SHRUB);set(49,148,T.SHRUB);
+  fill(37,122,51,133,T.DIRT);
+
+  // ── DUNGEON ENTRANCE (deep south, centre clearing) ────────────────────────
+  fill(79,68,88,91,T.GRASS);
+  fill(80,70,87,89,T.VAULT);
+  fill(82,74,85,85,T.GRATING);
+  set(78,75,T.SIGN);set(78,76,T.SIGN);set(78,77,T.SIGN);
+  set(78,82,T.SIGN);set(78,83,T.SIGN);
+
+  // ── W DEEP RUINS (below river 2) ──────────────────────────────────────────
+  box(75,7,86,22);
+  fill(76,8,85,21,T.STONE);
+  set(75,13,T.STONE);set(75,14,T.STONE);set(75,15,T.STONE);
+  set(86,13,T.STONE);set(86,14,T.STONE);set(86,15,T.STONE);
+  fill(78,9,83,12,T.VAULT);fill(78,17,83,20,T.VAULT);
+  set(80,13,T.COLUMN);set(80,14,T.COLUMN);
+
+  // ── E DEEP RUINS ──────────────────────────────────────────────────────────
+  box(75,135,86,152);
+  fill(76,136,85,151,T.STONE);
+  set(75,142,T.STONE);set(75,143,T.STONE);set(75,144,T.STONE);
+  set(86,142,T.STONE);set(86,143,T.STONE);set(86,144,T.STONE);
+  fill(78,137,83,141,T.VAULT);fill(78,145,83,149,T.VAULT);
+  set(80,142,T.COLUMN);set(80,143,T.COLUMN);
+
+  // ── Scattered trees in open zones (weave-around obstacles) ────────────────
+  // North safe zone scattered obstacles
+  [[3,10],[3,60],[3,100],[3,140],[22,10],[22,40],[22,118],[22,148],
+   [25,20],[25,55],[25,103],[25,138],
   ].forEach(([r,c])=>set(r,c,T.TREE));
-  [[24,9],[24,17],[24,52],[24,68],
-   [26,4],[26,26],[26,52],[26,71],
-   [29,11],[29,22],[29,63],[29,75],
-   [31,8],[31,33],[31,56],[31,70],
-   [34,15],[34,30],[34,52],[34,65],
-  ].forEach(([r,c])=>set(r,c,T.SHRUB));
+  // Between rivers scattered
+  [[55,40],[55,58],[55,100],[55,118],
+   [60,38],[60,55],[60,103],[60,120],
+   [65,42],[65,56],[65,102],[65,116],
+  ].forEach(([r,c])=>set(r,c,T.TREE));
 
-  // ── RIVER (rows 36-37) ───────────────────────────────────────────────────
-  fill(36,1,37,78,T.WATER);
-  fill(36,38,37,41,T.ROAD); // main bridge
-  fill(36,18,37,20,T.ROAD); // west bridge
-  fill(36,58,37,60,T.ROAD); // east bridge
-
-  // Danger warning signs just before the river
-  set(35,35,T.SIGN);set(35,36,T.SIGN);set(35,43,T.SIGN);
-
-  // ── DANGER ZONE (rows 38-58) ─────────────────────────────────────────────
-  // Dense forest walls flanking the three paths
-  fill(38,2,57,16,T.TREE);    // far-west danger forest
-  fill(38,22,57,37,T.TREE);   // left-of-center danger forest
-  fill(38,43,57,56,T.TREE);   // right-of-center danger forest
-  fill(38,62,57,77,T.TREE);   // far-east danger forest
-
-  // Walkable corridors around paths
-  fill(38,17,57,21,T.GRASS);  fill(38,18,57,20,T.DIRT); // west corridor
-  fill(38,57,57,61,T.GRASS);  fill(38,57,57,60,T.DIRT); // east corridor
-
-  // Carved glades in inner danger forests (accessible from center path)
-  fill(40,22,56,37,T.GRASS);  // SW inner clearing
-  fill(40,43,56,56,T.GRASS);  // SE inner clearing
-
-  // ── SOUTH RUINS (within danger zone, SW clearing) ────────────────────────
-  box(42,24,53,35);
-  fill(43,25,52,34,T.STONE);
-  // North and south wall gaps (entrances)
-  set(42,28,T.STONE);set(42,29,T.STONE);set(42,30,T.STONE);
-  set(53,28,T.STONE);set(53,29,T.STONE);set(53,30,T.STONE);
-  // Interior
-  fill(45,26,50,28,T.VAULT);fill(45,31,50,33,T.VAULT);
-  set(48,29,T.COLUMN);set(48,30,T.COLUMN);
-  set(44,25,T.SHRUB);set(44,33,T.SHRUB);set(52,25,T.SHRUB);
-
-  // ── EAST DANGER RUINS (SE clearing) ──────────────────────────────────────
-  box(42,45,53,55);
-  fill(43,46,52,54,T.STONE);
-  set(42,48,T.STONE);set(42,49,T.STONE);set(42,50,T.STONE);
-  set(53,48,T.STONE);set(53,49,T.STONE);set(53,50,T.STONE);
-  fill(45,47,50,49,T.VAULT);fill(45,51,50,53,T.VAULT);
-  set(48,50,T.COLUMN);
-  set(44,46,T.SHRUB);set(52,54,T.SHRUB);
-
-  // ── DUNGEON ENTRANCE HINT (deep south, center) ───────────────────────────
-  fill(54,34,58,45,T.GRASS);   // clearing leading to dungeon
-  fill(55,36,57,43,T.VAULT);   // dark dungeon-mouth floor
-  set(53,37,T.SIGN);set(53,38,T.SIGN);set(53,39,T.SIGN); // "DUNGEON" markers
-
-  // ── PERIMETER PATHS (thin walkable strips along walls) ───────────────────
-  fill(2,3,35,4,T.DIRT);    // west wall path (safe zone only)
-  fill(2,75,35,76,T.DIRT);  // east wall path (safe zone only)
+  // ── Perimeter wall paths (walkable thin strips) ────────────────────────────
+  fill(2,3,27,4,T.DIRT);      // N-zone west wall
+  fill(2,155,27,156,T.DIRT);  // N-zone east wall
 
   return m;
 })();
@@ -1179,7 +1226,7 @@ function makeTreasury(){
 const ZONES = {
   town:       {map:TOWN_MAP,        w:MAP_W,  h:MAP_H,  spawnX:20,spawnY:14,solid:SOLID_TILES,
                name:'Town Square',bg:'town'},
-  wilderness: {map:WILDERNESS_MAP,  w:WLD_W,  h:WLD_H,  spawnX:39,spawnY:5, solid:SOLID_TILES,
+  wilderness: {map:WILDERNESS_MAP,  w:WLD_W,  h:WLD_H,  spawnX:79,spawnY:4, solid:WILDERNESS_SOLID,
                name:'Wilderness',bg:'wilderness'},
   tavern:     {map:ZONE_MAPS.tavern,      w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
                name:'The Tavern',bg:'tavern'},
@@ -1297,9 +1344,20 @@ const ZONE_DOORS = {
   governance_exit: {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:12},
   marketplace_exit:{tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:8,  sy:14},
   treasury_exit:   {tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:29, sy:14},
-  // Wilderness exits (town south gate → wilderness north gate)
-  town_wilderness: {tileRows:[27],           tileCols:[19,20],           to:'wilderness', sx:39, sy:5},
-  wilderness_town: {tileRows:[0,1,2,3,4],    tileCols:[38,39,40,41],     to:'town',       sx:19, sy:26},
+  // ── Town → Wilderness (4 gates) ──
+  // South gate: enter wilderness from the north
+  town_wld_south:  {tileRows:[27],     tileCols:[19,20],    to:'wilderness', sx:79, sy:4},
+  // North gate: enter wilderness from the south
+  town_wld_north:  {tileRows:[0],      tileCols:[19,20],    to:'wilderness', sx:79, sy:95},
+  // East gate: enter wilderness from the west
+  town_wld_east:   {tileRows:[13,14],  tileCols:[39],       to:'wilderness', sx:4,  sy:49},
+  // West gate: enter wilderness from the east
+  town_wld_west:   {tileRows:[13,14],  tileCols:[0],        to:'wilderness', sx:155,sy:49},
+  // ── Wilderness → Town (4 return portals) ──
+  wld_exit_north:  {tileRows:[0,1,2,3,4],       tileCols:[78,79,80,81],            to:'town', sx:19, sy:26},
+  wld_exit_south:  {tileRows:[95,96,97,98,99],   tileCols:[78,79,80,81],            to:'town', sx:20, sy:1},
+  wld_exit_west:   {tileRows:[48,49,50,51],      tileCols:[0,1,2,3,4,5,6],         to:'town', sx:38, sy:13},
+  wld_exit_east:   {tileRows:[48,49,50,51],      tileCols:[153,154,155,156,157,158,159], to:'town', sx:1, sy:13},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
@@ -2060,18 +2118,29 @@ function makeScaledEnemy(key,depth){
   };
 }
 
+// How far are we from the nearest portal safe zone?
+// Safe zones: within 14 tiles of any portal entrance.
+function wildernessDepth(){
+  const tx=Math.floor(G.x/TS), ty=Math.floor(G.y/TS);
+  // Manhattan distance to each portal tile, minus safe radius
+  const dN=Math.max(0,(ty-14))+Math.max(0,Math.abs(tx-79)-6);  // N portal row 0
+  const dS=Math.max(0,(85-ty))+Math.max(0,Math.abs(tx-79)-6);  // S portal row 99
+  const dW=Math.max(0,(tx-14))+Math.max(0,Math.abs(ty-49)-6);  // W portal col 0
+  const dE=Math.max(0,(144-tx))+Math.max(0,Math.abs(ty-49)-6); // E portal col 159
+  return Math.min(dN,dS,dW,dE); // 0 = safe zone, higher = deeper danger
+}
+
 function checkEncounter(){
   if(G.battle)return;
   if(G.zone!=='wilderness')return;
-  const ty=Math.floor(G.y/TS);
-  if(ty<=38)return;          // safe — north of / at river
   if(!G.moving)return;
-  if(G.tick%90!==0)return;   // check every ~1.5 s at 60 fps
-  if(Math.random()>0.12)return; // 12% chance per check
-  const depth=ty-38;
+  if(G.tick%50!==0)return;       // check every ~0.8 s at 60 fps
+  const depth=wildernessDepth();
+  if(depth<8)return;             // safe zone — no encounters
+  if(Math.random()>0.22)return;  // 22% chance per check
   let key;
-  if(depth<8)       key=Math.random()<0.55?'wolf':'goblin';
-  else if(depth<16) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
+  if(depth<18)      key=Math.random()<0.55?'wolf':'goblin';
+  else if(depth<32) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
   else              key=Math.random()<0.35?'darkKnight':'skeleton';
   triggerBattle(key,depth);
 }
