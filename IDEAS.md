@@ -99,23 +99,46 @@ Reference: Mega Man X (Capcom, 1993) on SNES. This is the visual bar to hit.
 
 ### Overall Feel
 - Zelda-style top-down action RPG
-- Small town world with outdoor map and enterable buildings
-- Randomly generated adversaries roam the map and building interiors
+- Town as safe haven surrounded by a wider dangerous world
+- Randomly generated adversaries roam the wilderness and dungeon zones
+
+### Town as Safe Haven
+- The town (and all its interiors) is a **combat-free safe zone** — no enemies can enter
+- Leaving town via exits on the map edge transitions the player into the **Wilderness**
+- The Wilderness is a larger, scrolling overworld map with hostile zones, ruins, dungeons
+- Players return to town to sell loot, queue for the economic zone, recover HP, and interact
+- Visual cue at town boundary: the art style subtly shifts (darker palette, more jagged tiles) as you cross into danger
+- NPCs in town can comment on what's happening in the wilderness ("adventurers haven't returned from the eastern ruins...")
 
 ### Zones
-- Outdoor town (free exploration, combat)
-- Economic Zone (Marketplace + Treasury) — gated behind veQueue
-- Governance Hall — quest-related NPC interactions
-- Tavern — social hub, messages, leaderboard
+- **Town Square** — safe hub, shops, social, veQueue entry points
+- **Town Interiors** — Tavern, Governance Hall, Marketplace, Treasury (all safe)
+- **Wilderness / Overworld** — dangerous open world, enemies roam freely, multiple biomes
+- **Dungeons / Ruins** — fixed-location deep-danger zones with rare loot and boss-level adversaries
+- **Economic Zone** (Marketplace + Treasury interior) — gated behind veQueue, safe once inside
 
 ---
 
 ## Combat System
 
-- Player starts with a basic weapon (e.g. sword) and shield/armor
-- Zelda-style combat: attack, block/dodge with shield
-- Defeating adversaries earns currency (variable amounts by enemy type/difficulty)
+### Encounter Transition — Final Fantasy Style
+- Combat triggers when the player walks into a hostile enemy in the wilderness (bump-to-fight)
+- On trigger: the **screen pixelates outward** from the collision point (mosaic/pixelation effect), then zooms into a dedicated **battle screen** — a separate full-screen view with the two combatants facing off
+- Battle screen art is more zoomed-in and detailed than the overworld — big sprites, visible HP bars, attack animations
+- After the fight resolves (win, lose, or flee) the screen pixelates back and returns to the overworld at the same position
+- The pixelation + zoom transition is the signature feel — players should immediately recognize "a fight is starting"
+
+### Battle Screen Layout
+- Player sprite on the left, enemy on the right (classic JRPG positioning)
+- HP bars for both combatants displayed prominently
+- Action menu: **Attack**, **Item**, **Flee** (turn-based, not real-time — simpler to implement, easier to balance)
+- Enemy has a visible name, level, and loot preview (what they're carrying)
+- Stat system feeds directly into combat: STR → damage, END → damage reduction, AGI → flee chance / who goes first, LCK → crit chance, VIT → max HP
+
+### General Combat Rules
 - Adversaries are all NPCs — no PvP
+- Player starts with a basic weapon (e.g. sword) and shield/armor
+- Defeating adversaries earns currency (variable amounts by enemy type/difficulty)
 - Adversary populations regenerate slowly over real time; clearing an area makes it safer for others temporarily
 
 ---
