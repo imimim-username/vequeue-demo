@@ -44,8 +44,10 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 .stat-row{display:flex;gap:.5rem;align-items:center}
 .stat-name{color:#ccc;font-size:.8rem;width:80px}
 .stat-bar{display:flex;gap:2px}
-.stat-pip{width:14px;height:14px;border:1px solid #555;cursor:pointer}
-.stat-pip.filled{background:#FFD700}
+.stat-pip{width:12px;height:14px;border:1px solid #444;cursor:pointer;border-radius:1px}
+.stat-pip.filled{background:#FFD700;border-color:#CC9900}
+.stat-pip.capped{background:#1A1A1A;border-color:#2A2A2A;cursor:default;opacity:0.35}
+.stat-pip.filled.capped{background:#4A3A00;border-color:#332800;opacity:0.35}
 .stat-pts{color:#FFD700;font-size:.8rem;min-width:60px;text-align:right}
 #btn-create{background:#FFD700;border:none;color:#000;font-family:inherit;font-weight:bold;
   font-size:1.1rem;letter-spacing:.15em;padding:.6rem 2.5rem;cursor:pointer;margin-top:1rem}
@@ -1047,166 +1049,229 @@ function drawInteriorBG(ctx,zone,W,H){
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware
 function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor){
+  // ── Mega Man X–style armored hero sprite ─────────────────────────────────
   const sp=species||'human';
   const f=moving?(Math.floor(frame/4)%8):0;
   const c=color||'#2255DD';
-  const hi=lighten(c,55),mid=c,sh=darken(c,55);
-  const hair=hairColor||'#3A2010';
-  const hairHL=lighten(hair,30);
-  const boot='#2A1A08',bootHL='#4A3018';
-  const armSwing=[0,3,5,3,0,-3,-5,-3][f];
-  const px=ox,py=oy;
 
-  // per-species skin tones & body tweaks
+  // 5-shade armor palette
+  const aOut=darken(c,100); // very dark outline
+  const aSh =darken(c,60);  // shadow
+  const aMid=c;              // base
+  const aHi =lighten(c,50); // highlight
+  const aBrt=lighten(c,85); // bright accent / chest gem center
+
+  const hair=hairColor||HAIR_COLORS[1];
+  const hairHL=lighten(hair,35);
+  const hairSh=darken(hair,25);
+
+  // skin tones
   const skins={
-    human: {skin:'#FFCC99',dark:'#E8AA77',hl:'#FFE0BB',eyeC:'#3A2A1A'},
-    elf:   {skin:'#FFE0CC',dark:'#EEC4A0',hl:'#FFF4EE',eyeC:'#1A3A1A'},
-    dwarf: {skin:'#DDA870',dark:'#C08050',hl:'#EEC090',eyeC:'#3A1A00'},
-    goblin:{skin:'#90B060',dark:'#708040',hl:'#B0D080',eyeC:'#402000'},
-    orc:   {skin:'#80A050',dark:'#507030',hl:'#A0C070',eyeC:'#200000'},
-    robot: {skin:'#909090',dark:'#606060',hl:'#C0C0C0',eyeC:'#0060FF'},
+    human: {skin:'#FFCC99',sk2:'#D99A66',sk3:'#FFE8CC',eye:'#3A2A1A'},
+    elf:   {skin:'#F5D8B8',sk2:'#D0A878',sk3:'#FFF0E0',eye:'#1A401A'},
+    dwarf: {skin:'#CC8844',sk2:'#A06030',sk3:'#E0A060',eye:'#3A1A00'},
+    goblin:{skin:'#88AA40',sk2:'#5A7820',sk3:'#AACF60',eye:'#3A2000'},
+    orc:   {skin:'#6A9030',sk2:'#446020',sk3:'#8AB050',eye:'#200000'},
+    robot: {skin:'#A0A0A0',sk2:'#606060',sk3:'#C8C8C8',eye:'#00C0FF'},
   };
   const sk=skins[sp]||skins.human;
+  const boot='#201008',bootHL='#382010',bootSh='#100800';
 
-  // body proportions per species
-  const dims={
-    human: {bx:4,bw:16,by:12,bh:18,lx:[5,14],lw:6,lh:12,hx:4,hw:16,hy:0,hh:10,shadow:16},
-    elf:   {bx:5,bw:14,by:12,bh:20,lx:[6,14],lw:5,lh:14,hx:5,hw:14,hy:-2,hh:10,shadow:14},
-    dwarf: {bx:3,bw:18,by:14,bh:15,lx:[4,15],lw:7,lh:10,hx:3,hw:18,hy:2, hh:10,shadow:20},
-    goblin:{bx:5,bw:14,by:14,bh:14,lx:[6,14],lw:5,lh:10,hx:4,hw:16,hy:2, hh:10,shadow:14},
-    orc:   {bx:3,bw:18,by:12,bh:18,lx:[4,15],lw:7,lh:12,hx:3,hw:18,hy:0, hh:10,shadow:20},
-    robot: {bx:4,bw:16,by:12,bh:18,lx:[5,14],lw:6,lh:12,hx:3,hw:18,hy:0, hh:11,shadow:18},
-  }[sp]||{bx:4,bw:16,by:12,bh:18,lx:[5,14],lw:6,lh:12,hx:4,hw:16,hy:0,hh:10,shadow:16};
+  // species body dimensions: helmet(hx,hy,hw,hh), body(bx,by,bw,bh), legs(lw), shoulder-pad width(sw)
+  const SD={
+    human: {hx:4,hy:0, hw:16,hh:12,bx:4,by:14,bw:16,bh:13,lw:6,sw:4,legGap:10},
+    elf:   {hx:5,hy:-2,hw:14,hh:11,bx:5,by:13,bw:14,bh:15,lw:5,sw:3,legGap:9},
+    dwarf: {hx:3,hy:1, hw:18,hh:11,bx:3,by:14,bw:18,bh:11,lw:7,sw:5,legGap:11},
+    goblin:{hx:4,hy:2, hw:15,hh:10,bx:5,by:14,bw:14,bh:10,lw:5,sw:3,legGap:9},
+    orc:   {hx:2,hy:0, hw:20,hh:12,bx:2,by:14,bw:20,bh:13,lw:8,sw:6,legGap:12},
+    robot: {hx:3,hy:0, hw:18,hh:12,bx:3,by:14,bw:18,bh:13,lw:7,sw:5,legGap:11},
+  }[sp]||{hx:4,hy:0,hw:16,hh:12,bx:4,by:14,bw:16,bh:13,lw:6,sw:4,legGap:10};
+  const {hx,hy,hw,hh,bx,by,bw,bh,lw,sw,legGap}=SD;
+  const cx2=12; // sprite horizontal center
 
-  const animLegs={
-    0:[[dims.lx[0],28,dims.lw,dims.lh],[dims.lx[1],28,dims.lw,dims.lh]],
-    1:[[dims.lx[0]-2,26,dims.lw,dims.lh+2],[dims.lx[1]+1,30,dims.lw,dims.lh-2]],
-    2:[[dims.lx[0]-3,24,dims.lw,dims.lh+4],[dims.lx[1]+0,28,dims.lw,dims.lh]],
-    3:[[dims.lx[0]-2,26,dims.lw,dims.lh+2],[dims.lx[1]+1,30,dims.lw,dims.lh-2]],
-    4:[[dims.lx[0],28,dims.lw,dims.lh],[dims.lx[1],28,dims.lw,dims.lh]],
-    5:[[dims.lx[0]+1,30,dims.lw,dims.lh-2],[dims.lx[1]-2,26,dims.lw,dims.lh+2]],
-    6:[[dims.lx[0]+0,28,dims.lw,dims.lh],[dims.lx[1]-3,24,dims.lw,dims.lh+4]],
-    7:[[dims.lx[0]+1,30,dims.lw,dims.lh-2],[dims.lx[1]-2,26,dims.lw,dims.lh+2]],
-  }[f]||[[dims.lx[0],28,dims.lw,dims.lh],[dims.lx[1],28,dims.lw,dims.lh]];
+  // walk-cycle offsets (leg/arm swing)
+  const swing=[0,3,5,3,0,-3,-5,-3][f]||0;
+  const lLegOff=moving? swing:0;
+  const rLegOff=moving?-swing:0;
+  const lArmOff=moving?-swing:0;
+  const rArmOff=moving? swing:0;
 
-  // shadow
-  ctx.fillStyle='#00000044';ctx.fillRect(px+4,py+39,dims.shadow,3);
+  // ── Shadow ──
+  ctx.fillStyle='#00000040';
+  ctx.fillRect(ox+cx2-10,oy+41,20,3);
 
-  // ── legs ──
-  animLegs.forEach(([lx,ly,lw,lh])=>{
-    ctx.fillStyle=sh;ctx.fillRect(px+lx,py+ly,lw,lh);
-    ctx.fillStyle=mid;ctx.fillRect(px+lx,py+ly,lw-2,lh);
-    ctx.fillStyle=hi;ctx.fillRect(px+lx,py+ly,2,lh);
-    ctx.fillStyle=boot;ctx.fillRect(px+lx-1,py+ly+lh-4,lw+2,4);
-    ctx.fillStyle=bootHL;ctx.fillRect(px+lx,py+ly+lh-4,lw,2);
+  // ── Helper: rect with 1px dark outline ──
+  // (used throughout: draws outline color 1px larger, then fill on top)
+  const OR=(x,y,w,h,fill,out)=>{
+    ctx.fillStyle=out||aOut;ctx.fillRect(ox+x-1,oy+y-1,w+2,h+2);
+    ctx.fillStyle=fill;ctx.fillRect(ox+x,oy+y,w,h);
+  };
+
+  // ─ Boots ─
+  const bootY=by+bh+9;
+  const ll=cx2-legGap/2-lw, lr=cx2+legGap/2; // left-leg x, right-leg x
+  [ll,lr].forEach(lx=>{
+    ctx.fillStyle=bootSh;ctx.fillRect(ox+lx-1,oy+bootY-1,lw+2,8);
+    ctx.fillStyle=boot;  ctx.fillRect(ox+lx,  oy+bootY,  lw,  7);
+    ctx.fillStyle=bootHL;ctx.fillRect(ox+lx,  oy+bootY,  lw,  2);
   });
 
-  // ── body ──
-  ctx.fillStyle=sh;ctx.fillRect(px+dims.bx,py+dims.by,dims.bw,dims.bh);
-  ctx.fillStyle=mid;ctx.fillRect(px+dims.bx,py+dims.by,dims.bw-2,dims.bh);
-  ctx.fillStyle=hi;ctx.fillRect(px+dims.bx,py+dims.by,4,dims.bh);
-  // chest gem / emblem
-  ctx.fillStyle=darken(c,30);ctx.fillRect(px+dims.bx+5,py+dims.by+2,6,7);
-  ctx.fillStyle=lighten(c,80);ctx.fillRect(px+dims.bx+6,py+dims.by+3,4,2);
-  // belt
-  ctx.fillStyle='#3A2808';ctx.fillRect(px+dims.bx,py+dims.by+dims.bh-4,dims.bw,4);
-  ctx.fillStyle='#D4AF37';ctx.fillRect(px+dims.bx+dims.bw/2-2,py+dims.by+dims.bh-4,4,4);
+  // ─ Legs ─
+  const legY=by+bh;
+  // left leg
+  ctx.fillStyle=aOut;ctx.fillRect(ox+ll-1,oy+legY+lLegOff-1,lw+2,11);
+  ctx.fillStyle=aSh; ctx.fillRect(ox+ll,  oy+legY+lLegOff,  lw,  11);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+ll,  oy+legY+lLegOff,  lw-2,11);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+ll,  oy+legY+lLegOff,  2,   11);
+  // left knee pad
+  OR(ll,legY+4+lLegOff,lw,4,aBrt);
+  ctx.fillStyle=aHi;ctx.fillRect(ox+ll,oy+legY+4+lLegOff,lw,2);
 
-  // ── arms ──
-  const al=dims.bx-3,ar=dims.bx+dims.bw-1;
-  ctx.fillStyle=mid;ctx.fillRect(px+al,py+dims.by+1+armSwing,4,12);
-  ctx.fillStyle=hi;ctx.fillRect(px+al,py+dims.by+1+armSwing,2,12);
-  ctx.fillStyle=sk.skin;ctx.fillRect(px+al,py+dims.by+11+armSwing,4,4);
-  ctx.fillStyle=sh;ctx.fillRect(px+ar,py+dims.by+1-armSwing,4,12);
-  ctx.fillStyle=mid;ctx.fillRect(px+ar,py+dims.by+1-armSwing,2,12);
-  ctx.fillStyle=sk.skin;ctx.fillRect(px+ar,py+dims.by+11-armSwing,4,4);
+  // right leg
+  ctx.fillStyle=aOut;ctx.fillRect(ox+lr-1,oy+legY+rLegOff-1,lw+2,11);
+  ctx.fillStyle=aSh; ctx.fillRect(ox+lr,  oy+legY+rLegOff,  lw,  11);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+lr,  oy+legY+rLegOff,  lw-2,11);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+lr,  oy+legY+rLegOff,  2,   11);
+  // right knee pad
+  OR(lr,legY+4+rLegOff,lw,4,aBrt);
+  ctx.fillStyle=aHi;ctx.fillRect(ox+lr,oy+legY+4+rLegOff,lw,2);
 
-  // ── neck ──
-  ctx.fillStyle=sk.skin;ctx.fillRect(px+dims.hx+4,py+dims.hy+dims.hh,4,4);
+  // ─ Body / Chest plate ─
+  ctx.fillStyle=aOut;ctx.fillRect(ox+bx-1,oy+by-1,bw+2,bh+2);
+  ctx.fillStyle=aSh; ctx.fillRect(ox+bx,  oy+by,  bw,  bh);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+bx,  oy+by,  bw-3,bh);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+bx,  oy+by,  4,   bh);
+  ctx.fillStyle=aBrt;ctx.fillRect(ox+bx,  oy+by,  bw,  2);
 
-  // ── head base ──
-  ctx.fillStyle=sh;ctx.fillRect(px+dims.hx,py+dims.hy,dims.hw,dims.hh);
-  ctx.fillStyle=mid;ctx.fillRect(px+dims.hx,py+dims.hy,dims.hw-2,dims.hh);
-  ctx.fillStyle=hi;ctx.fillRect(px+dims.hx,py+dims.hy,4,dims.hh);
+  // ─ Chest Gem ─
+  const gx=cx2-4,gy=by+3;
+  ctx.fillStyle=aOut;   ctx.fillRect(ox+gx-1,oy+gy-1,10,8);
+  ctx.fillStyle=darken(c,40);ctx.fillRect(ox+gx,oy+gy,8,6);
+  ctx.fillStyle=aBrt;   ctx.fillRect(ox+gx+1,oy+gy+1,4,2);
+  ctx.fillStyle='#fff'; ctx.fillRect(ox+gx+1,oy+gy+1,2,1);
 
-  // ── face ──
-  const fx=px+dims.hx+2,fy=py+dims.hy+2,fw=dims.hw-4,fh=dims.hh-2;
-  ctx.fillStyle=sk.skin;ctx.fillRect(fx,fy,fw,fh);
-  ctx.fillStyle=sk.hl;ctx.fillRect(fx,fy,fw,3);
-  ctx.fillStyle=sk.dark;ctx.fillRect(fx+fw-2,fy,2,fh);
+  // ─ Belt ─
+  const beltY=by+bh-3;
+  ctx.fillStyle='#1A1008';ctx.fillRect(ox+bx,oy+beltY,bw,4);
+  ctx.fillStyle='#D4AF37';ctx.fillRect(ox+cx2-3,oy+beltY,6,4);
+  ctx.fillStyle='#FFE060';ctx.fillRect(ox+cx2-2,oy+beltY+1,4,2);
 
-  // ── hair ──
-  if(sp!=='robot'){
-    ctx.fillStyle=hair;
-    ctx.fillRect(px+dims.hx,py+dims.hy,dims.hw,3); // top
-    ctx.fillRect(px+dims.hx,py+dims.hy,3,dims.hh); // side
-    ctx.fillStyle=hairHL;ctx.fillRect(px+dims.hx,py+dims.hy,dims.hw,1);
+  // ─ Shoulder pads ─
+  OR(bx-sw-1,by-1,sw+1,7,aSh);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+bx-sw,oy+by,sw-1,6);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+bx-sw,oy+by,sw-1,2);
+  OR(bx+bw,by-1,sw+1,7,aSh);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+bx+bw+1,oy+by,sw-1,6);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+bx+bw+1,oy+by,sw-1,2);
+
+  // ─ Left arm ─
+  const lax=bx-4, lay=by+4;
+  ctx.fillStyle=aOut;ctx.fillRect(ox+lax-1,oy+lay+lArmOff-1,5,13);
+  ctx.fillStyle=aSh; ctx.fillRect(ox+lax,  oy+lay+lArmOff,  4,  13);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+lax,  oy+lay+lArmOff,  3,  13);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+lax,  oy+lay+lArmOff,  2,  13);
+  ctx.fillStyle=darken(c,35);ctx.fillRect(ox+lax,oy+lay+11+lArmOff,5,4);
+
+  // ─ Right arm ─
+  const rax=bx+bw;
+  ctx.fillStyle=aOut;ctx.fillRect(ox+rax,  oy+lay+rArmOff-1,5,13);
+  ctx.fillStyle=aSh; ctx.fillRect(ox+rax,  oy+lay+rArmOff,  4,  13);
+  ctx.fillStyle=aMid;ctx.fillRect(ox+rax+1,oy+lay+rArmOff,  3,  13);
+  ctx.fillStyle=aHi; ctx.fillRect(ox+rax+1,oy+lay+rArmOff,  1,  13);
+  ctx.fillStyle=darken(c,35);ctx.fillRect(ox+rax,oy+lay+11+rArmOff,5,4);
+
+  // ─ Neck ─
+  ctx.fillStyle=sk.skin;ctx.fillRect(ox+cx2-2,oy+hy+hh,4,3);
+
+  // ─ Helmet (Mega Man X–style: covers full head, only visor slit shows face) ─
+  // Outline
+  ctx.fillStyle=aOut;ctx.fillRect(ox+hx-1,oy+hy-1,hw+2,hh+2);
+  // Shadow side
+  ctx.fillStyle=aSh; ctx.fillRect(ox+hx,  oy+hy,  hw,  hh);
+  // Mid tone
+  ctx.fillStyle=aMid;ctx.fillRect(ox+hx,  oy+hy,  hw-3,hh);
+  // Highlight strip (left face of helmet)
+  ctx.fillStyle=aHi; ctx.fillRect(ox+hx,  oy+hy,  4,   hh);
+  // Bright top edge
+  ctx.fillStyle=aBrt;ctx.fillRect(ox+hx,  oy+hy,  hw,  2);
+
+  // ─ Visor slit (narrow horizontal window — the ONLY skin visible) ─
+  const vx=hx+2, vy=hy+5, vw=hw-4, vh=3;
+  ctx.fillStyle='#0A0A18';ctx.fillRect(ox+vx-1,oy+vy-1,vw+2,vh+2); // visor frame
+  ctx.fillStyle=sk.skin;  ctx.fillRect(ox+vx,  oy+vy,  vw,  vh);   // skin strip
+  ctx.fillStyle=sk.sk3;   ctx.fillRect(ox+vx,  oy+vy,  vw,  1);    // highlight row
+
+  // Eyes inside visor
+  if(sp==='robot'){
+    ctx.fillStyle=sk.eye;ctx.fillRect(ox+vx,oy+vy,vw,vh);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(ox+vx+1,oy+vy+1,2,1);ctx.fillRect(ox+vx+vw-3,oy+vy+1,2,1);
   } else {
-    // robot antenna
-    ctx.fillStyle='#888';ctx.fillRect(px+dims.hx+7,py+dims.hy-5,2,5);
-    ctx.fillStyle='#FF4040';ctx.fillRect(px+dims.hx+6,py+dims.hy-7,4,4);
-  }
-
-  // ── species extras ──
-  if(sp==='elf'){
-    // pointed ears
-    ctx.fillStyle=sk.skin;
-    ctx.fillRect(px+dims.hx-2,py+dims.hy+3,2,4);  // left ear
-    ctx.fillRect(px+dims.hx-2,py+dims.hy+1,1,2);  // ear tip
-    ctx.fillRect(px+dims.hx+dims.hw,py+dims.hy+3,2,4);  // right ear
-    ctx.fillRect(px+dims.hx+dims.hw+1,py+dims.hy+1,1,2);
-  } else if(sp==='dwarf'){
-    // beard
-    ctx.fillStyle=darken(hair,20);ctx.fillRect(fx,fy+fh-2,fw,6);
-    ctx.fillStyle=hair;ctx.fillRect(fx+1,fy+fh,fw-2,4);
-    ctx.fillStyle=hairHL;ctx.fillRect(fx+1,fy+fh,4,2);
-  } else if(sp==='goblin'){
-    // big round ears
-    ctx.fillStyle=sk.skin;
-    ctx.fillRect(px+dims.hx-4,py+dims.hy+2,5,6);
-    ctx.fillRect(px+dims.hx-3,py+dims.hy+1,3,1); // ear top
-    ctx.fillRect(px+dims.hx+dims.hw-1,py+dims.hy+2,5,6);
-    ctx.fillRect(px+dims.hx+dims.hw,py+dims.hy+1,3,1);
-    // pointy nose
-    ctx.fillStyle=sk.dark;ctx.fillRect(fx+fw/2-1,fy+fh-4,3,4);
-  } else if(sp==='orc'){
-    // tusks
-    ctx.fillStyle='#F0E8C0';
-    ctx.fillRect(fx+2,fy+fh-1,2,4);   // left tusk
-    ctx.fillRect(fx+fw-4,fy+fh-1,2,4); // right tusk
-    // thick brow ridge
-    ctx.fillStyle=darken(sk.skin,30);ctx.fillRect(fx,fy,fw,3);
-  } else if(sp==='robot'){
-    // glowing eyes (no pupils needed)
-    ctx.fillStyle=sk.eyeC;
-    if(dir===2||dir===0){ctx.fillRect(fx+2,fy+2,5,3);ctx.fillRect(fx+fw-7,fy+2,5,3);}
-    else if(dir===3){ctx.fillRect(fx+1,fy+2,5,3);}
-    else{ctx.fillRect(fx+fw-6,fy+2,5,3);}
-    // skip normal eye drawing below
-  }
-
-  // ── eyes (non-robot) ──
-  if(sp!=='robot'){
-    ctx.fillStyle=sk.eyeC;
     if(dir===2||dir===0){
-      ctx.fillRect(fx+2,fy+fh-5,3,2);ctx.fillRect(fx+fw-5,fy+fh-5,3,2);
-      ctx.fillStyle='#FFFFFF';ctx.fillRect(fx+2,fy+fh-5,1,1);ctx.fillRect(fx+fw-5,fy+fh-5,1,1);
-    } else if(dir===3){
-      ctx.fillRect(fx+1,fy+fh-5,3,2);ctx.fillStyle='#FFFFFF';ctx.fillRect(fx+1,fy+fh-5,1,1);
+      ctx.fillStyle=sk.eye;ctx.fillRect(ox+vx+2,oy+vy+1,2,2);ctx.fillRect(ox+vx+vw-4,oy+vy+1,2,2);
+      ctx.fillStyle='#fff';ctx.fillRect(ox+vx+2,oy+vy+1,1,1);ctx.fillRect(ox+vx+vw-4,oy+vy+1,1,1);
+    } else if(dir===1){
+      ctx.fillStyle=sk.eye;ctx.fillRect(ox+vx+vw-4,oy+vy+1,2,2);
+      ctx.fillStyle='#fff';ctx.fillRect(ox+vx+vw-4,oy+vy+1,1,1);
     } else {
-      ctx.fillRect(fx+fw-4,fy+fh-5,3,2);ctx.fillStyle='#FFFFFF';ctx.fillRect(fx+fw-4,fy+fh-5,1,1);
+      ctx.fillStyle=sk.eye;ctx.fillRect(ox+vx+2,oy+vy+1,2,2);
+      ctx.fillStyle='#fff';ctx.fillRect(ox+vx+2,oy+vy+1,1,1);
     }
   }
 
-  // ── visor on helmet ──
-  ctx.fillStyle=darken(c,20)+'66';ctx.fillRect(px+dims.hx,py+dims.hy+3,dims.hw,3);
+  // ─ Species extras ─
+  if(sp==='elf'){
+    // long pointed ears (outside helmet)
+    ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx-3,oy+hy+3,3,6);
+    ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx-2,oy+hy+2,1,2); // ear tip
+    ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx+hw,oy+hy+3,3,6);
+    ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx+hw+1,oy+hy+2,1,2);
+  } else if(sp==='dwarf'){
+    // bushy beard below helmet
+    ctx.fillStyle=hairSh;ctx.fillRect(ox+hx,  oy+hy+hh,  hw,  8);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx+1,oy+hy+hh+1,hw-2,6);
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+2,oy+hy+hh+1,5,   2);
+    // hair tuft at top
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,     hw,  2);
+  } else if(sp==='goblin'){
+    // big round ears with inner detail
+    ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx-5,oy+hy+2,5,8);
+    ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx-4,oy+hy+3,3,6);
+    ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx+hw,oy+hy+2,5,8);
+    ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx+hw+1,oy+hy+3,3,6);
+  } else if(sp==='orc'){
+    // tusks below visor
+    ctx.fillStyle='#EEE0A0';
+    ctx.fillRect(ox+vx+1,     oy+vy+vh, 3,6);
+    ctx.fillRect(ox+vx+vw-4,  oy+vy+vh, 3,6);
+    ctx.fillStyle='#C8C090';
+    ctx.fillRect(ox+vx+1,     oy+vy+vh+4,2,2);
+    ctx.fillRect(ox+vx+vw-3,  oy+vy+vh+4,2,2);
+    // heavy armor brow ridge over visor
+    ctx.fillStyle=aSh; ctx.fillRect(ox+hx,oy+vy-2,hw,3);
+    ctx.fillStyle=aOut;ctx.fillRect(ox+hx,oy+vy-2,hw,1);
+  } else if(sp==='robot'){
+    // antenna
+    ctx.fillStyle='#808080';ctx.fillRect(ox+cx2-1,oy+hy-6,2,6);
+    ctx.fillStyle='#FF2020';ctx.fillRect(ox+cx2-2,oy+hy-9,4,4);
+    ctx.fillStyle='#FF9090';ctx.fillRect(ox+cx2-1,oy+hy-8,2,2);
+    // ear vents instead of round ears
+    ctx.fillStyle='#404040';ctx.fillRect(ox+hx-2,oy+hy+3,2,hh-4);
+    ctx.fillStyle='#404040';ctx.fillRect(ox+hx+hw,oy+hy+3,2,hh-4);
+    ctx.fillStyle='#606060';ctx.fillRect(ox+hx-2,oy+hy+3,1,2);
+    ctx.fillStyle='#606060';ctx.fillRect(ox+hx+hw,oy+hy+3,1,2);
+  } else {
+    // human / mage / rogue etc — hair visible above visor at helmet top
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,hw,2);
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+1,oy+hy,hw-2,1);
+  }
 
-  // ── godmode halo ──
+  // ─ God mode halo ─
   if(godMode){
     ctx.strokeStyle='#FFD700';ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(px+dims.hx+dims.hw/2,py+dims.hy-4,9,0,Math.PI*2);ctx.stroke();
-    ctx.strokeStyle='#FFD70044';ctx.lineWidth=5;
-    ctx.beginPath();ctx.arc(px+dims.hx+dims.hw/2,py+dims.hy-4,11,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(ox+cx2,oy+hy-3,11,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='#FFD70055';ctx.lineWidth=5;
+    ctx.beginPath();ctx.arc(ox+cx2,oy+hy-3,14,0,Math.PI*2);ctx.stroke();
   }
 }
 
@@ -1513,7 +1578,28 @@ function buildCreateScreen(){
   const statNames=['str','vit','agi','end','lck'];
   const statLabels={str:'STR  (Attack)',vit:'VIT  (Max HP)',agi:'AGI  (Speed)',end:'END  (Defense)',lck:'LCK  (Drop)'};
   let alloc={str:2,vit:2,agi:2,end:2,lck:2};
-  const BASE_PTS=10; // extra points to spend (each stat starts at 0 and costs 1pt per pip)
+  const BASE_PTS=10;
+
+  // ── Preview canvas — init FIRST so updatePreview can reference it ──
+  const previewCv=document.getElementById('preview-canvas');
+  const previewCtx=previewCv.getContext('2d');
+  function updatePreview(){
+    previewCtx.fillStyle='#0a0a1a';previewCtx.fillRect(0,0,120,160);
+    previewCtx.fillStyle='#1a1a2a';previewCtx.fillRect(0,110,120,50);
+    previewCtx.fillStyle='#222234';previewCtx.fillRect(0,110,120,3);
+    const scale=2.5;
+    previewCtx.save();
+    previewCtx.scale(scale,scale);
+    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor);
+    previewCtx.restore();
+    const sp2=SPECIES[G.species||'human'];const cl=CLASSES[G.class_||'warrior'];
+    const finalHp=sp2.baseHp+Math.floor((alloc.vit-2)*0.5);
+    document.getElementById('preview-stats').innerHTML=
+      `<b style="color:#FFD700">${document.getElementById('inp-name').value||'Hero'}</b><br>`+
+      `${sp2.label} ${cl.label}<br>`+
+      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str+(cl.statBonus.str||0)}<br>`+
+      `${cl.startWeapon.name}`;
+  }
 
   function ptsUsed(){return Object.values(alloc).reduce((a,b)=>a+b,0)-10;}
   function ptsLeft(){return BASE_PTS-ptsUsed();}
@@ -1581,6 +1667,7 @@ function buildCreateScreen(){
 
   // ── Stat allocation ──
   const sa=document.getElementById('stat-alloc');
+  const MAX_PIPS=10; // total bar = game growth ceiling (species caps what you start with)
   function rebuildStats(){
     sa.innerHTML='';
     const remaining=ptsLeft();
@@ -1591,48 +1678,35 @@ function buildCreateScreen(){
       const lbl=document.createElement('div');lbl.className='stat-name';
       lbl.textContent=statLabels[s];lbl.style.width='110px';lbl.style.fontSize='.72rem';
       const bar=document.createElement('div');bar.className='stat-bar';
-      for(let p=1;p<=cap;p++){
+      for(let p=1;p<=MAX_PIPS;p++){
         const pip=document.createElement('div');
-        pip.className='stat-pip'+(p<=alloc[s]?' filled':'');
-        pip.style.opacity=p>cap?'0.2':'1';
-        pip.addEventListener('click',()=>{
-          if(p>cap)return;
-          const spend=p-alloc[s];
-          if(spend>0&&ptsLeft()<spend)return;
-          alloc[s]=p;rebuildStats();updatePreview();
-        });
+        const isFilled=p<=alloc[s];
+        const isCapped=p>cap;
+        pip.className='stat-pip'+(isFilled?' filled':'')+(isCapped?' capped':'');
+        if(!isCapped){
+          pip.title=`Set ${s.toUpperCase()} to ${p}`;
+          pip.addEventListener('click',()=>{
+            const spend=p-alloc[s];
+            if(spend>0&&ptsLeft()<spend)return;
+            alloc[s]=p;rebuildStats();updatePreview();
+          });
+        } else {
+          pip.title=`${s.toUpperCase()} cap: ${cap} for this species (unlock more in-game)`;
+        }
         bar.appendChild(pip);
       }
-      row.appendChild(lbl);row.appendChild(bar);
+      // species cap label
+      const capLbl=document.createElement('span');
+      capLbl.style.cssText='color:#555;font-size:.65rem;margin-left:5px;white-space:nowrap';
+      capLbl.textContent=`/${cap}`;
+      row.appendChild(lbl);row.appendChild(bar);row.appendChild(capLbl);
       sa.appendChild(row);
     });
     updatePreview();
   }
   rebuildStats();
 
-  // ── Live preview ──
-  const previewCv=document.getElementById('preview-canvas');
-  const previewCtx=previewCv.getContext('2d');
-  function updatePreview(){
-    previewCtx.fillStyle='#0a0a1a';previewCtx.fillRect(0,0,120,160);
-    // simple floor
-    previewCtx.fillStyle='#1a1a2a';previewCtx.fillRect(0,110,120,50);
-    previewCtx.fillStyle='#222234';previewCtx.fillRect(0,110,120,3);
-    // draw sprite at 2.5× scale
-    const scale=2.5;
-    previewCtx.save();
-    previewCtx.scale(scale,scale);
-    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor);
-    previewCtx.restore();
-    // stats summary
-    const sp2=SPECIES[G.species||'human'];const cl=CLASSES[G.class_||'warrior'];
-    const finalHp=sp2.baseHp+Math.floor((alloc.vit-2)*0.5);
-    document.getElementById('preview-stats').innerHTML=
-      `<b style="color:#FFD700">${document.getElementById('inp-name').value||'Hero'}</b><br>`+
-      `${sp2.label} ${cl.label}<br>`+
-      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str+cl.statBonus.str??0}<br>`+
-      `${cl.startWeapon.name}`;
-  }
+  // wire up name input and do initial render
   document.getElementById('inp-name').addEventListener('input',updatePreview);
   updatePreview();
 
