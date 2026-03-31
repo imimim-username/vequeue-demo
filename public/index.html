@@ -474,7 +474,58 @@ const ENEMIES = {
     xp:40, gold:30,
     msg:'A Dark Knight bars your path!',
   },
+  lich: {
+    type:'lich', name:'Ancient Lich', maxHp:80, atk:15, def:8, spd:1,
+    xp:500, gold:200,
+    msg:'The Ancient Lich rises from its obsidian throne!',
+  },
 };
+
+// ── DUNGEON MAP ───────────────────────────────────────────────────────────────
+const DGN_W=50, DGN_H=36;
+const DUNGEON_MAP=(()=>{
+  const m=Array.from({length:DGN_H},()=>new Array(DGN_W).fill(T.WALL));
+  function f(r1,c1,r2,c2,t){for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)m[r][c]=t;}
+  function s(r,c,t){m[r][c]=t;}
+  // ── Room 1: Entry ──────────────────────────────────────────────────────────
+  f(2,2,10,14,T.STONE);
+  // Exit door visual (north wall opening) — triggers zone transition
+  s(2,7,T.DOOR_O);s(2,8,T.DOOR_O);
+  // Pillars
+  s(3,3,T.COLUMN);s(3,13,T.COLUMN);s(9,3,T.COLUMN);s(9,13,T.COLUMN);
+  // Grating floor accents
+  s(5,8,T.GRATING);s(7,7,T.GRATING);s(7,9,T.GRATING);
+  // Passage east to corridor (rows 5-7 at col 14 are STONE not WALL)
+  // (already filled above — row 2-10 cols 2-14 all STONE)
+  // ── Corridor 1 ─────────────────────────────────────────────────────────────
+  f(5,14,7,26,T.STONE);
+  // ── Room 2: Middle ─────────────────────────────────────────────────────────
+  f(2,26,13,40,T.STONE);
+  s(3,27,T.COLUMN);s(3,39,T.COLUMN);s(12,27,T.COLUMN);s(12,39,T.COLUMN);
+  s(7,32,T.GRATING);s(7,33,T.GRATING);s(7,34,T.GRATING);
+  s(5,37,T.COLUMN);s(9,37,T.COLUMN); // alcove columns
+  // Passage south to corridor
+  f(13,31,13,34,T.STONE);
+  // ── Corridor 2: South ──────────────────────────────────────────────────────
+  f(13,31,24,34,T.STONE);
+  // ── Boss Room ──────────────────────────────────────────────────────────────
+  f(24,22,34,48,T.VAULT);
+  // Walls around boss room
+  for(let c=22;c<=48;c++){m[24][c]=T.WALL;m[34][c]=T.WALL;}
+  for(let r=24;r<=34;r++){m[r][22]=T.WALL;m[r][48]=T.WALL;}
+  // Corridor opening into boss room
+  s(24,31,T.VAULT);s(24,32,T.VAULT);s(24,33,T.VAULT);s(24,34,T.VAULT);
+  // Pillars
+  s(25,24,T.COLUMN);s(25,30,T.COLUMN);s(25,38,T.COLUMN);s(25,46,T.COLUMN);
+  s(33,24,T.COLUMN);s(33,30,T.COLUMN);s(33,38,T.COLUMN);s(33,46,T.COLUMN);
+  // Altar/throne at far east
+  f(28,44,30,47,T.STONE);
+  s(29,46,T.COLUMN);s(29,47,T.WALL);
+  // Grating accents
+  s(29,28,T.GRATING);s(29,34,T.GRATING);s(29,40,T.GRATING);
+  s(27,26,T.GRATING);s(31,26,T.GRATING);
+  return m;
+})();
 
 // ── SHOP CATALOG ───────────────────────────────────────────────────────────────
 const SHOP_CATALOG = {
@@ -1265,6 +1316,7 @@ const ZONES = {
                name:'Marketplace',bg:'marketplace'},
   treasury:   {map:ZONE_MAPS.treasury,    w:20,h:13,spawnX:10,spawnY:2, solid:SOLID_TILES,
                name:'Treasury',bg:'treasury'},
+  dungeon:    {map:DUNGEON_MAP,            w:DGN_W,h:DGN_H,spawnX:8,spawnY:6, solid:SOLID_TILES, name:'Ancient Dungeon',bg:'dungeon'},
 };
 
 // Zone entrance/exit connections
@@ -1350,6 +1402,18 @@ const NPCS = {
       ]
     },
   ],
+  dungeon:[
+    { id:'dungeon_ghost', x:33, y:7, type:'guard', face:2, name:'Restless Spirit',
+      dialog:[
+        "You... you can see me? After all these years...",
+        "I came here for glory. The Lich took everything. Do not make my mistake.",
+        "The boss chamber lies to the south through the long corridor.",
+        "The Lich is ancient — older than the town, older than the rivers.",
+        "Stock up on potions before you face it. You'll need every one.",
+        "If you defeat it... my soul can finally rest. Please.",
+      ]
+    },
+  ],
   treasury:[
     { id:'treasurer', x:10, y:3, type:'clerk', face:2, name:'Treasurer Vox',
       dialog:[
@@ -1373,6 +1437,8 @@ const ZONE_DOORS = {
   governance_exit: {from:'governance',tileRows:[12],tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
   marketplace_exit:{from:'marketplace',tileRows:[12],tileCols:[8,9,10,11],to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+14},
   treasury_exit:   {from:'treasury',  tileRows:[12],tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+29, sy:TOWN_OY+14},
+  world_dungeon:   {from:'world', tileRows:[139,140,141,142,143,144], tileCols:[108,109,110,111], to:'dungeon', sx:8, sy:6},
+  dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:148},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
@@ -1540,6 +1606,7 @@ function drawInteriorBG(ctx,zone,W,H){
     governance:{bg:'#050A1A',wall:'#0A1535',beam:'#D4AF3720'},
     marketplace:{bg:'#0D0020',wall:'#1A0040',beam:'#9060D030'},
     treasury:{bg:'#000D00',wall:'#001A00',beam:'#00400020'},
+    dungeon:{bg:'#050008',wall:'#0D0020',beam:'#6600AA18'},
   };
   const t=themes[zone]||themes.governance;
   ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
@@ -1864,6 +1931,7 @@ const G = {
   showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
   shop:null,            // {vendorId} — active shop or null
+  dungeonBossDefeated:false,
 };
 
 // Cache of server-broadcast queue states
@@ -2143,7 +2211,7 @@ function playerPowerLevel(){
 function makeScaledEnemy(key,depth){
   const tmpl=ENEMIES[key];
   const pl=playerPowerLevel();
-  const baseMult={wolf:0.65,goblin:0.55,skeleton:0.82,darkKnight:1.15}[key]||0.75;
+  const baseMult={wolf:0.65,goblin:0.55,skeleton:0.82,darkKnight:1.15,lich:2.2}[key]||0.75;
   const depthBonus=Math.min(0.15,depth/130); // up to +15% at the very bottom
   const m=baseMult+depthBonus;
   return{
@@ -2205,6 +2273,15 @@ function checkEncounter(){
   else if(depth<40) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
   else              key=Math.random()<0.35?'darkKnight':'skeleton';
   triggerBattle(key,depth);
+}
+
+function checkBossEncounter(){
+  if(G.battle||G.zone!=='dungeon'||G.dungeonBossDefeated)return;
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  if(ty>=26&&tx>=23&&tx<=47){
+    chatLog('★ The air grows cold... something ancient stirs!','#AA00FF');
+    triggerBattle('lich',999);
+  }
 }
 
 function triggerBattle(key,depth=0){
@@ -2269,8 +2346,47 @@ function drawEnemySprite(ctx,type,x,y){
     case'skeleton':  drawBattleSkeleton(ctx,S);  break;
     case'goblin':    drawBattleGoblin(ctx,S);     break;
     case'darkKnight':drawBattleDarkKnight(ctx,S); break;
+    case'lich':      drawBattleLich(ctx,S);       break;
   }
   ctx.restore();
+}
+
+function drawBattleLich(ctx,S){
+  // Aura glow
+  ctx.fillStyle='#6600AA33';
+  ctx.beginPath();ctx.arc(10*S,10*S,9*S,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#AA00FF22';
+  ctx.beginPath();ctx.arc(10*S,10*S,12*S,0,Math.PI*2);ctx.fill();
+  // Robe
+  ctx.fillStyle='#2A004A';ctx.fillRect(4*S,8*S,12*S,14*S);
+  ctx.fillStyle='#4A007A';ctx.fillRect(5*S,8*S,10*S,13*S);
+  // Robe highlights
+  ctx.fillStyle='#6A00AA';ctx.fillRect(9*S,8*S,2*S,12*S);
+  // Skull
+  ctx.fillStyle='#D8D0B0';ctx.fillRect(6*S,2*S,8*S,7*S);
+  ctx.fillStyle='#B0A890';ctx.fillRect(6*S,2*S,2*S,7*S); // shadow side
+  // Eye glow
+  ctx.fillStyle='#00FFAA';ctx.fillRect(7*S,3*S,2*S,2*S);ctx.fillRect(11*S,3*S,2*S,2*S);
+  ctx.fillStyle='#AAFFDD';ctx.fillRect(8*S,3*S,1*S,1*S);ctx.fillRect(12*S,3*S,1*S,1*S);
+  // Nose cavity
+  ctx.fillStyle='#0D0020';ctx.fillRect(9*S,5*S,2*S,2*S);
+  // Teeth
+  ctx.fillStyle='#D8D0B0';ctx.fillRect(7*S,8*S,1*S,1*S);ctx.fillRect(9*S,8*S,1*S,1*S);ctx.fillRect(11*S,8*S,1*S,1*S);
+  ctx.fillStyle='#0D0020';ctx.fillRect(8*S,8*S,1*S,1*S);ctx.fillRect(10*S,8*S,1*S,1*S);ctx.fillRect(12*S,8*S,1*S,1*S);
+  // Bone arms
+  ctx.fillStyle='#D8D0B0';
+  ctx.fillRect(0*S,9*S,5*S,2*S);ctx.fillRect(15*S,9*S,5*S,2*S);
+  ctx.fillRect(0*S,11*S,2*S,3*S);ctx.fillRect(3*S,11*S,2*S,2*S);
+  ctx.fillRect(15*S,11*S,2*S,2*S);ctx.fillRect(18*S,11*S,2*S,3*S);
+  // Staff
+  ctx.fillStyle='#3A1A00';ctx.fillRect(16*S,1*S,2*S,20*S);
+  ctx.fillStyle='#5A2A00';ctx.fillRect(16*S,1*S,1*S,20*S);
+  // Staff orb
+  ctx.fillStyle='#AA00FF';ctx.fillRect(14*S,0,4*S,3*S);
+  ctx.fillStyle='#DDAAFF';ctx.fillRect(15*S,0,2*S,1*S);
+  // Crown
+  ctx.fillStyle='#7700AA';
+  ctx.fillRect(6*S,1*S,2*S,2*S);ctx.fillRect(9*S,0,2*S,2*S);ctx.fillRect(12*S,1*S,2*S,2*S);
 }
 
 function drawBattleWolf(ctx,S){
@@ -2643,6 +2759,10 @@ function doBattleAction(action){
     G.schmeckles+=bt.goldGained;
     G.xp+=bt.xpGained;
     checkLevelUp();
+    if(bt.enemy.type==='lich'){
+      G.dungeonBossDefeated=true;
+      chatLog('★ THE LICH IS DEFEATED! Ancient evil vanquished!','#AA00FF');
+    }
     chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
     // Wait for player input — do NOT auto-advance
     return;
@@ -3216,6 +3336,7 @@ function gameLoop(ts){
     else{G.moveTimer=0;}
     checkDoorTrigger();
     checkEncounter();
+    checkBossEncounter();
     updateCamera();
     // scroll tile layer when camera moves
     renderTileLayer();
