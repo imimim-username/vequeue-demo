@@ -40,6 +40,8 @@ const G = {
   dungeonBossDefeated:false,
   worldLoot:[],
   marketListings:[],
+  livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
+  treasury:{alUSD:0,alETH:0},
   quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
 };
 
@@ -1331,7 +1333,14 @@ function distributeTransmuterPool(sbAmount,ethAmount){
 
 // ── EXCHANGE ──────────────────────────────────────────────────────────────────
 // Exchange rates (relative to alUSD)
-const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1,alcx:5};
+const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
+// Updated from server on price_update events
+function applyLivePrices(prices){
+  if(prices.alETH)EXCHANGE_RATES.alETH=prices.alETH;
+  if(prices.alcx) EXCHANGE_RATES.alcx=prices.alcx;
+  // alUSD stays at 1 (peg), spacebucks/schmeckles are in-game tokens
+  G.livePrices={...prices};
+}
 function openExchange(){
   G.paused=true;
   renderExchangeUI();
@@ -1363,7 +1372,14 @@ function doExchange(){
   else if(to==='alETH')G.alETH=Math.round((G.alETH+received)*10000)/10000;
   else if(to==='alcx')G.alcx=Math.round((G.alcx+received)*100)/100;
   chatLog(`⚗ Swapped ${amt} ${from} → ${received.toFixed(4)} ${to} (fee: ${fee.toFixed(4)})`, '#4CAF50');
+  // Report fee to server for treasury tracking
+  if(socket){
+    const feeAlUSD=to==='alUSD'||from==='alUSD'?parseFloat(fee.toFixed(2)):0;
+    const feeAlETH=to==='alETH'||from==='alETH'?parseFloat(fee.toFixed(4)):0;
+    socket.emit('exchange_fee',{feeAlUSD,feeAlETH});
+  }
   SFX.buy();
+  saveToServer();
   renderExchangeUI();
 }
 function renderExchangeUI(){
@@ -1645,6 +1661,52 @@ function renderSpriteLayer(ctx){
 }
 
 // ── HUD ───────────────────────────────────────────────────────────────────────
+// ── Governance Hall Treasury + Price Panel ────────────────────────────────────
+function renderGovernancePanel(ctx){
+  const pad=12, w=220, lh=16;
+  const lines=[
+    {label:'── PROTOCOL TREASURY ──', val:'', color:'#FFD700'},
+    {label:'alUSD collected',  val:`$${(G.treasury.alUSD||0).toFixed(2)}`,  color:'#4CAF50'},
+    {label:'alETH collected',  val:`⟠${(G.treasury.alETH||0).toFixed(4)}`, color:'#7B68EE'},
+    {label:'', val:'', color:'#333'},
+    {label:'── LIVE PRICES ──', val:'', color:'#FFD700'},
+    {label:'alUSD', val:`$${(G.livePrices.alUSD||1).toFixed(4)}`,           color:G.livePrices.alUSD<0.98?'#FF4444':'#4CAF50'},
+    {label:'alETH (ETH)',val:`$${(G.livePrices.alETH||0).toLocaleString()}`,color:'#7B68EE'},
+    {label:'ALCX',  val:`$${(G.livePrices.alcx||0).toFixed(2)}`,            color:'#FF9800'},
+  ];
+  const h=pad*2+lines.length*lh+4;
+  const x=W-w-pad, y=80;
+  // Panel bg
+  ctx.fillStyle='rgba(5,5,15,0.82)';
+  ctx.strokeStyle='#5A3A80';
+  ctx.lineWidth=1;
+  roundRect(ctx,x,y,w,h,6);
+  ctx.fill(); ctx.stroke();
+  ctx.font='10px monospace';
+  ctx.textBaseline='top';
+  lines.forEach((l,i)=>{
+    const ly=y+pad+i*lh;
+    if(!l.label&&!l.val)return; // divider gap
+    ctx.fillStyle=l.color||'#CCC';
+    ctx.textAlign='left';
+    ctx.fillText(l.label,x+10,ly);
+    if(l.val){
+      ctx.textAlign='right';
+      ctx.fillStyle='#EEE';
+      ctx.fillText(l.val,x+w-10,ly);
+    }
+  });
+  ctx.textAlign='left';
+  ctx.textBaseline='alphabetic';
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
 function renderHUD(){
   const hearts=document.getElementById('hud-hearts');
   hearts.innerHTML='';
@@ -2026,6 +2088,8 @@ function gameLoop(ts){
     renderHUD();
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
+    // Governance Hall: treasury + live prices panel
+    if(G.zone==='governance')renderGovernancePanel(ctxUI);
     // ALCX queue drip
     if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%300===0){
       G.alcx+=1;
@@ -2277,6 +2341,23 @@ function initSocket(){
       if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
     });
     socket.on('market_error',data=>{chatLog(data.error,'#FF4444');SFX.error();});
+
+    // ── Live Prices ──────────────────────────────────────────────────────────
+    socket.on('price_update',data=>{
+      if(data.prices)applyLivePrices(data.prices);
+      // Refresh exchange UI if open
+      if(document.getElementById('exchange-ui').style.display!=='none')renderExchangeUI();
+    });
+    socket.on('price_event',data=>{
+      if(!data.msg)return;
+      chatLog(`📣 Town Crier: ${data.msg}`,'#FFD54F');
+      SFX.select();
+    });
+
+    // ── Treasury ─────────────────────────────────────────────────────────────
+    socket.on('treasury_update',data=>{
+      if(data.treasury)G.treasury={...data.treasury};
+    });
 }
 
 function joinGameServer(){

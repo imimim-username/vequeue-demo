@@ -1,6 +1,7 @@
 'use strict';
 const express=require('express');
 const http=require('http');
+const https=require('https');
 const{Server}=require('socket.io');
 const path=require('path');
 const crypto=require('crypto');
@@ -47,6 +48,65 @@ setInterval(()=>{
   marketplace=marketplace.filter(l=>now-l.listedAt<24*60*60*1000);
   if(marketplace.length!==before){saveMarket();io.emit('market_state',{listings:marketplace});}
 },5*60*1000);
+
+// ── Live Price Feed ────────────────────────────────────────────────────────────
+let livePrices={alUSD:1.00,alETH:1800.0,alcx:5.0};
+let prevPrices={...livePrices};
+// Treasury: accumulated protocol fees (alUSD and alETH)
+let treasury={alUSD:0,alETH:0};
+function broadcastTreasury(){io.emit('treasury_update',{treasury});}
+
+function fetchCoinGeckoPrices(){
+  const url='/api/v3/simple/price?ids=alchemix-usd,ethereum,alchemix&vs_currencies=usd&precision=4';
+  const opts={hostname:'api.coingecko.com',path:url,headers:{'User-Agent':'vequeue-game/1.0','Accept':'application/json'}};
+  const req=https.get(opts,res=>{
+    let raw='';
+    res.on('data',c=>raw+=c);
+    res.on('end',()=>{
+      try{
+        const j=JSON.parse(raw);
+        prevPrices={...livePrices};
+        if(j['alchemix-usd']?.usd) livePrices.alUSD=j['alchemix-usd'].usd;
+        if(j['ethereum']?.usd)     livePrices.alETH=j['ethereum'].usd;
+        if(j['alchemix']?.usd)     livePrices.alcx=j['alchemix'].usd;
+        io.emit('price_update',{prices:livePrices});
+        checkPriceEvents();
+        console.log('[Prices]',livePrices);
+      }catch(e){console.error('[CoinGecko parse]',e.message);}
+    });
+  });
+  req.on('error',e=>console.error('[CoinGecko fetch]',e.message));
+  req.end();
+}
+
+function checkPriceEvents(){
+  const evts=[];
+  // alUSD depeg
+  if(livePrices.alUSD<0.98&&prevPrices.alUSD>=0.98)
+    evts.push({type:'depeg',msg:`🚨 alUSD depegged to $${livePrices.alUSD.toFixed(4)}! Transmuter arbitrage window is OPEN — deposit alUSD now for 1:1 Spacebucks!`});
+  else if(livePrices.alUSD>=0.995&&prevPrices.alUSD<0.995)
+    evts.push({type:'repeg',msg:`✅ alUSD recovered to $${livePrices.alUSD.toFixed(4)}. Peg restored. Arbitrage window closed.`});
+  // alETH / ETH moves
+  const ethChg=(livePrices.alETH-prevPrices.alETH)/prevPrices.alETH;
+  if(ethChg<-0.05)
+    evts.push({type:'eth_drop',msg:`📉 ETH dropped ${(Math.abs(ethChg)*100).toFixed(1)}% to $${livePrices.alETH.toFixed(0)}. alETH borrowing now cheaper!`});
+  else if(ethChg>0.05)
+    evts.push({type:'eth_pump',msg:`📈 ETH surged ${(ethChg*100).toFixed(1)}% to $${livePrices.alETH.toFixed(0)}! Schmeckles collateral worth more.`});
+  // ALCX moves
+  const alcxChg=(livePrices.alcx-prevPrices.alcx)/prevPrices.alcx;
+  if(alcxChg>0.10)
+    evts.push({type:'alcx_pump',msg:`🚀 ALCX pumped ${(alcxChg*100).toFixed(1)}% to $${livePrices.alcx.toFixed(2)}! Queue-jumping costs more now.`});
+  else if(alcxChg<-0.10)
+    evts.push({type:'alcx_drop',msg:`📉 ALCX dropped ${(Math.abs(alcxChg)*100).toFixed(1)}% to $${livePrices.alcx.toFixed(2)}.`});
+  evts.forEach(ev=>io.emit('price_event',ev));
+}
+
+// Fetch on startup, then every hour
+fetchCoinGeckoPrices();
+setInterval(fetchCoinGeckoPrices,60*60*1000);
+
+// Track exchange fees from clients (0.3% swaps)
+// (exchange is client-side; client emits a small fee event for treasury accounting)
 
 // ── Queue state ───────────────────────────────────────────────────────────────
 // Each economic zone has an entry queue and an exit queue.
@@ -160,6 +220,14 @@ io.on('connection',socket=>{
     saveDb();
   });
 
+  // Client reports exchange fees (0.3% of each swap) for treasury accounting
+  socket.on('exchange_fee',data=>{
+    const{feeAlUSD,feeAlETH}=data;
+    if(feeAlUSD>0)treasury.alUSD=parseFloat((treasury.alUSD+(feeAlUSD||0)).toFixed(2));
+    if(feeAlETH>0)treasury.alETH=parseFloat((treasury.alETH+(feeAlETH||0)).toFixed(4));
+    broadcastTreasury();
+  });
+
   socket.on('save_character',data=>{
     if(!socket.accountId)return;
     pdb[socket.accountId].data=data;
@@ -189,6 +257,8 @@ io.on('connection',socket=>{
     QUEUE_ZONES.forEach(z=>socket.emit('queue_state',queueStateFor(z)));
     socket.emit('world_loot_init',{piles:worldLoot.filter(l=>l.zone===p.zone)});
     socket.emit('market_state',{listings:marketplace});
+    socket.emit('price_update',{prices:livePrices});
+    socket.emit('treasury_update',{treasury});
   });
 
   socket.on('move',data=>{
@@ -324,6 +394,10 @@ io.on('connection',socket=>{
     saveDb();
     const fee=parseFloat((listing.price*0.05).toFixed(listing.currency==='alETH'?4:2));
     const payout=parseFloat((listing.price-fee).toFixed(listing.currency==='alETH'?4:2));
+    // 5% marketplace fee → treasury
+    if(listing.currency==='alETH')treasury.alETH=parseFloat((treasury.alETH+fee).toFixed(4));
+    else treasury.alUSD=parseFloat((treasury.alUSD+fee).toFixed(2));
+    broadcastTreasury();
     const sellerData=pdb[listing.sellerId]?.data;
     if(sellerData){
       if(listing.currency==='alETH')sellerData.alETH=parseFloat(((sellerData.alETH||0)+payout).toFixed(4));
@@ -400,8 +474,10 @@ setInterval(()=>{
       pos.debt=Math.max(0,pos.debt-redeem);
       pos.earmarked=0;
       const net=redeem*(1-0.005); // 0.5% borrower redemption fee
-      if(pos.collateral==='spacebucks')sbRedeemed+=net;
-      else ethRedeemed+=net;
+      const redemptionFee=redeem-net;
+      // Accumulate 0.5% redemption fee to treasury
+      if(pos.collateral==='spacebucks'){sbRedeemed+=net;treasury.alUSD=parseFloat((treasury.alUSD+redemptionFee).toFixed(2));}
+      else{ethRedeemed+=net;treasury.alETH=parseFloat((treasury.alETH+redemptionFee).toFixed(4));}
       if(pos.debt<=0.001)pos.debt=0;
     });
     // Push updated positions to connected player
@@ -409,6 +485,7 @@ setInterval(()=>{
     if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
   });
 
+  if(sbRedeemed>0||ethRedeemed>0)broadcastTreasury();
   if(sbRedeemed<=0&&ethRedeemed<=0){saveDb();return;}
 
   // 3. Distribute pro-rata to transmuter depositors

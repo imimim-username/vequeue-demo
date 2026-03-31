@@ -367,13 +367,15 @@ const ZONES = {
 // Each NPC: {id, x, y (tile coords), type (sprite), name, face (direction 0-3), dialog[]}
 const NPCS = {
   world:[
-    { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier', questId:'wolf_hunt',
+    { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier', questId:'wolf_hunt', priceCrier:true,
       dialog:[
         "Hear ye, hear ye! Welcome to Victory Quest, brave adventurer!",
         "Our town is a safe haven — no monsters dare enter these gates.",
         "To the south lies the Wilderness. The deeper you go, the deadlier it gets.",
         "The Marketplace and Treasury use the veQueue system — join the queue and wait your turn.",
-        "While in queue, 20% of your Schmeckles are held as a deposit. You get them back!",
+        "Live token prices — alUSD, alETH, and ALCX — are tracked in real time from the markets!",
+        "When alUSD dips below $0.98, I'll shout it from the rooftops. The Transmuter arbitrage window opens!",
+        "Check the Governance Hall for the Protocol Treasury balance and live price feed.",
         "Build up your stats before venturing too far south. Dark Knights don't play nice.",
       ]
     },
