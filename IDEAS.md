@@ -603,7 +603,7 @@ During a live presentation, the admin can say: *"Watch what happens when I lower
 ## Magic Points (MP)
 
 - Characters have a **magic points bar** alongside their HP bar on the HUD
-- Using magic (spells, special abilities) depletes MP proportionally to the spell's power
+- Using any magic ability depletes MP proportionally to the ability's power — this includes spells, passive-triggered effects, and active species/class abilities like Holy Light, Shadow Strike, etc.
 - MP regenerates gradually over time on its own — no item required, just wait
 - Max MP scales with character stats (e.g. Luck or a future INT stat)
 - HUD shows MP as a blue segmented bar below the HP bar
