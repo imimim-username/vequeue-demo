@@ -79,7 +79,7 @@ function saveHoF(){try{fs.writeFileSync(HOF_FILE,JSON.stringify(hallOfFame),'utf
 function updateHofBoard(board,name,value){
   const idx=board.findIndex(e=>e.name===name);
   if(idx>=0)board[idx].value=value; else board.push({name,value});
-  board.sort((a,b)=>b.value-a.value);
+  board.sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name));
   return board.slice(0,5);
 }
 function updateHallOfFame(accountId,data){
@@ -171,7 +171,7 @@ let _marketIdSeq=marketplace.reduce((m,l)=>Math.max(m,l.id||0),0)+1;
 setInterval(()=>{
   const now=Date.now();
   const before=marketplace.length;
-  marketplace=marketplace.filter(l=>now-l.listedAt<24*60*60*1000);
+  marketplace=marketplace.filter(l=>now-l.listedAt<=24*60*60*1000);
   if(marketplace.length!==before){saveMarket();io.emit('market_state',{listings:marketplace});}
 },5*60*1000);
 
@@ -252,6 +252,7 @@ function queueStateFor(zoneName){
   const q=queues[zoneName];
   return{
     zone:zoneName,
+    tickMs:QUEUE_TICK_MS,
     entry:{serving:q.entry.serving,entries:q.entry.entries.map(e=>({nickname:e.nickname,ticket:e.ticket}))},
     exit: {serving:q.exit.serving, entries:q.exit.entries.map(e=>({nickname:e.nickname,ticket:e.ticket}))},
   };
@@ -372,7 +373,20 @@ io.on('connection',socket=>{
     data.alcx      =parseFloat(clamp(data.alcx,0,100_000).toFixed(4));
     data.level     =clamp(data.level,1,50);
     data.xp        =clamp(data.xp,0,1_000_000);
-    data.kills     =clamp(data.kills,0,999_999);
+    data.kills         =clamp(data.kills,0,999_999);
+    data.zoneSeniority =clamp(data.zoneSeniority,0,999);
+    // Cross-currency guard: prevent currencies from INCREASING via client manipulation.
+    // Legitimate decreases (purchases) are allowed; only inflation is blocked.
+    // TODO: full server-side shop validation requires moving item definitions server-side.
+    const prev=pdb[socket.accountId].data;
+    if(prev){
+      const alUSDPrev=prev.alUSD||0, alETHPrev=prev.alETH||0;
+      // Block any save where alUSD/alETH rose without a server-initiated transaction
+      // (market payouts, loot, etc. are handled server-side and not via save_character)
+      if(data.alUSD>alUSDPrev+0.01)data.alUSD=parseFloat(alUSDPrev.toFixed(2));
+      if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
+      if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
+    }
     data._sig      =signPlayerData(data);
     pdb[socket.accountId].data=data;
     pdb[socket.accountId].updated=Date.now();
@@ -566,11 +580,13 @@ io.on('connection',socket=>{
     if(!buyerData)return socket.emit('market_buy_result',{ok:false,error:'No character data.'});
     const bal=listing.currency==='alETH'?(buyerData.alETH||0):(buyerData.alUSD||0);
     if(bal<listing.price)return socket.emit('market_buy_result',{ok:false,error:`Not enough ${listing.currency}.`});
-    if(listing.currency==='alETH')buyerData.alETH=parseFloat(((buyerData.alETH||0)-listing.price).toFixed(4));
-    else buyerData.alUSD=parseFloat(((buyerData.alUSD||0)-listing.price).toFixed(2));
+    // Check inventory space BEFORE deducting currency to avoid item loss
     const buyerInv=buyerData.inventory=buyerData.inventory||new Array(8).fill(null);
     const freeSlot=buyerInv.findIndex((s,i)=>i>=2&&s===null);
-    if(freeSlot!==-1)buyerInv[freeSlot]=listing.item;
+    if(freeSlot===-1)return socket.emit('market_buy_result',{ok:false,error:'Inventory full! Clear a slot first.'});
+    if(listing.currency==='alETH')buyerData.alETH=parseFloat(((buyerData.alETH||0)-listing.price).toFixed(4));
+    else buyerData.alUSD=parseFloat(((buyerData.alUSD||0)-listing.price).toFixed(2));
+    buyerInv[freeSlot]=listing.item;
     saveDb();
     const fee=parseFloat((listing.price*0.05).toFixed(listing.currency==='alETH'?4:2));
     const payout=parseFloat((listing.price-fee).toFixed(listing.currency==='alETH'?4:2));
@@ -598,7 +614,19 @@ io.on('connection',socket=>{
     const se=snowballEnemies.splice(idx,1)[0];
     saveSnowball();
     io.emit('snowball_removed',{id:se.id});
-    socket.emit('snowball_kill_result',{ok:true,loot:se.loot,name:se.name,kills:se.killCount});
+    // Apply same 20% item decay as regular loot pickup for consistency
+    const SNOWBALL_DECAY=0.20;
+    const lootWithDecay={...se.loot};
+    if(Array.isArray(lootWithDecay.items)){
+      lootWithDecay.items=lootWithDecay.items.map(item=>{
+        const d={...item};
+        if(d.dmg)d.dmg=Math.max(1,Math.floor(d.dmg*(1-SNOWBALL_DECAY)));
+        if(d.def)d.def=Math.max(0,Math.floor(d.def*(1-SNOWBALL_DECAY)));
+        if(d.heal)d.heal=Math.max(1,Math.floor(d.heal*(1-SNOWBALL_DECAY)));
+        return d;
+      });
+    }
+    socket.emit('snowball_kill_result',{ok:true,loot:lootWithDecay,name:se.name,kills:se.killCount,decayPct:SNOWBALL_DECAY});
     const p=players[socket.id];
     if(p)io.emit('chat',{nickname:'⚠ System',text:`★ ${p.nickname} has vanquished ${se.name} (${se.killCount} kill streak)! Loot claimed.`});
   });
@@ -690,9 +718,15 @@ io.on('connection',socket=>{
     if(!QUEUE_ZONES.includes(zone)||!['entry','exit'].includes(queueType))return;
     const bidAmt=parseFloat(alcx);
     if(isNaN(bidAmt)||bidAmt<1)return socket.emit('auction_result',{ok:false,error:'Minimum bid is 1 ALCX.'});
+    // Validate server-side ALCX balance to prevent duplication on reconnect
+    const bidderData=socket.accountId&&pdb[socket.accountId]?.data;
+    const serverAlcx=bidderData?(bidderData.alcx||0):0;
+    if(serverAlcx<bidAmt)return socket.emit('auction_result',{ok:false,error:`Not enough ALCX. (server: ${serverAlcx.toFixed(2)})`});
     const side=queues[zone][queueType];
     const myEntry=side.entries.find(e=>e.id===socket.id);
     if(!myEntry)return socket.emit('auction_result',{ok:false,error:'You are not in this queue.'});
+    // Deduct ALCX server-side so reconnect doesn't restore the bid amount
+    if(bidderData)bidderData.alcx=parseFloat(Math.max(0,(bidderData.alcx||0)-bidAmt).toFixed(4));
     // Move to front: give ticket value just below current serving+1
     side.entries=side.entries.filter(e=>e.id!==socket.id);
     const frontTicket=side.serving+0.5; // sorts before next integer ticket

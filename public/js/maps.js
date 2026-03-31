@@ -372,7 +372,8 @@ const NPCS = {
         "Hear ye, hear ye! Welcome to Victory Quest, brave adventurer!",
         "Our town is a safe haven — no monsters dare enter these gates.",
         "To the south lies the Wilderness. The deeper you go, the deadlier it gets.",
-        "The Marketplace and Treasury use the veQueue system — join the queue and wait your turn.",
+        "The Marketplace and Treasury use the veQueue system — you need ALCX to join the queue! Lock tokens to earn your place.",
+        "Tip: Earn alETH by slaying Dark Knights — ask the Armorer in the eastern district for a bounty.",
         "Live token prices — alUSD, alETH, and ALCX — are tracked in real time from the markets!",
         "When alUSD dips below $0.98, I'll shout it from the rooftops. The Transmuter arbitrage window opens!",
         "Check the Governance Hall for the Protocol Treasury balance and live price feed.",
@@ -391,6 +392,14 @@ const NPCS = {
       dialog:[
         "The Tavern's open for business. Mind your manners inside.",
         "We keep the peace in this town. Monsters stay out — that's the deal.",
+      ]
+    },
+    { id:'armorer_brix', x:TOWN_OX+31, y:TOWN_OY+11, type:'merchant', face:3, name:'Armorer Brix', questId:'dark_knight_elite',
+      dialog:[
+        "Looking to earn alETH? The premium currency of the on-chain realm?",
+        "Dark Knights drop it — and I pay bounties in alETH for every three you slay.",
+        "Bring it to the Marketplace: alETH unlocks the finest weapons — Flame Blade, Shadow Blade.",
+        "The queue is your gateway. Lock your ALCX, wait your turn, and trade in style.",
       ]
     },
     { id:'guard_east', x:TOWN_OX+33, y:TOWN_OY+12, type:'guard', face:3, name:'Town Guard',

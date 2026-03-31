@@ -11,8 +11,8 @@ const CFG = {
   SPEED:2.2,             // player speed px/frame
   START_SPACEBUCKS:100,
   START_ALUSD:50,
-  START_ALCX:20,
-  MAX_HP:6,
+  START_ALCX:50,
+  MAX_HP:10,
   KONAMI:[38,38,40,40,37,39,37,39,66,65],
 };
 const {W,H,TS,TW,TH} = CFG;
@@ -35,6 +35,7 @@ const WORLD_W=220, WORLD_H=150;
 const TOWN_OX=90, TOWN_OY=55; // top-left of town in world tile coords
 const NS_L=TOWN_OX+19, NS_R=TOWN_OX+20; // N-S road cols (109,110)
 const EW_T=TOWN_OY+13, EW_B=TOWN_OY+14; // E-W road rows (68,69)
+const RESPAWN_TX=TOWN_OX+20, RESPAWN_TY=TOWN_OY+14; // Town respawn tile (road intersection)
 
 // ── COLORS ───────────────────────────────────────────────────────────────────
 const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
@@ -122,7 +123,7 @@ const CLASSES = {
 // Wilderness danger-zone encounter table (south of river, rows 38+)
 const ENEMIES = {
   wolf: {
-    type:'wolf', name:'Dire Wolf', maxHp:12, atk:4, def:1, spd:5,
+    type:'wolf', name:'Dire Wolf', maxHp:12, atk:3, def:1, spd:5,
     xp:12, drops:{spacebucks:8},
     msg:'A Dire Wolf lunges from the shadows!',
   },
@@ -247,7 +248,7 @@ const QUEST_DEFS = {
   lich_quest:{
     id:'lich_quest', title:'The Ancient Evil', giver:'Senior Clerk Praxis',
     type:'kill', target:'lich', required:1,
-    reward:{xp:800,alUSD:500},
+    reward:{xp:800,alUSD:500,alETH:0.05},
     offerLines:[
       "The records speak of an Ancient Lich entombed beneath the dungeon entrance.",
       "It predates this town, the rivers, perhaps civilization itself.",
@@ -259,6 +260,22 @@ const QUEST_DEFS = {
       "The realm owes you a debt beyond measure. Take this — it is the least we can offer.",
     ],
     completedLines:["Peace shall reign. We'll need to update the records. Extensively."],
+  },
+  dark_knight_elite:{
+    id:'dark_knight_elite', title:'Knight Slayer Elite', giver:'Armorer Brix',
+    type:'kill', target:'darkKnight', required:3,
+    reward:{xp:500,alETH:0.02},
+    offerLines:[
+      "Three Dark Knights have been spotted forming a war band in the south.",
+      "The city coffers can't pay in common coin — but I have alETH for someone brave enough.",
+      "Slay all three and I'll make it worth your while.",
+    ],
+    inProgressLine:"More Dark Knights to slay. Don't stop now.",
+    readyLines:[
+      "Three Dark Knights, all dead? The south road is safe at last.",
+      "Here — alETH, the currency of the on-chain realm. Spend it wisely in the Marketplace.",
+    ],
+    completedLines:["Try the Marketplace inside the economic zone — alETH buys the finest gear."],
   },
 };
 

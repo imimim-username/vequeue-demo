@@ -1,11 +1,11 @@
 // ── GAME STATE ────────────────────────────────────────────────────────────────
 const G = {
   zone:'world',
-  x: (TOWN_OX+20+0.5)*TS,
-  y: (TOWN_OY+14+0.5)*TS,
+  x: (RESPAWN_TX+0.5)*TS,
+  y: (RESPAWN_TY+0.5)*TS,
   dir:2, // 0=up,1=right,2=down,3=left
   frame:0, moveTimer:0, moving:false,
-  hp:6, maxHp:6,
+  hp:CFG.MAX_HP, maxHp:CFG.MAX_HP,
   mp:6, maxMp:6,
   spacebucks: CFG.START_SPACEBUCKS,
   schmeckles: 0,
@@ -199,7 +199,8 @@ function getQuestDialog(npc){
     ];
   }
   if(qs.status==='ready'){
-    return[...qdef.readyLines,`[ Claim reward: +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD ]`];
+    const rp=[qdef.reward.xp&&`+${qdef.reward.xp} XP`,qdef.reward.alUSD&&`+${qdef.reward.alUSD} alUSD`,qdef.reward.alETH&&`+${qdef.reward.alETH} alETH`,qdef.reward.alcx&&`+${qdef.reward.alcx} ALCX`].filter(Boolean).join(', ');
+    return[...qdef.readyLines,`[ Claim reward: ${rp} ]`];
   }
   // completed
   return qdef.completedLines;
@@ -218,13 +219,21 @@ function handleQuestDialogClose(npc){
     chatLog(`★ Quest accepted: "${qdef.title}" — ${qdef.inProgressLine}`,'#FFD700');
   } else if(qs.status==='ready'){
     // Turn in the quest
-    G.alUSD+=qdef.reward.alUSD;
+    if(qdef.reward.alUSD)G.alUSD=parseFloat((G.alUSD+qdef.reward.alUSD).toFixed(2));
+    if(qdef.reward.alETH)G.alETH=parseFloat((G.alETH+qdef.reward.alETH).toFixed(4));
+    if(qdef.reward.alcx)G.alcx=parseFloat((G.alcx+qdef.reward.alcx).toFixed(4));
     G.xp+=qdef.reward.xp;
     checkLevelUp();
     qs.status='completed';
     SFX.questComplete();
     SFX.coin();
-    chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD`,'#4CAF50');
+    const rewardParts=[
+      qdef.reward.xp&&`+${qdef.reward.xp} XP`,
+      qdef.reward.alUSD&&`+${qdef.reward.alUSD} alUSD`,
+      qdef.reward.alETH&&`+${qdef.reward.alETH} alETH`,
+      qdef.reward.alcx&&`+${qdef.reward.alcx} ALCX`,
+    ].filter(Boolean).join(', ');
+    chatLog(`★ Quest complete: "${qdef.title}"! ${rewardParts}`,'#4CAF50');
     if(G.paused)renderInventoryScreen();
   }
 }
@@ -249,12 +258,24 @@ function declineOrAbandonQuest(){
   } else if(qs.status==='active'){
     // Abandoning an active quest — charge penalty
     if(G.alUSD<QUEST_ABANDON_PENALTY){
-      chatLog(`Can't abandon: need ${QUEST_ABANDON_PENALTY} alUSD (have ${G.alUSD.toFixed(2)}).`,'#FF4444');
+      // Can't pay — offer a penalty-free forfeit so the player is never permanently stuck
+      const forfeit=confirm(
+        `You can't pay the ${QUEST_ABANDON_PENALTY} alUSD penalty (you have ${G.alUSD.toFixed(2)} alUSD).\n\n`+
+        `Forfeit the quest for free instead? (No penalty, but you won't be able to restart it.)\n\n`+
+        `Click OK to forfeit, Cancel to keep the quest.`
+      );
+      if(!forfeit){
+        // Put the dialog back so they can keep the quest
+        G.npcDialog={npc,lineIdx:0,dialog:getQuestDialog(npc)};
+        G.paused=true;
+        showNpcDialog();
+        return;
+      }
+      // Free forfeit
+      delete G.quests[qid];
+      chatLog(`Quest forfeited: "${qdef.title}" (no penalty — could not afford ${QUEST_ABANDON_PENALTY} alUSD).`,'#888888');
       SFX.error();
-      // Re-open the dialog so they know they're stuck with it
-      G.npcDialog={npc,lineIdx:0,dialog:getQuestDialog(npc)};
-      G.paused=true;
-      showNpcDialog();
+      saveToServer();
       return;
     }
     G.alUSD=Math.max(0,G.alUSD-QUEST_ABANDON_PENALTY);
@@ -289,7 +310,7 @@ function tryInteract(){
   // Check for nearby loot piles
   {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
   const nearLoot=G.worldLoot.find(l=>l.zone===G.zone&&Math.abs(l.x-px_)<=1&&Math.abs(l.y-py_)<=1);
-  if(nearLoot){socket.emit('loot_pickup',{lootId:nearLoot.id});return;}}
+  if(nearLoot){socket?.emit('loot_pickup',{lootId:nearLoot.id});return;}}
   // Check for nearby snowball enemies (world zone only)
   if(G.zone==='world'){
     const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
@@ -405,7 +426,26 @@ function handleQueueDoor(key,door){
 
 function joinQueue(zone,type){
   if(G.queueState)return; // already in a queue
-  const lockAmt=type==='entry'?Math.max(5,Math.floor(G.alcx*0.20)):0;
+  // Cap lockAmt to actual balance so locked amount never exceeds what was deducted
+  const lockAmt=type==='entry'?Math.min(G.alcx,Math.max(5,Math.floor(G.alcx*0.20))):0;
+  // First-time queue explanation (shown once, then flagged)
+  if(!G._shownQueueTip&&lockAmt>0){
+    G._shownQueueTip=true;
+    alert(
+      '📖 How the Queue Works\n\n'+
+      '• You take a ticket and wait your turn — just like a real rate-limited protocol.\n'+
+      '• 20% of your ALCX is locked as a commitment signal. You get it all back when you enter or leave.\n'+
+      '• The longer you stay in the queue zone (Seniority ⭐), the more ALCX drip you earn per cycle.\n'+
+      '• You can bid ALCX to jump ahead in line — bid amount is split among other waiters.\n\n'+
+      'This teaches how veQueue protects economic zones from spam and rewards patient participants.'
+    );
+  }
+  // Warn player about ALCX lock before proceeding
+  if(lockAmt>0){
+    const zl=zone[0].toUpperCase()+zone.slice(1);
+    const msg=`Join ${zl} entry queue?\n\n⚗ ${lockAmt} ALCX (20% of your balance) will be locked until you enter or leave.\n\nClick OK to confirm.`;
+    if(!confirm(msg))return;
+  }
   G.alcx=Math.max(0,G.alcx-lockAmt);
   G.lockedAlcx=lockAmt;
   G.queueState={zone,type,ticket:null,served:false};
@@ -421,19 +461,24 @@ function updateQueuePanel(){
   panel.style.display='block';
   const{zone,type,ticket,served}=G.queueState;
   const zl=zone[0].toUpperCase()+zone.slice(1);
-  document.getElementById('queue-header').textContent=
-    `${zl} ${type==='entry'?'ENTRY':'EXIT'} QUEUE`;
-  document.getElementById('queue-ticket-num').textContent=ticket?`🎫 #${ticket}`:'🎫 …';
+  const isExit=type==='exit';
+  // Helper: safe getElementById — never throws if element is missing
+  const qEl=id=>document.getElementById(id);
+  qEl('queue-header')&&(qEl('queue-header').textContent=
+    `${zl} ${isExit?'EXIT':'ENTRY'} QUEUE${isExit?' (free in this demo)':''}`);
+  qEl('queue-ticket-num')&&(qEl('queue-ticket-num').textContent=ticket?`🎫 #${ticket}`:'🎫 …');
 
   const sq=serverQueues[zone]?.[type];
   if(sq&&ticket){
     const ahead=sq.entries.filter(e=>e.ticket<ticket).length;
-    document.getElementById('queue-serving-line').textContent=
-      `Now serving: #${sq.serving||'—'}`;
-    document.getElementById('queue-ahead-line').textContent=
-      served?'✅ YOUR TURN!':(ahead===0?'You\'re next!':ahead+' ahead of you');
-    const listEl=document.getElementById('queue-list');
-    listEl.innerHTML=sq.entries.map(e=>{
+    qEl('queue-serving-line')&&(qEl('queue-serving-line').textContent=`Now serving: #${sq.serving||'—'}`);
+    const tickMs=serverQueues[zone]?.tickMs||10000;
+    const waitSec=ahead*tickMs/1000;
+    const waitStr=waitSec>=60?`~${Math.round(waitSec/60)}m wait`:`~${Math.round(waitSec)}s wait`;
+    qEl('queue-ahead-line')&&(qEl('queue-ahead-line').textContent=
+      served?'✅ YOUR TURN!':(ahead===0?'You\'re next!':`${ahead} ahead of you (${waitStr})`));
+    const listEl=qEl('queue-list');
+    if(listEl)listEl.innerHTML=sq.entries.map(e=>{
       const isYou=e.ticket===ticket;
       const isDone=sq.serving>=e.ticket;
       const col=isYou?'#FFD700':isDone?'#44AA66':'#444';
@@ -441,11 +486,14 @@ function updateQueuePanel(){
       return`<div style="color:${col}">${mark}#${e.ticket} ${e.nickname}</div>`;
     }).join('')||'<div style="color:#333">—</div>';
   } else {
-    document.getElementById('queue-serving-line').textContent='Connecting…';
-    document.getElementById('queue-ahead-line').textContent='';
-    document.getElementById('queue-list').innerHTML='';
+    // Offline / waiting for first server sync — show a non-confusing placeholder
+    const offline=!socket||!socket.connected;
+    qEl('queue-serving-line')&&(qEl('queue-serving-line').textContent=offline?'(offline mode — no live queue)':'Syncing…');
+    qEl('queue-ahead-line')&&(qEl('queue-ahead-line').textContent=offline?'Queue position unavailable':'');
+    if(qEl('queue-list'))qEl('queue-list').innerHTML=offline
+      ?'<div style="color:#555;font-size:.7rem">Connect to a game server to see live queue data.</div>':'';
   }
-  const lockEl=document.getElementById('queue-locked-line');
+  const lockEl=qEl('queue-locked-line');
   if(G.lockedAlcx>0){
     lockEl.textContent=`🔒 ${G.lockedAlcx} ⚗ ALCX locked`;
     lockEl.style.display='block';
@@ -456,6 +504,9 @@ function updateQueuePanel(){
   let senEl=document.getElementById('queue-seniority');
   if(!senEl){senEl=document.createElement('div');senEl.id='queue-seniority';senEl.style.cssText='font-size:.7rem;color:#9C27B0;margin-top:2px';panel.insertBefore(senEl,document.getElementById('queue-enter-btn'));}
   senEl.textContent=G.zoneSeniority>0?`⭐ Seniority: ${G.zoneSeniority} (drip ×${1+Math.floor(G.zoneSeniority/3)})`:'';
+  senEl.title=G.zoneSeniority>0
+    ?`Seniority ${G.zoneSeniority}: +1 every 5 min inside this zone. Your ALCX drip multiplier is now ${1+Math.floor(G.zoneSeniority/3)}×. Longer commitment = more yield.`
+    :'Stay in this zone to build seniority and earn a bonus ALCX drip multiplier.';
   // Auction / Donation bid row
   let aucEl=document.getElementById('queue-auction-row');
   if(!aucEl){
@@ -1210,7 +1261,7 @@ function endBattle(){
     G.hp=Math.max(1,Math.floor(G.maxHp*0.3));
     runPixelTransition('out',()=>{
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
-      changeZone('world',TOWN_OX+20,TOWN_OY+14);
+      changeZone('world',RESPAWN_TX,RESPAWN_TY);
       const lostStr=[sbDrop&&`${sbDrop}🪙`,smDrop&&`${smDrop}💀`,auDrop&&`${auDrop}$`].filter(Boolean).join(' ');
       chatLog(`Defeated! Dropped: ${lostStr||'nothing'}. Respawned in town.`,'#FF4040');
     });
@@ -1273,9 +1324,9 @@ function renderGovernanceUI(){
 function govPropose(){
   const v=parseFloat(document.getElementById('gov-rate-inp')?.value);
   if(isNaN(v)||v<0.1||v>2.0){chatLog('Rate must be 0.1–2.0%.','#FF4444');return;}
-  socket.emit('governance_propose',{rate:v/100});
+  socket?.emit('governance_propose',{rate:v/100});
 }
-function govVote(id,choice){socket.emit('governance_vote',{proposalId:id,choice});}
+function govVote(id,choice){socket?.emit('governance_vote',{proposalId:id,choice});}
 function doAuctionBid(){
   if(!G.queueState||G.queueState.served)return;
   const amt=parseFloat(document.getElementById('queue-bid-amt')?.value||0);
@@ -1283,7 +1334,7 @@ function doAuctionBid(){
   if(G.alcx<amt){chatLog(`Not enough ALCX! (have ${G.alcx})`, '#FF4444');SFX.error();return;}
   G.alcx=parseFloat((G.alcx-amt).toFixed(4));
   renderHUD();
-  socket.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
+  socket?.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
   chatLog(`⚡ Bid ${amt} ALCX to jump the queue!`,'#FFD700');
 }
 
@@ -1349,7 +1400,7 @@ function renderMarketUI(){
             <option value="alUSD">$ alUSD</option><option value="alETH">⟠ alETH</option>
           </select></div>
       </div>
-      <div style="color:#555;font-size:.7rem">5% consignment fee deducted from sale. Listings expire in 24h.</div>
+      <div style="color:#9C7ABF;font-size:.72rem;padding:4px 0">⚠ 5% consignment fee — you receive 95% of sale price. Listings expire in 24h.</div>
       <button onclick="submitListItem()" style="padding:6px;background:#2A1040;border:1px solid #5A3A80;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.8rem">📋 LIST ITEM</button>
     </div>`;
   }
@@ -1359,10 +1410,10 @@ function submitListItem(){
   const price=parseFloat(document.getElementById('mkt-price')?.value);
   const currency=document.getElementById('mkt-currency')?.value;
   if(isNaN(slot)||isNaN(price)||price<=0){chatLog('Enter a valid price.','#FF8800');return;}
-  socket.emit('market_list',{inventorySlot:slot,price,currency});
+  socket?.emit('market_list',{inventorySlot:slot,price,currency});
 }
-function buyListing(id){socket.emit('market_buy',{listingId:id});}
-function cancelListing(id){socket.emit('market_cancel',{listingId:id});}
+function buyListing(id){socket?.emit('market_buy',{listingId:id});}
+function cancelListing(id){socket?.emit('market_cancel',{listingId:id});}
 
 // ── BANK ──────────────────────────────────────────────────────────────────────
 // ── Inventory Expansion ───────────────────────────────────────────────────────
@@ -2601,11 +2652,17 @@ function initSocket(){
       G.spacebucks+=data.currencies.spacebucks;
       G.schmeckles+=data.currencies.schmeckles;
       G.alUSD=parseFloat((G.alUSD+data.currencies.alUSD).toFixed(2));
-      data.items.forEach(item=>{const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);if(slot!==-1)G.inventory[slot]=item;});
+      let itemsFit=0, itemsLost=0;
+      data.items.forEach(item=>{
+        const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+        if(slot!==-1){G.inventory[slot]=item;itemsFit++;}
+        else itemsLost++;
+      });
       G.worldLoot=G.worldLoot.filter(l=>l.id!==data.lootId);
       const c=data.currencies;
       const got=[c.spacebucks&&`+${c.spacebucks}🪙`,c.schmeckles&&`+${c.schmeckles}💀`,c.alUSD&&`+${c.alUSD}$`].filter(Boolean).join(' ');
-      chatLog(`💰 Found ${data.fromPlayer}'s loot! ${got||'items only'} + ${data.items.length} item(s) (${Math.round(data.decayPct*100)}% decayed)`,'#FFD700');
+      chatLog(`💰 Found ${data.fromPlayer}'s loot! ${got||'coins'} + ${itemsFit} item(s) (${Math.round(data.decayPct*100)}% decayed)`,'#FFD700');
+      if(itemsLost>0)chatLog(`⚠ ${itemsLost} item(s) lost — inventory full! Free a slot before looting.`,'#FF8800');
       SFX.coin();saveToServer();
     });
     socket.on('market_state',data=>{
@@ -2691,7 +2748,8 @@ function initSocket(){
       G.alUSD=parseFloat((G.alUSD+(loot.alUSD||0)).toFixed(2));
       (loot.items||[]).forEach(item=>{const sl=G.inventory.findIndex((s,i)=>i>=2&&s===null);if(sl!==-1)G.inventory[sl]=item;});
       const parts=[loot.spacebucks&&`+${loot.spacebucks}🪙`,loot.schmeckles&&`+${loot.schmeckles}💀`,loot.alUSD&&`+${loot.alUSD}$`,loot.items?.length&&`+${loot.items.length} items`].filter(Boolean).join(' ');
-      chatLog(`★ Vanquished ${data.name} (${data.kills}-kill streak)! Bonus loot: ${parts||'none'}`,'#FF8C00');
+      const decayNote=data.decayPct?` (${Math.round(data.decayPct*100)}% item decay)`:'';
+      chatLog(`★ Vanquished ${data.name} (${data.kills}-kill streak)! Bonus loot: ${parts||'none'}${decayNote}`,'#FF8C00');
       SFX.coin();saveToServer();
     });
 
@@ -2723,6 +2781,19 @@ function initSocket(){
         chatLog(`⚡ Queue skip confirmed! Bid ${data.alcx} ALCX. ${data.others} others each earned ${data.share} ALCX.`,'#FFD700');
         SFX.buy();
         updateQueuePanel();
+        // Flash the queue panel header gold to give visible "jumped" feedback
+        const hdr=document.getElementById('queue-header');
+        const tkn=document.getElementById('queue-ticket-num');
+        if(hdr){
+          const orig=hdr.style.color;
+          hdr.style.color='#FFD700';hdr.style.textShadow='0 0 8px #FFD700';
+          setTimeout(()=>{hdr.style.color=orig;hdr.style.textShadow='';},1500);
+        }
+        if(tkn){
+          const orig=tkn.style.color;
+          tkn.textContent='⚡ FRONT!';tkn.style.color='#FFD700';
+          setTimeout(()=>{tkn.style.color=orig;updateQueuePanel();},1500);
+        }
       }else{chatLog('Auction: '+data.error,'#FF4444');SFX.error();}
     });
     socket.on('auction_payout',data=>{
@@ -2772,6 +2843,7 @@ function applyServerState(s){
   G.quests=s.quests||{};
   G.dungeonBossDefeated=s.dungeonBossDefeated||false;
   if(s.kills!=null)G.kills=s.kills;
+  if(s.zoneSeniority!=null)G.zoneSeniority=s.zoneSeniority;
 }
 
 function saveToServer(){
@@ -2787,6 +2859,7 @@ function saveToServer(){
     inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
     kills:G.kills||0,
+    zoneSeniority:G.zoneSeniority||0,
   });
 }
 function updateOnlineCount(){
@@ -2826,7 +2899,7 @@ document.getElementById('btn-start').addEventListener('click',()=>{
 });
 
 // ── Queue panel buttons ───────────────────────────────────────────────────────
-document.getElementById('queue-enter-btn').addEventListener('click',()=>{
+document.getElementById('queue-enter-btn')?.addEventListener('click',()=>{
   if(!G.queueState?.served)return;
   const{zone,type}=G.queueState;
   socket?.emit('queue_leave',{zone,queueType:type});
@@ -2836,7 +2909,7 @@ document.getElementById('queue-enter-btn').addEventListener('click',()=>{
   const door=ZONE_DOORS[key];
   if(door)changeZone(door.to,door.sx,door.sy);
 });
-document.getElementById('queue-leave-btn').addEventListener('click',()=>{
+document.getElementById('queue-leave-btn')?.addEventListener('click',()=>{
   if(!G.queueState)return;
   socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
   G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
