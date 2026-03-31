@@ -1777,6 +1777,10 @@ function drawWildernessBG(ctx,cx,cy,W,H,tick){
   const fogG=ctx.createLinearGradient(0,groundY,0,groundY+28);
   fogG.addColorStop(0,'#2E4030AA');fogG.addColorStop(1,'#2E403000');
   ctx.fillStyle=fogG;ctx.fillRect(0,groundY,W,28);
+
+  // Foreground foliage strip — fast parallax (0.6×), dark brush/ferns at screen bottom
+  const bx=-(cx*0.6)%(W*1.4);
+  drawFoliageStrip(ctx,bx,H*0.82,W);
 }
 
 function drawWildTreeline(ctx,ox,baseY,W,H){
@@ -1798,6 +1802,28 @@ function drawWildTreeline(ctx,ox,baseY,W,H){
       ctx.moveTo(x-treeW*0.4,baseY-treeH*0.4);
       ctx.lineTo(x,baseY-treeH*0.9);
       ctx.lineTo(x+treeW*0.4,baseY-treeH*0.4);
+      ctx.fill();
+    }
+  });
+}
+
+function drawFoliageStrip(ctx,ox,baseY,W){
+  // Two layers of dark bush/fern silhouettes — foreground feel
+  [['#080F08',1.0],['#0A140A',0.7]].forEach(([col,scale],pass)=>{
+    ctx.fillStyle=col;
+    const offX=pass*W*0.38;
+    for(let i=0;i<32;i++){
+      const x=ox+offX+i*(W/13);
+      const bh=(14+9*Math.abs(Math.sin(i*2.3+pass*1.7)))*scale;
+      const bw=(20+12*Math.abs(Math.sin(i*1.7+pass*2.1)))*scale;
+      ctx.beginPath();
+      ctx.ellipse(x,baseY,bw/2,bh/2,0,0,Math.PI*2);
+      ctx.fill();
+      // Add a jagged spike for fern fronds
+      ctx.beginPath();
+      ctx.moveTo(x-bw*0.3,baseY-bh*0.3);
+      ctx.lineTo(x,baseY-bh*0.9);
+      ctx.lineTo(x+bw*0.3,baseY-bh*0.3);
       ctx.fill();
     }
   });
