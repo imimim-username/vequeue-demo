@@ -320,8 +320,12 @@ const T={
 const SOLID_TILES = new Set([
   T.WALL,T.TREE,T.FENCE,T.COLUMN,T.DOOR_C,T.SIGN,T.SHRUB,T.STALL
 ]); // T.VAULT intentionally walkable — decorative floor plating
-// Wilderness adds water as solid (rivers/lakes must be crossed at bridges)
-const WILDERNESS_SOLID = new Set([...SOLID_TILES, T.WATER]);
+const WORLD_SOLID = new Set([...SOLID_TILES, T.WATER]);
+// Town offset within the world map
+const WORLD_W=220, WORLD_H=150;
+const TOWN_OX=90, TOWN_OY=55; // top-left of town in world tile coords
+const NS_L=TOWN_OX+19, NS_R=TOWN_OX+20; // N-S road cols (109,110)
+const EW_T=TOWN_OY+13, EW_B=TOWN_OY+14; // E-W road rows (68,69)
 
 // ── COLORS ───────────────────────────────────────────────────────────────────
 const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
@@ -946,197 +950,161 @@ const TOWN_MAP=(()=>{
   return m;
 })();
 
-// ── WILDERNESS MAP ─────────────────────────────────────────────────────────────
-// 160 wide × 100 tall. Accessible from all 4 sides of town.
-// Four portals:  N (cols 78-81, row 0)  from town south gate
-//                S (cols 78-81, row 99) from town north gate
-//                W (rows 48-51, col 0)  from town east gate
-//                E (rows 48-51, col 159)from town west gate
-// Main roads: N-S (cols 78-81) and E-W (rows 48-51) cross at the centre.
-// River #1 (rows 28-30): 3 bridges — centre, west, east.
-// River #2 (rows 70-72): centre bridge only — deep danger zone.
-const WLD_W=160,WLD_H=100;
-const WILDERNESS_MAP=(()=>{
-  const m=Array.from({length:WLD_H},()=>new Array(WLD_W).fill(T.GRASS));
-  const set=(r,c,t)=>{if(r>=0&&r<WLD_H&&c>=0&&c<WLD_W)m[r][c]=t;};
-  const fill=(r1,c1,r2,c2,t)=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)set(r,c,t);};
+// ── WORLD MAP ─────────────────────────────────────────────────────────────────
+// 220×150 unified world. The town is embedded at (TOWN_OX,TOWN_OY).
+// Four river barriers form a protective ring around town:
+//   N river: rows 22-24   S river: rows 100-102
+//   W river: cols 50-52   E river: cols 165-167
+// Main N-S road: cols 109-110   Main E-W road: rows 68-69
+const WORLD_MAP=(()=>{
+  const m=Array.from({length:WORLD_H},()=>new Array(WORLD_W).fill(T.GRASS));
+  const s=(r,c,t)=>{if(r>=0&&r<WORLD_H&&c>=0&&c<WORLD_W)m[r][c]=t;};
+  const f=(r1,c1,r2,c2,t)=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)s(r,c,t);};
   const box=(r1,c1,r2,c2)=>{
-    for(let c=c1;c<=c2;c++){set(r1,c,T.WALL);set(r2,c,T.WALL);}
-    for(let r=r1;r<=r2;r++){set(r,c1,T.WALL);set(r,c2,T.WALL);}
+    for(let c=c1;c<=c2;c++){s(r1,c,T.WALL);s(r2,c,T.WALL);}
+    for(let r=r1;r<=r2;r++){s(r,c1,T.WALL);s(r,c2,T.WALL);}
   };
 
-  // ── Perimeter walls ────────────────────────────────────────────────────────
-  box(0,0,WLD_H-1,WLD_W-1);
+  // World perimeter
+  box(0,0,WORLD_H-1,WORLD_W-1);
 
-  // ── Forest zones (large blocks — roads/clearings are carved after) ─────────
-  fill(5,2,27,76,T.TREE);      // NW forest (north safe zone, west of road)
-  fill(5,83,27,157,T.TREE);    // NE forest
-  fill(31,2,47,76,T.TREE);     // W upper danger forest (above E-W road)
-  fill(31,83,47,157,T.TREE);   // E upper danger forest
-  fill(54,2,69,76,T.TREE);     // W lower danger forest (below E-W road)
-  fill(54,83,69,157,T.TREE);   // E lower danger forest
-  fill(73,2,89,76,T.TREE);     // W deep danger forest (below river 2)
-  fill(73,83,89,157,T.TREE);   // E deep danger forest
-  fill(92,2,98,76,T.TREE);     // SW south safe zone forests
-  fill(92,83,98,157,T.TREE);   // SE south safe zone forests
+  // Fill entire interior with trees (roads/clearings carved below)
+  f(1,1,WORLD_H-2,WORLD_W-2,T.TREE);
 
-  // ── Clearings carved within forest blocks ─────────────────────────────────
-  // NW glade (safe zone, accessible via dirt spur from road)
-  fill(7,5,20,32,T.GRASS);
-  for(let c=5;c<=32;c++){set(7,c,T.SHRUB);set(20,c,T.SHRUB);}
-  for(let r=7;r<=20;r++){set(r,5,T.SHRUB);set(r,32,T.SHRUB);}
-  // NE glade
-  fill(7,125,20,152,T.GRASS);
-  for(let c=125;c<=152;c++){set(7,c,T.SHRUB);set(20,c,T.SHRUB);}
-  for(let r=7;r<=20;r++){set(r,125,T.SHRUB);set(r,152,T.SHRUB);}
-  // W mid-danger clearing (between rivers, west side)
-  fill(33,5,68,34,T.GRASS);
-  // E mid-danger clearing
-  fill(33,124,68,153,T.GRASS);
-  // Deep-zone centre clearing (funnel to dungeon)
-  fill(73,60,89,99,T.GRASS);
+  // ── Road corridors (6-tile-wide grass strips, roads set later) ────────────
+  f(1,NS_L-2,WORLD_H-2,NS_R+2,T.GRASS);   // N-S corridor
+  f(EW_T-2,1,EW_B+2,WORLD_W-2,T.GRASS);   // E-W corridor
 
-  // ── Main roads (overwrite forest where they cross) ─────────────────────────
-  fill(1,78,98,81,T.ROAD);     // N-S road — full map height
-  fill(48,1,51,158,T.ROAD);    // E-W road — full map width
-  fill(46,76,53,83,T.ROAD);    // crossroads widening
+  // ── Clear area immediately around the town walls ───────────────────────────
+  f(TOWN_OY-4,TOWN_OX-4,TOWN_OY+MAP_H+3,TOWN_OX+MAP_W+3,T.GRASS);
 
-  // ── Side paths (dirt) through mid-zone clearings ──────────────────────────
-  fill(31,35,69,36,T.DIRT);    // W side corridor (edges clearings)
-  fill(31,122,69,123,T.DIRT);  // E side corridor
+  // ── Embed TOWN_MAP tiles ──────────────────────────────────────────────────
+  for(let r=0;r<MAP_H;r++)
+    for(let c=0;c<MAP_W;c++)
+      m[TOWN_OY+r][TOWN_OX+c]=TOWN_MAP[r][c];
 
-  // ── River 1 (rows 28-30) — three bridges ──────────────────────────────────
-  fill(28,1,30,158,T.WATER);
-  fill(28,78,30,81,T.ROAD);    // centre bridge
-  fill(28,35,30,38,T.ROAD);    // west bridge
-  fill(28,120,30,123,T.ROAD);  // east bridge
-  // Warning signs north of river
-  set(27,75,T.SIGN);set(27,82,T.SIGN);
-  set(27,33,T.SIGN);set(27,121,T.SIGN);
+  // ── Main roads (skip town interior to avoid overwriting it) ───────────────
+  f(1,NS_L,TOWN_OY-1,NS_R,T.ROAD);
+  f(TOWN_OY+MAP_H,NS_L,WORLD_H-2,NS_R,T.ROAD);
+  f(EW_T,1,EW_B,TOWN_OX-1,T.ROAD);
+  f(EW_T,TOWN_OX+MAP_W,EW_B,WORLD_W-2,T.ROAD);
 
-  // ── River 2 (rows 70-72) — centre bridge only ─────────────────────────────
-  fill(70,1,72,158,T.WATER);
-  fill(70,78,72,81,T.ROAD);    // only the main bridge crosses
-  set(69,75,T.SIGN);set(69,82,T.SIGN);
+  // ── NORTH RIVER (rows 22-24) + 3 bridges ─────────────────────────────────
+  f(22,1,24,WORLD_W-2,T.WATER);
+  f(22,NS_L,24,NS_R,T.ROAD);  f(22,44,24,46,T.ROAD);  f(22,171,24,173,T.ROAD);
+  s(21,NS_L-1,T.SIGN);s(21,NS_R+1,T.SIGN);s(21,43,T.SIGN);s(21,172,T.SIGN);
 
-  // ── NORTH PORTAL (from town south gate) — row 0, cols 78-81 ──────────────
-  for(let c=78;c<=81;c++)set(0,c,T.ROAD);
-  fill(1,78,6,81,T.ROAD);
-  set(0,77,T.COLUMN);set(0,82,T.COLUMN);
-  for(let r=1;r<=5;r++){set(r,77,T.WALL);set(r,82,T.WALL);}
+  // ── SOUTH RIVER (rows 100-102) + 3 bridges ───────────────────────────────
+  f(100,1,102,WORLD_W-2,T.WATER);
+  f(100,NS_L,102,NS_R,T.ROAD); f(100,44,102,46,T.ROAD); f(100,171,102,173,T.ROAD);
+  s(99,NS_L-1,T.SIGN);s(99,NS_R+1,T.SIGN);
 
-  // ── SOUTH PORTAL (from town north gate) — row 99, cols 78-81 ─────────────
-  for(let c=78;c<=81;c++)set(99,c,T.ROAD);
-  fill(93,78,98,81,T.ROAD);
-  set(99,77,T.COLUMN);set(99,82,T.COLUMN);
-  for(let r=94;r<=98;r++){set(r,77,T.WALL);set(r,82,T.WALL);}
+  // ── WEST RIVER (cols 50-52) + bridges at E-W road and at N/S rivers ───────
+  f(1,50,WORLD_H-2,52,T.WATER);
+  f(EW_T,50,EW_B,52,T.ROAD);  // E-W road bridge
+  f(22,50,24,52,T.ROAD);       // N river bridge (already water, overwrite with road)
+  f(100,50,102,52,T.ROAD);     // S river bridge
+  s(EW_T-1,49,T.SIGN);s(EW_T-1,53,T.SIGN);
 
-  // ── WEST PORTAL (from town east gate) — col 0, rows 48-51 ────────────────
-  for(let r=48;r<=51;r++)set(r,0,T.ROAD);
-  fill(48,1,51,6,T.ROAD);
-  set(47,0,T.COLUMN);set(52,0,T.COLUMN);
-  for(let c=1;c<=5;c++){set(47,c,T.WALL);set(52,c,T.WALL);}
+  // ── EAST RIVER (cols 165-167) + bridges ──────────────────────────────────
+  f(1,165,WORLD_H-2,167,T.WATER);
+  f(EW_T,165,EW_B,167,T.ROAD); // E-W road bridge
+  f(22,165,24,167,T.ROAD);
+  f(100,165,102,167,T.ROAD);
+  s(EW_T-1,164,T.SIGN);s(EW_T-1,168,T.SIGN);
 
-  // ── EAST PORTAL (from town west gate) — col 159, rows 48-51 ──────────────
-  for(let r=48;r<=51;r++)set(r,159,T.ROAD);
-  fill(48,153,51,158,T.ROAD);
-  set(47,159,T.COLUMN);set(52,159,T.COLUMN);
-  for(let c=154;c<=158;c++){set(47,c,T.WALL);set(52,c,T.WALL);}
+  // ── NORTH SAFE ZONE glades (rows 25-54, inside the ring) ─────────────────
+  f(25,NS_L-10,54,NS_R+10,T.GRASS);
+  f(27,6,48,42,T.GRASS);
+  for(let c=6;c<=42;c++){s(27,c,T.SHRUB);s(48,c,T.SHRUB);}
+  for(let r=27;r<=48;r++){s(r,6,T.SHRUB);s(r,42,T.SHRUB);}
+  f(36,43,38,NS_L-3,T.DIRT);
+  f(27,175,48,213,T.GRASS);
+  for(let c=175;c<=213;c++){s(27,c,T.SHRUB);s(48,c,T.SHRUB);}
+  for(let r=27;r<=48;r++){s(r,175,T.SHRUB);s(r,213,T.SHRUB);}
+  f(36,NS_R+3,38,175,T.DIRT);
 
-  // ── Crossroads features ───────────────────────────────────────────────────
-  set(46,76,T.FOUNTAIN);set(46,77,T.FOUNTAIN);
-  set(47,76,T.FOUNTAIN);set(47,77,T.FOUNTAIN);
-  set(45,74,T.SIGN);set(45,84,T.SIGN);  // direction markers
-  set(53,74,T.SIGN);set(53,84,T.SIGN);
+  // ── NW Safe-zone ruins ────────────────────────────────────────────────────
+  box(30,10,42,28); f(31,11,41,27,T.STONE);
+  s(30,17,T.STONE);s(30,18,T.STONE);s(30,19,T.STONE);
+  s(42,17,T.STONE);s(42,18,T.STONE);s(42,19,T.STONE);
+  f(33,12,39,15,T.VAULT);f(33,23,39,26,T.VAULT);
+  s(36,18,T.COLUMN);s(36,19,T.COLUMN);s(35,12,T.SHRUB);s(41,26,T.SHRUB);
 
-  // ── Dirt spurs connecting roads to glades ─────────────────────────────────
-  fill(13,33,15,77,T.DIRT);   // NW glade spur
-  fill(13,82,15,125,T.DIRT);  // NE glade spur
+  // ── NE Safe-zone ruins ────────────────────────────────────────────────────
+  box(30,188,42,208); f(31,189,41,207,T.STONE);
+  s(30,196,T.STONE);s(30,197,T.STONE);s(30,198,T.STONE);
+  s(42,196,T.STONE);s(42,197,T.STONE);s(42,198,T.STONE);
+  f(33,190,39,193,T.VAULT);f(33,203,39,206,T.VAULT);
+  s(36,197,T.COLUMN);s(36,198,T.COLUMN);s(35,190,T.SHRUB);s(41,206,T.SHRUB);
 
-  // ── NW GLADE RUINS (safe zone) ────────────────────────────────────────────
-  box(9,8,18,24);
-  fill(10,9,17,23,T.STONE);
-  set(9,14,T.STONE);set(9,15,T.STONE);set(9,16,T.STONE);   // N entrance
-  set(18,14,T.STONE);set(18,15,T.STONE);set(18,16,T.STONE); // S entrance
-  fill(11,10,15,13,T.VAULT);fill(11,19,15,22,T.VAULT);
-  set(13,15,T.COLUMN);set(13,16,T.COLUMN);
-  set(10,9,T.SHRUB);set(17,22,T.SHRUB);
+  // ── Waymarker signs outside town gates ────────────────────────────────────
+  s(TOWN_OY-2,NS_L-1,T.SIGN);s(TOWN_OY+MAP_H+1,NS_L-1,T.SIGN);
+  s(EW_T,TOWN_OX-3,T.SIGN);s(EW_T,TOWN_OX+MAP_W+2,T.SIGN);
 
-  // ── NE GLADE RUINS (safe zone) ────────────────────────────────────────────
-  box(9,132,18,148);
-  fill(10,133,17,147,T.STONE);
-  set(9,138,T.STONE);set(9,139,T.STONE);set(9,140,T.STONE);
-  set(18,138,T.STONE);set(18,139,T.STONE);set(18,140,T.STONE);
-  fill(11,134,15,137,T.VAULT);fill(11,143,15,146,T.VAULT);
-  set(13,139,T.COLUMN);set(13,140,T.COLUMN);
-  set(10,133,T.SHRUB);set(17,146,T.SHRUB);
+  // ── SOUTH SAFE ZONE (rows 83-99) ─────────────────────────────────────────
+  f(TOWN_OY+MAP_H,NS_L-10,99,NS_R+10,T.GRASS);
+  f(TOWN_OY+MAP_H,TOWN_OX-4,99,TOWN_OX-1,T.GRASS);
+  f(TOWN_OY+MAP_H,TOWN_OX+MAP_W,99,TOWN_OX+MAP_W+3,T.GRASS);
 
-  // ── W DANGER RUINS (mid-zone clearing, rows 35-52) ────────────────────────
-  box(37,7,50,24);
-  fill(38,8,49,23,T.STONE);
-  set(37,14,T.STONE);set(37,15,T.STONE);set(37,16,T.STONE);
-  set(50,14,T.STONE);set(50,15,T.STONE);set(50,16,T.STONE);
-  fill(40,9,47,12,T.VAULT);fill(40,18,47,22,T.VAULT);
-  set(44,14,T.COLUMN);set(44,15,T.COLUMN);
-  set(38,8,T.SHRUB);set(38,22,T.SHRUB);set(49,8,T.SHRUB);set(49,22,T.SHRUB);
-  // Path from side corridor to ruins entrance
-  fill(37,25,51,35,T.DIRT);
+  // ── SOUTH DANGER ZONE (rows 103-148) ─────────────────────────────────────
+  f(103,NS_L-15,WORLD_H-2,NS_R+15,T.GRASS); // centre corridor
+  f(103,35,WORLD_H-2,47,T.GRASS);             // SW clearing (near W bridge)
+  f(103,170,WORLD_H-2,181,T.GRASS);           // SE clearing (near E bridge)
+  // Scattered trees in clearings
+  [[105,38],[108,43],[112,36],[116,41],[120,39],[105,173],[108,177],[112,171],[116,175],
+  ].forEach(([r,c])=>s(r,c,T.TREE));
+  // South ruins (danger centre)
+  box(108,NS_L-7,122,NS_R+7); f(109,NS_L-6,121,NS_R+6,T.STONE);
+  s(108,NS_L,T.STONE);s(108,NS_R,T.STONE);s(122,NS_L,T.STONE);s(122,NS_R,T.STONE);
+  f(111,NS_L-4,119,NS_L-1,T.VAULT);f(111,NS_R+1,119,NS_R+4,T.VAULT);
+  s(115,NS_L,T.COLUMN);s(115,NS_R,T.COLUMN);
+  // SW danger ruins
+  box(113,37,125,47); f(114,38,124,46,T.STONE);
+  s(113,41,T.STONE);s(113,42,T.STONE);s(125,41,T.STONE);s(125,42,T.STONE);
+  f(116,39,122,41,T.VAULT);f(116,44,122,46,T.VAULT); s(120,42,T.COLUMN);
+  // SE danger ruins
+  box(113,170,125,181); f(114,171,124,180,T.STONE);
+  s(113,174,T.STONE);s(113,175,T.STONE);s(125,174,T.STONE);s(125,175,T.STONE);
+  f(116,172,122,174,T.VAULT);f(116,177,122,179,T.VAULT); s(120,175,T.COLUMN);
+  // Dungeon entrance (deep south)
+  f(136,NS_L-4,147,NS_R+4,T.GRASS);
+  f(137,NS_L-2,146,NS_R+2,T.VAULT);f(139,NS_L-1,144,NS_R+1,T.GRATING);
+  s(135,NS_L-2,T.SIGN);s(135,NS_L-1,T.SIGN);s(135,NS_R+1,T.SIGN);s(135,NS_R+2,T.SIGN);
 
-  // ── E DANGER RUINS (mid-zone clearing) ────────────────────────────────────
-  box(37,133,50,150);
-  fill(38,134,49,149,T.STONE);
-  set(37,140,T.STONE);set(37,141,T.STONE);set(37,142,T.STONE);
-  set(50,140,T.STONE);set(50,141,T.STONE);set(50,142,T.STONE);
-  fill(40,135,47,139,T.VAULT);fill(40,144,47,148,T.VAULT);
-  set(44,140,T.COLUMN);set(44,141,T.COLUMN);
-  set(38,134,T.SHRUB);set(38,148,T.SHRUB);set(49,134,T.SHRUB);set(49,148,T.SHRUB);
-  fill(37,122,51,133,T.DIRT);
+  // ── NORTH DANGER (rows 1-21) clearings + ruins ───────────────────────────
+  f(2,55,20,88,T.GRASS); // NW danger clearing (between W river and N-S road)
+  f(2,130,20,163,T.GRASS); // NE danger clearing
+  // NW danger ruins
+  box(4,58,16,82); f(5,59,15,81,T.STONE);
+  s(4,67,T.STONE);s(4,68,T.STONE);s(4,69,T.STONE);s(16,67,T.STONE);s(16,68,T.STONE);s(16,69,T.STONE);
+  f(7,60,13,63,T.VAULT);f(7,76,13,80,T.VAULT); s(10,68,T.COLUMN);s(10,69,T.COLUMN);
+  // NE danger ruins
+  box(4,135,16,160); f(5,136,15,159,T.STONE);
+  s(4,145,T.STONE);s(4,146,T.STONE);s(4,147,T.STONE);s(16,145,T.STONE);s(16,146,T.STONE);s(16,147,T.STONE);
+  f(7,137,13,141,T.VAULT);f(7,155,13,159,T.VAULT); s(10,146,T.COLUMN);s(10,147,T.COLUMN);
 
-  // ── DUNGEON ENTRANCE (deep south, centre clearing) ────────────────────────
-  fill(79,68,88,91,T.GRASS);
-  fill(80,70,87,89,T.VAULT);
-  fill(82,74,85,85,T.GRATING);
-  set(78,75,T.SIGN);set(78,76,T.SIGN);set(78,77,T.SIGN);
-  set(78,82,T.SIGN);set(78,83,T.SIGN);
+  // ── FAR WEST danger clearings (cols 1-49) ────────────────────────────────
+  f(EW_T-3,1,EW_B+3,49,T.GRASS); // E-W road corridor west of W river
+  f(25,1,99,49,T.GRASS); // inside ring area west
+  f(1,1,21,44,T.GRASS);  // N danger west
+  f(103,1,148,44,T.GRASS); // S danger west
 
-  // ── W DEEP RUINS (below river 2) ──────────────────────────────────────────
-  box(75,7,86,22);
-  fill(76,8,85,21,T.STONE);
-  set(75,13,T.STONE);set(75,14,T.STONE);set(75,15,T.STONE);
-  set(86,13,T.STONE);set(86,14,T.STONE);set(86,15,T.STONE);
-  fill(78,9,83,12,T.VAULT);fill(78,17,83,20,T.VAULT);
-  set(80,13,T.COLUMN);set(80,14,T.COLUMN);
-
-  // ── E DEEP RUINS ──────────────────────────────────────────────────────────
-  box(75,135,86,152);
-  fill(76,136,85,151,T.STONE);
-  set(75,142,T.STONE);set(75,143,T.STONE);set(75,144,T.STONE);
-  set(86,142,T.STONE);set(86,143,T.STONE);set(86,144,T.STONE);
-  fill(78,137,83,141,T.VAULT);fill(78,145,83,149,T.VAULT);
-  set(80,142,T.COLUMN);set(80,143,T.COLUMN);
-
-  // ── Scattered trees in open zones (weave-around obstacles) ────────────────
-  // North safe zone scattered obstacles
-  [[3,10],[3,60],[3,100],[3,140],[22,10],[22,40],[22,118],[22,148],
-   [25,20],[25,55],[25,103],[25,138],
-  ].forEach(([r,c])=>set(r,c,T.TREE));
-  // Between rivers scattered
-  [[55,40],[55,58],[55,100],[55,118],
-   [60,38],[60,55],[60,103],[60,120],
-   [65,42],[65,56],[65,102],[65,116],
-  ].forEach(([r,c])=>set(r,c,T.TREE));
-
-  // ── Perimeter wall paths (walkable thin strips) ────────────────────────────
-  fill(2,3,27,4,T.DIRT);      // N-zone west wall
-  fill(2,155,27,156,T.DIRT);  // N-zone east wall
+  // ── FAR EAST danger clearings (cols 168-218) ─────────────────────────────
+  f(EW_T-3,168,EW_B+3,WORLD_W-2,T.GRASS); // E-W road corridor east of E river
+  f(25,168,99,WORLD_W-2,T.GRASS); // inside ring area east
+  f(1,168,21,WORLD_W-2,T.GRASS);  // N danger east
+  f(103,168,148,WORLD_W-2,T.GRASS); // S danger east
+  // Add some trees back in far east/west as obstacles
+  [[5,8],[8,22],[12,15],[16,35],[18,8],[60,5],[65,22],[70,12],[75,30],[80,18],
+   [5,180],[8,195],[12,188],[16,210],[18,175],[60,172],[65,195],[70,183],[75,205],
+  ].forEach(([r,c])=>s(r,c,T.TREE));
 
   return m;
 })();
 
 // ── BUILDING INTERIORS ────────────────────────────────────────────────────────
 const ZONE_MAPS = {
-  town: null, // use TOWN_MAP
-  wilderness: null, // use WILDERNESS_MAP
   tavern: makeTavern(),
   governance: makeGovernance(),
   marketplace: makeMarketplace(),
@@ -1224,10 +1192,8 @@ function makeTreasury(){
 
 // Zone metadata
 const ZONES = {
-  town:       {map:TOWN_MAP,        w:MAP_W,  h:MAP_H,  spawnX:20,spawnY:14,solid:SOLID_TILES,
-               name:'Town Square',bg:'town'},
-  wilderness: {map:WILDERNESS_MAP,  w:WLD_W,  h:WLD_H,  spawnX:79,spawnY:4, solid:WILDERNESS_SOLID,
-               name:'Wilderness',bg:'wilderness'},
+  world:      {map:WORLD_MAP,              w:WORLD_W,h:WORLD_H,spawnX:TOWN_OX+20,spawnY:TOWN_OY+14,
+               solid:WORLD_SOLID,          name:'Town Square',bg:'world'},
   tavern:     {map:ZONE_MAPS.tavern,      w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
                name:'The Tavern',bg:'tavern'},
   governance: {map:ZONE_MAPS.governance,  w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
@@ -1242,8 +1208,8 @@ const ZONES = {
 // ── NPC DEFINITIONS ───────────────────────────────────────────────────────────
 // Each NPC: {id, x, y (tile coords), type (sprite), name, face (direction 0-3), dialog[]}
 const NPCS = {
-  town:[
-    { id:'town_crier', x:20, y:10, type:'guard', face:2, name:'Town Crier',
+  world:[
+    { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier',
       dialog:[
         "Hear ye, hear ye! Welcome to Victory Quest, brave adventurer!",
         "Our town is a safe haven — no monsters dare enter these gates.",
@@ -1253,7 +1219,7 @@ const NPCS = {
         "Build up your stats before venturing too far south. Dark Knights don't play nice.",
       ]
     },
-    { id:'merchant_ned', x:13, y:14, type:'merchant', face:0, name:'Merchant Ned',
+    { id:'merchant_ned', x:TOWN_OX+13, y:TOWN_OY+14, type:'merchant', face:0, name:'Merchant Ned',
       dialog:[
         "Psst! Looking to make a deal, friend?",
         "The Marketplace has the finest wares this side of the Wilderness.",
@@ -1261,13 +1227,13 @@ const NPCS = {
         "The more you adventure, the better gear I'll have waiting for you.",
       ]
     },
-    { id:'guard_west', x:6, y:12, type:'guard', face:1, name:'Town Guard',
+    { id:'guard_west', x:TOWN_OX+6, y:TOWN_OY+12, type:'guard', face:1, name:'Town Guard',
       dialog:[
         "The Tavern's open for business. Mind your manners inside.",
         "We keep the peace in this town. Monsters stay out — that's the deal.",
       ]
     },
-    { id:'guard_east', x:33, y:12, type:'guard', face:3, name:'Town Guard',
+    { id:'guard_east', x:TOWN_OX+33, y:TOWN_OY+12, type:'guard', face:3, name:'Town Guard',
       dialog:[
         "The Governance Hall handles all official matters of state.",
         "If you have a complaint, file it through proper channels.",
@@ -1334,37 +1300,30 @@ const NPCS = {
 };
 
 const ZONE_DOORS = {
-  // {zone, tileRow, tileCol} -> {targetZone, spawnX, spawnY}
-  town_tavern:     {tileRows:[11],tileCols:[7,8,9], to:'tavern',    sx:10,sy:11},
-  town_governance: {tileRows:[11],tileCols:[28,29,30],to:'governance',sx:10,sy:11},
-  town_marketplace:{tileRows:[15],tileCols:[7,8,9], to:'marketplace',sx:10,sy:1, queue:true},
-  town_treasury:   {tileRows:[15],tileCols:[28,29,30],to:'treasury', sx:10,sy:1, queue:true},
-  // exits: spawn just outside the door the player entered from
-  tavern_exit:     {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:8,  sy:12},
-  governance_exit: {tileRows:[12],tileCols:[9,10,11], to:'town',     sx:29, sy:12},
-  marketplace_exit:{tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:8,  sy:14},
-  treasury_exit:   {tileRows:[12],tileCols:[8,9,10,11], to:'town',   sx:29, sy:14},
-  // ── Town → Wilderness (4 gates) ──
-  // South gate: enter wilderness from the north
-  town_wld_south:  {tileRows:[27],     tileCols:[19,20],    to:'wilderness', sx:79, sy:4},
-  // North gate: enter wilderness from the south
-  town_wld_north:  {tileRows:[0],      tileCols:[19,20],    to:'wilderness', sx:79, sy:95},
-  // East gate: enter wilderness from the west
-  town_wld_east:   {tileRows:[13,14],  tileCols:[39],       to:'wilderness', sx:4,  sy:49},
-  // West gate: enter wilderness from the east
-  town_wld_west:   {tileRows:[13,14],  tileCols:[0],        to:'wilderness', sx:155,sy:49},
-  // ── Wilderness → Town (4 return portals) ──
-  wld_exit_north:  {tileRows:[0,1,2,3,4],       tileCols:[78,79,80,81],            to:'town', sx:19, sy:26},
-  wld_exit_south:  {tileRows:[95,96,97,98,99],   tileCols:[78,79,80,81],            to:'town', sx:20, sy:1},
-  wld_exit_west:   {tileRows:[48,49,50,51],      tileCols:[0,1,2,3,4,5,6],         to:'town', sx:38, sy:13},
-  wld_exit_east:   {tileRows:[48,49,50,51],      tileCols:[153,154,155,156,157,158,159], to:'town', sx:1, sy:13},
+  // From world → building interiors (tileRows/Cols in WORLD coordinates)
+  world_tavern:     {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'tavern',    sx:10,sy:11},
+  world_governance: {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'governance',sx:10,sy:11},
+  world_marketplace:{from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'marketplace',sx:10,sy:1, queue:true},
+  world_treasury:   {from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'treasury',  sx:10,sy:1, queue:true},
+  // From building interiors → world
+  tavern_exit:     {from:'tavern',    tileRows:[12],tileCols:[9,10,11],   to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
+  governance_exit: {from:'governance',tileRows:[12],tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
+  marketplace_exit:{from:'marketplace',tileRows:[12],tileCols:[8,9,10,11],to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+14},
+  treasury_exit:   {from:'treasury',  tileRows:[12],tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+29, sy:TOWN_OY+14},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
 function drawBackground(ctx,zone,camPx,camPy,W,H,tick){
-  if(zone==='town')           drawTownBG(ctx,camPx,camPy,W,H,tick);
+  if(zone==='world'){
+    const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+    const inTown=tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H;
+    if(inTown)drawTownBG(ctx,camPx,camPy,W,H,tick);
+    else drawWildernessBG(ctx,camPx,camPy,W,H,tick);
+    return;
+  }
+  if(zone==='town')            drawTownBG(ctx,camPx,camPy,W,H,tick);
   else if(zone==='wilderness') drawWildernessBG(ctx,camPx,camPy,W,H,tick);
-  else                        drawInteriorBG(ctx,zone,W,H);
+  else                         drawInteriorBG(ctx,zone,W,H);
 }
 
 function drawTownBG(ctx,cx,cy,W,H,tick){
@@ -1813,9 +1772,9 @@ function drawNPCSprite(ctx,ox,oy,type,face=2){
 
 // ── GAME STATE ────────────────────────────────────────────────────────────────
 const G = {
-  zone:'town',
-  x: (ZONES.town.spawnX+0.5)*TS,
-  y: (ZONES.town.spawnY+0.5)*TS,
+  zone:'world',
+  x: (TOWN_OX+20+0.5)*TS,
+  y: (TOWN_OY+14+0.5)*TS,
   dir:2, // 0=up,1=right,2=down,3=left
   frame:0, moveTimer:0, moving:false,
   hp:6, maxHp:6,
@@ -1836,6 +1795,7 @@ const G = {
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedSchmeckles:0,   // schmeckles locked while in entry queue
   battle:null,          // active battle state or null
+  showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
 };
 
@@ -1893,6 +1853,7 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.key==='p'||e.key==='P') togglePause();
+  if(e.key==='m'||e.key==='M'){G.showMinimap=!G.showMinimap;_mmCanvas=null;}
 });
 window.addEventListener('keyup',e=>{delete KEYS[e.key];delete KEYS[e.keyCode];});
 
@@ -1991,8 +1952,7 @@ function showNpcDialog(){
 function checkDoorTrigger(){
   const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
   for(const[key,door] of Object.entries(ZONE_DOORS)){
-    const fromZone=key.split('_')[0]==='town'?'town':key.split('_')[0];
-    if(G.zone===fromZone&&door.tileRows.includes(ty)&&door.tileCols.includes(tx)){
+    if(G.zone===door.from&&door.tileRows.includes(ty)&&door.tileCols.includes(tx)){
       if(door.queue){handleQueueDoor(key,door);}
       else{changeZone(door.to,door.sx,door.sy);}
       return;
@@ -2003,10 +1963,10 @@ function checkDoorTrigger(){
 // ── Queue door handler ────────────────────────────────────────────────────────
 function queueInfoFromKey(key){
   return({
-    'town_marketplace':{zone:'marketplace',type:'entry'},
-    'town_treasury':   {zone:'treasury',   type:'entry'},
-    'marketplace_exit':{zone:'marketplace',type:'exit'},
-    'treasury_exit':   {zone:'treasury',   type:'exit'},
+    'world_marketplace': {zone:'marketplace',type:'entry'},
+    'world_treasury':    {zone:'treasury',   type:'entry'},
+    'marketplace_exit':  {zone:'marketplace',type:'exit'},
+    'treasury_exit':     {zone:'treasury',   type:'exit'},
   })[key]||null;
 }
 
@@ -2082,7 +2042,15 @@ function updateQueuePanel(){
 
 function changeZone(zone,sx,sy){
   G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;G.camX=0;G.camY=0;
-  document.getElementById('hud-zone').textContent=ZONES[zone]?.name||zone;
+  _mmCanvas=null;G.showMinimap=false;
+  {
+    let zoneName=ZONES[G.zone]?.name||G.zone;
+    if(G.zone==='world'){
+      const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+      zoneName=(tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H)?'Town Square':'Wilderness';
+    }
+    document.getElementById('hud-zone').textContent=zoneName;
+  }
   // emit to server
   socket?.emit('zone_change',{zone,x:G.x,y:G.y});
   renderTileLayer();
@@ -2118,29 +2086,27 @@ function makeScaledEnemy(key,depth){
   };
 }
 
-// How far are we from the nearest portal safe zone?
-// Safe zones: within 14 tiles of any portal entrance.
-function wildernessDepth(){
-  const tx=Math.floor(G.x/TS), ty=Math.floor(G.y/TS);
-  // Manhattan distance to each portal tile, minus safe radius
-  const dN=Math.max(0,(ty-14))+Math.max(0,Math.abs(tx-79)-6);  // N portal row 0
-  const dS=Math.max(0,(85-ty))+Math.max(0,Math.abs(tx-79)-6);  // S portal row 99
-  const dW=Math.max(0,(tx-14))+Math.max(0,Math.abs(ty-49)-6);  // W portal col 0
-  const dE=Math.max(0,(144-tx))+Math.max(0,Math.abs(ty-49)-6); // E portal col 159
-  return Math.min(dN,dS,dW,dE); // 0 = safe zone, higher = deeper danger
+// Safe ring defined by four rivers. Depth = tiles outside the ring.
+function worldDangerDepth(){
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  // Inside the ring (between all 4 rivers) → depth 0
+  if(tx>52&&tx<165&&ty>24&&ty<100)return 0;
+  const dx=Math.max(0,52-tx,tx-164);
+  const dy=Math.max(0,24-ty,ty-99);
+  return dx+dy;
 }
 
 function checkEncounter(){
   if(G.battle)return;
-  if(G.zone!=='wilderness')return;
+  if(G.zone!=='world')return;
   if(!G.moving)return;
-  if(G.tick%50!==0)return;       // check every ~0.8 s at 60 fps
-  const depth=wildernessDepth();
-  if(depth<8)return;             // safe zone — no encounters
-  if(Math.random()>0.22)return;  // 22% chance per check
+  if(G.tick%50!==0)return;
+  const depth=worldDangerDepth();
+  if(depth<8)return;             // safe zone
+  if(Math.random()>0.22)return;
   let key;
-  if(depth<18)      key=Math.random()<0.55?'wolf':'goblin';
-  else if(depth<32) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
+  if(depth<20)      key=Math.random()<0.55?'wolf':'goblin';
+  else if(depth<40) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
   else              key=Math.random()<0.35?'darkKnight':'skeleton';
   triggerBattle(key,depth);
 }
@@ -2608,7 +2574,7 @@ function endBattle(){
     G.hp=Math.max(1,Math.floor(G.maxHp*0.3));
     runPixelTransition('out',()=>{
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
-      changeZone('town',ZONES.town.spawnX,ZONES.town.spawnY);
+      changeZone('world',TOWN_OX+20,TOWN_OY+14);
       chatLog(`Defeated! Lost ${pen} ₴. Respawned in town.`,'#FF4040');
     });
   } else {
@@ -2637,6 +2603,58 @@ function renderTileLayer(){
       }
     }
   }
+}
+
+// ── MINIMAP ────────────────────────────────────────────────────────────────────
+const MINI_COLORS={
+  0:'#111',1:'#3a5a2a',2:'#8a8070',3:'#3a3a3a',4:'#1a3a0a',5:'#8a6040',
+  6:'#7a6050',7:'#2a5a8a',8:'#8a6040',9:'#aaa090',10:'#5a5a5a',11:'#5a3070',
+  12:'#556677',13:'#8a6040',14:'#6a6a6a',15:'#a07040',16:'#5a4a3a',17:'#505060',
+  18:'#404060',19:'#8a5020',20:'#4080c0',21:'#7a6050',22:'#2a5a1a',
+  23:'#80a040',24:'#60a060',25:'#c0a000',26:'#6b4226',
+};
+let _mmCanvas=null;
+function buildMinimap(){
+  const z=ZONES[G.zone];if(!z)return;
+  _mmCanvas=document.createElement('canvas');
+  _mmCanvas.width=z.w;_mmCanvas.height=z.h;
+  const ctx=_mmCanvas.getContext('2d');
+  const img=ctx.createImageData(z.w,z.h);
+  for(let r=0;r<z.h;r++){
+    for(let c=0;c<z.w;c++){
+      const t=z.map[r][c];
+      const hex=MINI_COLORS[t]||'#222';
+      const ri=parseInt(hex.slice(1,3),16)||34;
+      const gi=parseInt(hex.slice(3,5),16)||34;
+      const bi=parseInt(hex.slice(5,7),16)||34;
+      const idx=(r*z.w+c)*4;
+      img.data[idx]=ri;img.data[idx+1]=gi;img.data[idx+2]=bi;img.data[idx+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+}
+function renderMinimap(ctx){
+  if(!G.showMinimap)return;
+  if(!_mmCanvas)buildMinimap();
+  const z=ZONES[G.zone];if(!z)return;
+  // Scale minimap to fit in 280×180 display area
+  const scale=Math.min(280/z.w,180/z.h);
+  const dw=Math.round(z.w*scale),dh=Math.round(z.h*scale);
+  const ox=Math.round((W-dw)/2),oy=Math.round((H-dh)/2);
+  // Backdrop
+  ctx.fillStyle='rgba(0,0,0,0.88)';ctx.fillRect(ox-8,oy-22,dw+16,dh+30);
+  ctx.fillStyle='#888';ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillText('MAP  [ M ] close',W/2,oy-9);ctx.textAlign='left';
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(_mmCanvas,ox,oy,dw,dh);
+  ctx.imageSmoothingEnabled=true;
+  // Border
+  ctx.strokeStyle='#4a90d9';ctx.lineWidth=2;ctx.strokeRect(ox,oy,dw,dh);
+  // Player dot
+  const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
+  const dx=ox+Math.round(px*scale),dy=oy+Math.round(py*scale);
+  ctx.fillStyle='#FF4444';ctx.fillRect(dx-2,dy-2,5,5);
+  ctx.fillStyle='#FFAAAA';ctx.fillRect(dx-1,dy-1,3,3);
 }
 
 // ── SPRITE LAYER ──────────────────────────────────────────────────────────────
@@ -2697,6 +2715,14 @@ function renderHUD(){
   const locked=G.lockedSchmeckles;
   document.getElementById('hud-gold').textContent=
     locked>0?`${G.schmeckles} ₴  🔒${locked}`:`${G.schmeckles} ₴`;
+  {
+    let zoneName=ZONES[G.zone]?.name||G.zone;
+    if(G.zone==='world'){
+      const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+      zoneName=(tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H)?'Town Square':'Wilderness';
+    }
+    document.getElementById('hud-zone').textContent=zoneName;
+  }
 }
 
 // ── PAUSE / INVENTORY ─────────────────────────────────────────────────────────
@@ -2989,6 +3015,7 @@ function gameLoop(ts){
     renderSpriteLayer(ctxSprites);
     // HUD
     renderHUD();
+    renderMinimap(ctxUI);
     // persist
     if(G.persist&&G.tick%300===0)saveState();
   }
@@ -3110,7 +3137,14 @@ function startGame(){
   setupCanvases();
   buildTileCache();
   renderTileLayer();
-  document.getElementById('hud-zone').textContent=ZONES[G.zone].name;
+  {
+    let zoneName=ZONES[G.zone]?.name||G.zone;
+    if(G.zone==='world'){
+      const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+      zoneName=(tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H)?'Town Square':'Wilderness';
+    }
+    document.getElementById('hud-zone').textContent=zoneName;
+  }
   initSocket();
   requestAnimationFrame(gameLoop);
 }
@@ -3128,7 +3162,7 @@ document.getElementById('queue-enter-btn').addEventListener('click',()=>{
   socket?.emit('queue_leave',{zone,queueType:type});
   G.lockedSchmeckles=0;G.queueState=null;
   updateQueuePanel();
-  const key=type==='entry'?`town_${zone}`:`${zone}_exit`;
+  const key=type==='entry'?`world_${zone}`:`${zone}_exit`;
   const door=ZONE_DOORS[key];
   if(door)changeZone(door.to,door.sx,door.sy);
 });

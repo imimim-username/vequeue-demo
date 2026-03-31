@@ -37,7 +37,7 @@ function queueStateFor(zoneName){
 function broadcastQueueState(zoneName){
   const state=queueStateFor(zoneName);
   // Everyone in town or inside the zone can see the queue
-  io.to('town').emit('queue_state',state);
+  io.to('world').emit('queue_state',state);
   io.to(zoneName).emit('queue_state',state);
 }
 
@@ -88,7 +88,7 @@ io.on('connection',socket=>{
       hairColor:data.hairColor||'#3A2010',
       species:data.species||'human',
       class_:data.class_||'warrior',
-      zone:data.zone||'town',
+      zone:data.zone||'world',
       x:data.x||660, y:data.y||460,
       dir:2,frame:0,moving:false,
       schmeckles:data.schmeckles||100,
