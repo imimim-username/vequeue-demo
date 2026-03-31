@@ -48,6 +48,7 @@ const G = {
   kills:0,              // total enemy kills (tracked for Hall of Fame)
   graffiti:[],          // [{id, zone, tileX, tileY, author, text, ts}]
   hallOfFame:{topXP:[],topKills:[],topGold:[]},
+  snowballEnemies:[],   // [{id, zone, tileX, tileY, baseType, name, killCount, loot}]
 };
 
 // Cache of server-broadcast queue states
@@ -285,6 +286,12 @@ function tryInteract(){
   {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
   const nearLoot=G.worldLoot.find(l=>l.zone===G.zone&&Math.abs(l.x-px_)<=1&&Math.abs(l.y-py_)<=1);
   if(nearLoot){socket.emit('loot_pickup',{lootId:nearLoot.id});return;}}
+  // Check for nearby snowball enemies (world zone only)
+  if(G.zone==='world'){
+    const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
+    const nearSE=G.snowballEnemies.find(se=>se.zone===G.zone&&Math.abs(se.tileX-px_)<=1&&Math.abs(se.tileY-py_)<=1);
+    if(nearSE){triggerSnowballBattle(nearSE);return;}
+  }
   // Check for nearby graffiti
   {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
   const nearG=G.graffiti.find(g=>g.zone===G.zone&&Math.abs(g.tileX-px_)<=1&&Math.abs(g.tileY-py_)<=1);
@@ -572,6 +579,38 @@ function triggerBattle(key,depth=0){
     result:null,
     xpGained:0,spacebucksGained:0,schmecklesGained:0,
     savedX:G.x,savedY:G.y,
+  };
+  G.paused=true;
+  document.getElementById('cv-ui').style.pointerEvents='auto';
+  SFX.battleStart();
+  runPixelTransition('in',()=>{G.battle.phase='player_turn';});
+}
+
+function triggerSnowballBattle(se){
+  const baseType=se.baseType||'skeleton';
+  const tmpl=ENEMIES[baseType]||ENEMIES['skeleton'];
+  const depth=30; // treat as mid-wilderness encounter
+  const base=makeScaledEnemy(baseType,depth);
+  const kc=Math.min(se.killCount||1,10);
+  const enemy={
+    ...base,
+    name:se.name,
+    type:baseType,
+    maxHp:Math.round(base.maxHp*(1+kc*0.3)),
+    currentHp:Math.round(base.maxHp*(1+kc*0.3)),
+    atk:base.atk+kc*2,
+    def:base.def+Math.floor(kc*0.5),
+    xp:Math.round(base.xp*(1+kc*0.5)),
+    msg:`${se.name} snarls — ${se.killCount} player kill${se.killCount!==1?'s':''} in its wake!`,
+  };
+  _snapCtx.clearRect(0,0,W,H);
+  ['cv-bg','cv-tiles','cv-sprites'].forEach(id=>{const cv=document.getElementById(id);if(cv)_snapCtx.drawImage(cv,0,0);});
+  G.battle={
+    enemy,phase:'transition_in',animTimer:0,hitShake:0,playerHitShake:0,
+    log:[enemy.msg,'What will you do?'],
+    result:null,xpGained:0,spacebucksGained:0,schmecklesGained:0,
+    savedX:G.x,savedY:G.y,
+    snowballId:se.id, // claim bonus loot on win
   };
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
@@ -1080,6 +1119,7 @@ function doBattleAction(action){
     G.schmeckles += bt.schmecklesGained;
     G.xp+=bt.xpGained;
     G.kills=(G.kills||0)+1;
+    if(bt.snowballId&&socket)socket.emit('snowball_kill',{id:bt.snowballId});
     checkLevelUp();
     if(bt.enemy.type==='lich'){
       G.dungeonBossDefeated=true;
@@ -1765,6 +1805,28 @@ function renderSpriteLayer(ctx){
       ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,14,0,Math.PI*2);ctx.fill();
       ctx.save();ctx.font='20px serif';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText('💰',sx,sy);
+      ctx.restore();
+    });
+  }
+  // Draw snowball enemies
+  if(G.snowballEnemies){
+    G.snowballEnemies.filter(se=>se.zone===G.zone).forEach(se=>{
+      const sx=se.tileX*TS-G.camX+TS/2,sy=se.tileY*TS-G.camY+TS/2;
+      if(sx<-TS||sx>W+TS||sy<-TS||sy>H+TS)return;
+      const kc=Math.min(se.killCount||1,10);
+      const glowR=14+kc*3;
+      const pulse=0.18+0.08*Math.sin(G.tick*0.08); // subtle pulse
+      const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,glowR);
+      grd.addColorStop(0,`rgba(255,30,0,${pulse})`);
+      grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,glowR,0,Math.PI*2);ctx.fill();
+      ctx.save();
+      ctx.font=`${14+Math.min(kc,6)*1.5}px serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('👹',sx,sy);
+      ctx.font='bold 8px monospace';ctx.fillStyle='#FF6030';
+      ctx.fillText(se.name,sx,sy-Math.round(14+kc));
+      if(se.killCount>1){ctx.fillStyle='#FFD700';ctx.fillText(`☠${se.killCount}`,sx,sy+16);}
       ctx.restore();
     });
   }
@@ -2520,6 +2582,31 @@ function initSocket(){
     // ── Treasury ─────────────────────────────────────────────────────────────
     socket.on('treasury_update',data=>{
       if(data.treasury)G.treasury={...data.treasury};
+    });
+
+    // ── Snowball Enemies ──────────────────────────────────────────────────────
+    socket.on('snowball_init',data=>{G.snowballEnemies=data.enemies||[];});
+    socket.on('snowball_spawned',data=>{
+      if(!G.snowballEnemies.find(e=>e.id===data.enemy.id))G.snowballEnemies.push(data.enemy);
+      chatLog(`⚔ ${data.enemy.name} has appeared in the wilderness — seek it for bonus loot!`,'#FF6030');
+    });
+    socket.on('snowball_updated',data=>{
+      const idx=G.snowballEnemies.findIndex(e=>e.id===data.enemy.id);
+      if(idx>=0)G.snowballEnemies[idx]=data.enemy;else G.snowballEnemies.push(data.enemy);
+    });
+    socket.on('snowball_removed',data=>{
+      G.snowballEnemies=G.snowballEnemies.filter(e=>e.id!==data.id);
+    });
+    socket.on('snowball_kill_result',data=>{
+      if(!data.ok)return;
+      const loot=data.loot||{};
+      G.spacebucks+=(loot.spacebucks||0);
+      G.schmeckles+=(loot.schmeckles||0);
+      G.alUSD=parseFloat((G.alUSD+(loot.alUSD||0)).toFixed(2));
+      (loot.items||[]).forEach(item=>{const sl=G.inventory.findIndex((s,i)=>i>=2&&s===null);if(sl!==-1)G.inventory[sl]=item;});
+      const parts=[loot.spacebucks&&`+${loot.spacebucks}🪙`,loot.schmeckles&&`+${loot.schmeckles}💀`,loot.alUSD&&`+${loot.alUSD}$`,loot.items?.length&&`+${loot.items.length} items`].filter(Boolean).join(' ');
+      chatLog(`★ Vanquished ${data.name} (${data.kills}-kill streak)! Bonus loot: ${parts||'none'}`,'#FF8C00');
+      SFX.coin();saveToServer();
     });
 
     // ── Graffiti ─────────────────────────────────────────────────────────────

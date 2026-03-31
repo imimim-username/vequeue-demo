@@ -41,6 +41,28 @@ function verifyPlayerData(d){
   return d._sig===signPlayerData(d);
 }
 
+// ── Snowball Enemies ──────────────────────────────────────────────────────────
+const SNOWBALL_FILE=path.join(__dirname,'snowball_enemies.json');
+let snowballEnemies=[];
+try{snowballEnemies=JSON.parse(fs.readFileSync(SNOWBALL_FILE,'utf8'));}catch(e){snowballEnemies=[];}
+function saveSnowball(){try{fs.writeFileSync(SNOWBALL_FILE,JSON.stringify(snowballEnemies),'utf8');}catch(e){}}
+let _snowballIdSeq=snowballEnemies.reduce((m,e)=>Math.max(m,e.id||0),0)+1;
+const SNOWBALL_TTL_MS=30*60*1000; // 30 minutes
+const SNOWBALL_ADJS=['Bloodsoaked','Vengeful','Empowered','Ancient','Veteran','Fearsome','Relentless','Corrupted','Ravenous','Unstoppable'];
+function snowballName(kills,baseType){
+  const adj=SNOWBALL_ADJS[Math.min(Math.floor(kills/1),SNOWBALL_ADJS.length-1)];
+  const names={wolf:'Wolf',goblin:'Goblin',skeleton:'Skeleton',darkKnight:'Dark Knight',lich:'Lich'};
+  return `${adj} ${names[baseType]||'Creature'}`;
+}
+setInterval(()=>{
+  const now=Date.now();
+  const before=snowballEnemies.length;
+  const expired=snowballEnemies.filter(e=>now-e.spawnedAt>SNOWBALL_TTL_MS);
+  expired.forEach(e=>io.emit('snowball_removed',{id:e.id}));
+  snowballEnemies=snowballEnemies.filter(e=>now-e.spawnedAt<=SNOWBALL_TTL_MS);
+  if(snowballEnemies.length!==before)saveSnowball();
+},60000);
+
 // ── Graffiti ──────────────────────────────────────────────────────────────────
 const GRAFFITI_FILE=path.join(__dirname,'graffiti.json');
 let graffiti=[];
@@ -328,6 +350,7 @@ io.on('connection',socket=>{
     socket.emit('treasury_update',{treasury});
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
+    socket.emit('snowball_init',{enemies:snowballEnemies});
   });
 
   socket.on('move',data=>{
@@ -405,6 +428,36 @@ io.on('connection',socket=>{
     worldLoot.push(pile);
     io.to(zone).emit('world_loot_added',{pile});
     io.to('world').emit('world_loot_added',{pile});
+
+    // 40% chance to spawn/boost a snowball enemy in the world zone
+    if(zone==='world'&&Math.random()<0.40){
+      const bonusSb=Math.floor(pile.currencies.spacebucks*0.5);
+      const bonusSm=Math.floor(pile.currencies.schmeckles*0.5);
+      const bonusAl=parseFloat((pile.currencies.alUSD*0.5).toFixed(2));
+      const nearby=snowballEnemies.find(e=>e.zone===zone&&Math.abs(e.tileX-x)<=15&&Math.abs(e.tileY-y)<=15);
+      if(nearby){
+        nearby.killCount=(nearby.killCount||1)+1;
+        nearby.loot.spacebucks+=bonusSb;
+        nearby.loot.schmeckles+=bonusSm;
+        nearby.loot.alUSD=parseFloat((nearby.loot.alUSD+bonusAl).toFixed(2));
+        nearby.loot.items=[...nearby.loot.items,...pile.items.slice(0,2)].slice(-12);
+        nearby.name=snowballName(nearby.killCount,nearby.baseType);
+        io.emit('snowball_updated',{enemy:nearby});
+        io.emit('chat',{nickname:'⚠ System',text:`${nearby.name} grows stronger from the carnage! (${nearby.killCount} kills)`});
+      }else{
+        const baseType=['wolf','goblin','skeleton','darkKnight'].includes(killerType)?killerType:'skeleton';
+        const se={
+          id:_snowballIdSeq++,zone,tileX:x,tileY:y+2,
+          baseType,name:snowballName(1,baseType),killCount:1,
+          loot:{spacebucks:bonusSb,schmeckles:bonusSm,alUSD:bonusAl,items:pile.items.slice(0,4)},
+          spawnedAt:Date.now(),
+        };
+        snowballEnemies.push(se);
+        io.emit('snowball_spawned',{enemy:se});
+        io.emit('chat',{nickname:'⚠ System',text:`A ${se.name} has emerged, empowered by fallen blood! Seek it out for bonus loot.`});
+      }
+      saveSnowball();
+    }
   });
 
   socket.on('loot_pickup',data=>{
@@ -479,6 +532,17 @@ io.on('connection',socket=>{
     saveMarket();
     io.emit('market_state',{listings:marketplace});
     socket.emit('market_buy_result',{ok:true,item:listing.item,price:listing.price,currency:listing.currency,sellerName:listing.sellerName});
+  });
+
+  socket.on('snowball_kill',data=>{
+    const idx=snowballEnemies.findIndex(e=>e.id===data.id);
+    if(idx<0)return socket.emit('snowball_kill_result',{ok:false,error:'Already defeated.'});
+    const se=snowballEnemies.splice(idx,1)[0];
+    saveSnowball();
+    io.emit('snowball_removed',{id:se.id});
+    socket.emit('snowball_kill_result',{ok:true,loot:se.loot,name:se.name,kills:se.killCount});
+    const p=players[socket.id];
+    if(p)io.emit('chat',{nickname:'⚠ System',text:`★ ${p.nickname} has vanquished ${se.name} (${se.killCount} kill streak)! Loot claimed.`});
   });
 
   socket.on('graffiti_add',data=>{
