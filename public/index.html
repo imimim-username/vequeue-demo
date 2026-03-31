@@ -83,8 +83,8 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 #screen-game{background:#000;flex-direction:column}
 #game-wrap{position:relative;image-rendering:pixelated}
 #game-wrap canvas{position:absolute;top:0;left:0;image-rendering:pixelated}
-#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}
-#cv-ui{z-index:4;pointer-events:none}
+#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}#cv-ceiling{z-index:4;pointer-events:none}
+#cv-ui{z-index:5;pointer-events:none}
 #cv-ui[style*="pointer-events: auto"]{cursor:pointer}
 
 /* ── HUD ── */
@@ -299,6 +299,7 @@ body.touch #mobile-act{display:flex}
     <canvas id="cv-bg"></canvas>
     <canvas id="cv-tiles"></canvas>
     <canvas id="cv-sprites"></canvas>
+    <canvas id="cv-ceiling"></canvas>
     <canvas id="cv-ui"></canvas>
   </div>
   <div id="hud">
@@ -1798,6 +1799,166 @@ function drawTorch(ctx,x,y,tick,phase){
   ctx.fillStyle='#2A2010';ctx.fillRect(x-4,y,8,7);ctx.fillRect(x-2,y+5,4,3);
 }
 
+// ── CEILING LAYER RENDERERS (cv-ceiling, z:4, always above tiles+sprites) ────
+function drawTavernCeiling(ctx,W,tick){
+  // Dark ceiling zone
+  ctx.fillStyle='#0E0700';ctx.fillRect(0,0,W,64);
+  // 3 horizontal timber beams
+  [4,20,36].forEach(by=>{
+    ctx.fillStyle='#3A1E08';ctx.fillRect(0,by,W,11);
+    ctx.fillStyle='#4E2A0E';ctx.fillRect(0,by,W,3);
+    ctx.fillStyle='#251205';ctx.fillRect(0,by+9,W,2);
+  });
+  // 3 hanging lanterns (chain + body + animated glow)
+  [W*0.25,W*0.5,W*0.75].forEach((lx,i)=>{
+    const ly=58;
+    ctx.fillStyle='#3A3020';ctx.fillRect(lx-1,0,2,ly-10); // chain
+    ctx.fillStyle='#2A2010';ctx.fillRect(lx-6,ly-10,12,12); // body
+    ctx.fillStyle='#3A3020';ctx.fillRect(lx-4,ly-8,8,8);
+    const flick=0.7+0.3*Math.sin(tick*0.15+i*1.8);
+    const glow=ctx.createRadialGradient(lx,ly,0,lx,ly,28);
+    glow.addColorStop(0,`rgba(255,180,60,${0.45*flick})`);
+    glow.addColorStop(0.5,`rgba(255,120,20,${0.18*flick})`);
+    glow.addColorStop(1,'transparent');
+    ctx.fillStyle=glow;ctx.fillRect(lx-28,ly-28,56,56);
+    ctx.fillStyle='#FF9900';ctx.fillRect(lx-1,ly-7,2,5);
+    ctx.fillStyle='#FFCC00';ctx.fillRect(lx,ly-8,1,4);
+  });
+  // Bottom trim strip
+  ctx.fillStyle='#4A2008';ctx.fillRect(0,60,W,4);
+  ctx.fillStyle='#6B3A18';ctx.fillRect(0,60,W,1);
+}
+
+function drawGovernanceCeiling(ctx,W,tick){
+  ctx.fillStyle='#050A1A';ctx.fillRect(0,0,W,64);
+  // Blue marble bands
+  ['#070E28','#0A1535','#070E28','#0C1840'].forEach((col,i,a)=>{
+    ctx.fillStyle=col;ctx.fillRect(0,i*(48/a.length),W,48/a.length+1);
+  });
+  // 3 marble pillar stubs from ceiling — capitals at bottom of strip
+  [W*0.15,W*0.5,W*0.85].forEach(px=>{
+    const pw=22;
+    ctx.fillStyle='#1A2A4A';ctx.fillRect(px-pw/2,0,pw,52);
+    ctx.fillStyle='#243660';ctx.fillRect(px-pw/2,0,pw*0.35,52);
+    ctx.fillStyle='#101E38';ctx.fillRect(px+pw/2-5,0,5,52);
+    // Capital ornaments at y≈48
+    ctx.fillStyle='#D4AF37';ctx.fillRect(px-pw/2-4,48,pw+8,4);
+    ctx.fillStyle='#B8930A';ctx.fillRect(px-pw/2-2,44,pw+4,4);
+    ctx.fillStyle='#D4AF37';ctx.fillRect(px-pw/2-6,40,pw+12,4);
+    ctx.fillStyle='#F0D060';ctx.fillRect(px-pw/2-6,40,pw+12,1);
+  });
+  // Heraldic banners between pillars
+  [[W*0.28,6,12,36],[W*0.68,6,12,36]].forEach(([bx,by,bw,bh])=>{
+    ctx.fillStyle='#0D1E44';ctx.fillRect(bx-bw/2,by,bw,bh);
+    ctx.fillStyle='#D4AF3730';
+    ctx.fillRect(bx-bw/2,by,bw,2);ctx.fillRect(bx-bw/2,by,2,bh);ctx.fillRect(bx+bw/2-2,by,2,bh);
+    ctx.fillStyle='#D4AF3720';ctx.fillRect(bx-3,by+bh*0.35,6,5);ctx.fillRect(bx-1,by+bh*0.2,2,bh*0.2);
+  });
+  // Gold trim at top and bottom
+  ctx.fillStyle='#D4AF3740';ctx.fillRect(0,0,W,2);
+  ctx.fillStyle='#D4AF37';ctx.fillRect(0,60,W,2);ctx.fillStyle='#F0D060';ctx.fillRect(0,60,W,1);
+}
+
+function drawMarketplaceCeiling(ctx,W,tick){
+  ctx.fillStyle='#0D0020';ctx.fillRect(0,0,W,64);
+  // Arch curve at top
+  ctx.fillStyle='#1E0840';
+  for(let xi=0;xi<W;xi+=2){const c=Math.sin((xi/W)*Math.PI)*14;ctx.fillRect(xi,c,2,16);}
+  ctx.fillStyle='#2A1055';
+  for(let xi=0;xi<W;xi+=2){const c=Math.sin((xi/W)*Math.PI)*14;ctx.fillRect(xi,c,2,4);}
+  // 3 awning canopies
+  [W*0.15,W*0.5,W*0.82].forEach((ax,i)=>{
+    const aw=W*0.2;
+    for(let xi=ax-aw/2;xi<ax+aw/2;xi+=6){
+      ctx.fillStyle=(Math.floor((xi-(ax-aw/2))/6)%2===0)?'#5A2888':'#3A1460';
+      ctx.fillRect(xi,26+i*2,6,16);
+    }
+    ctx.fillStyle='#9050CC';ctx.fillRect(ax-aw/2,26+i*2,aw,2);
+    // String lights with flicker
+    ctx.fillStyle='#FFFF44';
+    for(let xi=ax-aw/2+6;xi<ax+aw/2;xi+=10){
+      ctx.fillRect(xi,24+i*2,2,2);
+      ctx.fillStyle='#FFFF0020';ctx.fillRect(xi-2,22+i*2,6,6);ctx.fillStyle='#FFFF44';
+    }
+  });
+  // Purple trim
+  ctx.fillStyle='#4A1880';ctx.fillRect(0,60,W,4);ctx.fillStyle='#6A28A0';ctx.fillRect(0,60,W,1);
+}
+
+function drawTreasuryCeiling(ctx,W,tick){
+  ctx.fillStyle='#000D00';ctx.fillRect(0,0,W,64);
+  // Wall panel lines
+  [16,32].forEach(py=>{
+    ctx.fillStyle='#002200';ctx.fillRect(0,py,W,3);ctx.fillStyle='#003300';ctx.fillRect(0,py,W,1);
+  });
+  // Vault door (compact: center at y=26, radius=20)
+  const vx=W/2,vy=26,vr=20;
+  ctx.fillStyle='#0A1F0A';ctx.beginPath();ctx.arc(vx,vy,vr+4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#163A16';ctx.beginPath();ctx.arc(vx,vy,vr,0,Math.PI*2);ctx.fill();
+  [[vr*0.78,'#0E2E0E'],[vr*0.56,'#1A3E1A'],[vr*0.34,'#0E2E0E'],[vr*0.14,'#0A1A0A']].forEach(([r,col])=>{
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(vx,vy,r,0,Math.PI*2);ctx.fill();
+  });
+  ctx.strokeStyle='#2A5A2A';ctx.lineWidth=1.5;
+  for(let a=0;a<Math.PI*2;a+=Math.PI/4){
+    ctx.beginPath();ctx.moveTo(vx,vy);ctx.lineTo(vx+Math.cos(a)*vr*0.78,vy+Math.sin(a)*vr*0.78);ctx.stroke();
+  }
+  ctx.strokeStyle='#1E4A1E';ctx.lineWidth=2;ctx.beginPath();ctx.arc(vx,vy,vr+4,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='#2A6A2A';ctx.fillRect(vx-2,vy-2,4,4);ctx.fillStyle='#3A8A3A';ctx.fillRect(vx-1,vy-1,2,2);
+  // Green trim
+  ctx.fillStyle='#004400';ctx.fillRect(0,60,W,4);ctx.fillStyle='#00AA00';ctx.fillRect(0,60,W,1);
+}
+
+function drawDungeonCeiling(ctx,W,tick){
+  ctx.fillStyle='#050008';ctx.fillRect(0,0,W,64);
+  // Stone arch columns
+  [[0,28],[W-28,28]].forEach(([ax,aw])=>{
+    ctx.fillStyle='#0E001C';ctx.fillRect(ax,0,aw,64);
+    ctx.fillStyle='#150028';ctx.fillRect(ax,0,3,64);
+    ctx.fillStyle='#060010';ctx.fillRect(ax+aw-3,0,3,64);
+    [16,32,48].forEach(by=>{ctx.fillStyle='#080014';ctx.fillRect(ax+2,by,aw-4,1);});
+  });
+  // Arch keystone at center top
+  ctx.fillStyle='#160030';ctx.fillRect(W/2-14,0,28,22);
+  ctx.fillStyle='#1E0040';ctx.fillRect(W/2-8,0,16,16);
+  // Skull on keystone
+  ctx.fillStyle='#CCBBDD';ctx.fillRect(W/2-4,2,8,7);
+  ctx.fillStyle='#080008';
+  ctx.fillRect(W/2-3,4,2,2);ctx.fillRect(W/2+1,4,2,2);
+  ctx.fillRect(W/2-2,8,1,2);ctx.fillRect(W/2,8,1,2);ctx.fillRect(W/2+2,8,1,2);
+  // Animated torches on columns
+  drawTorch(ctx,36,50,tick,0);
+  drawTorch(ctx,W-36,50,tick,2.4);
+  // Water drip tracks
+  [W*0.3,W*0.52,W*0.72].forEach((dx,di)=>{
+    ctx.fillStyle='#10001A';ctx.fillRect(dx,0,2,56);
+    const dropY=((tick+di*30)%60)*(56/60);
+    ctx.fillStyle='#2A0A40';ctx.fillRect(dx-1,dropY,4,5);
+    ctx.fillStyle='#3A1060';ctx.fillRect(dx,dropY,2,4);
+  });
+  // Purple ambient glow
+  const aura=ctx.createRadialGradient(W/2,0,0,W/2,0,W*0.4);
+  aura.addColorStop(0,'#33006620');aura.addColorStop(1,'transparent');
+  ctx.fillStyle=aura;ctx.fillRect(0,0,W,64);
+  // Trim
+  ctx.fillStyle='#160030';ctx.fillRect(0,60,W,4);ctx.fillStyle='#220044';ctx.fillRect(0,60,W,1);
+}
+
+function renderCeiling(ctx,zone,W,H,tick){
+  ctx.clearRect(0,0,W,H);
+  if(zone==='world')return;
+  if(zone==='tavern')          drawTavernCeiling(ctx,W,tick);
+  else if(zone==='governance') drawGovernanceCeiling(ctx,W,tick);
+  else if(zone==='marketplace')drawMarketplaceCeiling(ctx,W,tick);
+  else if(zone==='treasury')   drawTreasuryCeiling(ctx,W,tick);
+  else if(zone==='dungeon')    drawDungeonCeiling(ctx,W,tick);
+}
+
+// ── INTERIOR BG ROUTER (cv-bg — solid zone color, behind tiles) ───────────────
+function drawInteriorBG(ctx,zone,W,H,tick){
+  const colors={tavern:'#1A0D00',governance:'#050A1A',marketplace:'#0D0020',treasury:'#000D00',dungeon:'#050008'};
+  ctx.fillStyle=colors[zone]||'#050A1A';ctx.fillRect(0,0,W,H);
+}
+
 // ── TAVERN ────────────────────────────────────────────────────────────────────
 function drawTavernBG(ctx,W,H,tick){
   // Floor
@@ -2065,20 +2226,7 @@ function drawDungeonBG(ctx,W,H,tick){
   ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
 }
 
-// ── INTERIOR BG ROUTER ────────────────────────────────────────────────────────
-function drawInteriorBG(ctx,zone,W,H,tick){
-  if(zone==='tavern')          drawTavernBG(ctx,W,H,tick);
-  else if(zone==='governance') drawGovernanceBG(ctx,W,H,tick);
-  else if(zone==='marketplace')drawMarketplaceBG(ctx,W,H,tick);
-  else if(zone==='treasury')   drawTreasuryBG(ctx,W,H,tick);
-  else if(zone==='dungeon')    drawDungeonBG(ctx,W,H,tick);
-  else{
-    ctx.fillStyle='#050A1A';ctx.fillRect(0,0,W,H);
-    const vig=ctx.createRadialGradient(W/2,H/2,H*0.2,W/2,H/2,H);
-    vig.addColorStop(0,'transparent');vig.addColorStop(1,'#00000088');
-    ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-  }
-}
+// (drawInteriorBG is defined above, near ceiling helpers)
 
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware
@@ -4191,6 +4339,8 @@ function gameLoop(ts){
     drawBackground(ctxBG,G.zone,G.camX,G.camY,W,H,G.tick);
     // render sprites
     renderSpriteLayer(ctxSprites);
+    // ceiling layer (above sprites, z:4) — shows only for interior zones
+    renderCeiling(ctxCeiling,G.zone,W,H,G.tick);
     // HUD + minimap
     renderHUD();
     ctxUI.clearRect(0,0,W,H);
@@ -4229,7 +4379,7 @@ function gameLoop(ts){
 }
 
 // ── CANVAS SETUP ─────────────────────────────────────────────────────────────
-let ctxBG,ctxSprites,ctxUI;
+let ctxBG,ctxSprites,ctxUI,ctxCeiling;
 function setupCanvases(){
   const wrap=document.getElementById('game-wrap');
   const dpr=Math.min(window.devicePixelRatio||1,2);
@@ -4237,7 +4387,7 @@ function setupCanvases(){
   const scale=Math.min(aw/W,ah/H,2);
   const dw=Math.round(W*scale),dh=Math.round(H*scale);
   wrap.style.width=dw+'px';wrap.style.height=dh+'px';
-  ['cv-bg','cv-tiles','cv-sprites','cv-ui'].forEach(id=>{
+  ['cv-bg','cv-tiles','cv-sprites','cv-ceiling','cv-ui'].forEach(id=>{
     const cv=document.getElementById(id);
     cv.width=W;cv.height=H;
     cv.style.width=dw+'px';cv.style.height=dh+'px';
@@ -4246,6 +4396,7 @@ function setupCanvases(){
   ctxTiles=cvTiles.getContext('2d');
   ctxBG=document.getElementById('cv-bg').getContext('2d');
   ctxSprites=document.getElementById('cv-sprites').getContext('2d');
+  ctxCeiling=document.getElementById('cv-ceiling').getContext('2d');
   ctxUI=document.getElementById('cv-ui').getContext('2d');
 }
 
