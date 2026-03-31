@@ -22,6 +22,53 @@ app.use(express.static(path.join(__dirname,'public')));
 const players={};
 const socketsByAccount={}; // accountId -> socket.id (for targeted emits)
 
+// ── HMAC Anti-Cheat ───────────────────────────────────────────────────────────
+const SERVER_SECRET=process.env.VQ_SECRET||'vq-anticheat-2026';
+function signPlayerData(d){
+  const payload=JSON.stringify({
+    spacebucks:Math.round(d.spacebucks||0),
+    schmeckles:Math.round(d.schmeckles||0),
+    alUSD:parseFloat((d.alUSD||0).toFixed(2)),
+    alETH:parseFloat((d.alETH||0).toFixed(4)),
+    alcx:parseFloat((d.alcx||0).toFixed(4)),
+    level:d.level||1,
+    xp:d.xp||0,
+  });
+  return crypto.createHmac('sha256',SERVER_SECRET).update(payload).digest('hex');
+}
+function verifyPlayerData(d){
+  if(!d||!d._sig)return true; // unsigned old data: trust it once
+  return d._sig===signPlayerData(d);
+}
+
+// ── Graffiti ──────────────────────────────────────────────────────────────────
+const GRAFFITI_FILE=path.join(__dirname,'graffiti.json');
+let graffiti=[];
+try{graffiti=JSON.parse(fs.readFileSync(GRAFFITI_FILE,'utf8'));}catch(e){graffiti=[];}
+function saveGraffiti(){try{fs.writeFileSync(GRAFFITI_FILE,JSON.stringify(graffiti),'utf8');}catch(e){}}
+let _graffitiIdSeq=graffiti.reduce((m,g)=>Math.max(m,(g.id||0)),0)+1;
+const MAX_GRAFFITI=100;
+
+// ── Hall of Fame ──────────────────────────────────────────────────────────────
+const HOF_FILE=path.join(__dirname,'hall_of_fame.json');
+let hallOfFame={topXP:[],topKills:[],topGold:[]};
+try{hallOfFame=JSON.parse(fs.readFileSync(HOF_FILE,'utf8'));}catch(e){}
+function saveHoF(){try{fs.writeFileSync(HOF_FILE,JSON.stringify(hallOfFame),'utf8');}catch(e){}}
+function updateHofBoard(board,name,value){
+  const idx=board.findIndex(e=>e.name===name);
+  if(idx>=0)board[idx].value=value; else board.push({name,value});
+  board.sort((a,b)=>b.value-a.value);
+  return board.slice(0,5);
+}
+function updateHallOfFame(accountId,data){
+  const name=pdb[accountId]?.username||accountId;
+  hallOfFame.topXP    =updateHofBoard(hallOfFame.topXP,   name,data.xp||0);
+  hallOfFame.topKills =updateHofBoard(hallOfFame.topKills,name,data.kills||0);
+  hallOfFame.topGold  =updateHofBoard(hallOfFame.topGold, name,data.spacebucks||0);
+  saveHoF();
+  io.emit('hall_of_fame',hallOfFame);
+}
+
 // ── World Loot ────────────────────────────────────────────────────────────────
 let worldLoot=[];
 const LOOT_TTL_MS=10*60*1000;
@@ -202,7 +249,13 @@ io.on('connection',socket=>{
       return socket.emit('auth_result',{ok:false,error:'Invalid username or PIN.'});
     socket.accountId=key;
     socketsByAccount[key]=socket.id;
-    socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:row.data||null});
+    const savedData=row.data||null;
+    if(savedData&&!verifyPlayerData(savedData)){
+      console.warn(`[HMAC] Tamper detected for account: ${key} — stripping data`);
+      socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:null,_tampered:true});
+      return;
+    }
+    socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:savedData});
   });
 
   // Sync bank positions after any bank transaction (deposit/claim)
@@ -231,9 +284,21 @@ io.on('connection',socket=>{
 
   socket.on('save_character',data=>{
     if(!socket.accountId)return;
+    // Sanity-clamp numeric fields to prevent client-side inflation
+    const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,Number(v)||0));
+    data.spacebucks=clamp(data.spacebucks,0,9_999_999);
+    data.schmeckles=clamp(data.schmeckles,0,9_999_999);
+    data.alUSD     =parseFloat(clamp(data.alUSD,0,500_000).toFixed(2));
+    data.alETH     =parseFloat(clamp(data.alETH,0,10_000).toFixed(4));
+    data.alcx      =parseFloat(clamp(data.alcx,0,100_000).toFixed(4));
+    data.level     =clamp(data.level,1,50);
+    data.xp        =clamp(data.xp,0,1_000_000);
+    data.kills     =clamp(data.kills,0,999_999);
+    data._sig      =signPlayerData(data);
     pdb[socket.accountId].data=data;
     pdb[socket.accountId].updated=Date.now();
     saveDb();
+    updateHallOfFame(socket.accountId,data);
   });
 
   socket.on('join',data=>{
@@ -261,6 +326,8 @@ io.on('connection',socket=>{
     socket.emit('market_state',{listings:marketplace});
     socket.emit('price_update',{prices:livePrices});
     socket.emit('treasury_update',{treasury});
+    socket.emit('graffiti_state',{graffiti});
+    socket.emit('hall_of_fame',hallOfFame);
   });
 
   socket.on('move',data=>{
@@ -412,6 +479,31 @@ io.on('connection',socket=>{
     saveMarket();
     io.emit('market_state',{listings:marketplace});
     socket.emit('market_buy_result',{ok:true,item:listing.item,price:listing.price,currency:listing.currency,sellerName:listing.sellerName});
+  });
+
+  socket.on('graffiti_add',data=>{
+    const p=players[socket.id];if(!p)return;
+    const text=String(data.text||'').trim().slice(0,80);
+    if(!text)return;
+    const entry={
+      id:_graffitiIdSeq++,zone:p.zone,
+      tileX:Math.round(p.x/32),tileY:Math.round(p.y/32),
+      author:p.nickname,text,ts:Date.now(),
+    };
+    graffiti.push(entry);
+    if(graffiti.length>MAX_GRAFFITI)graffiti.shift();
+    saveGraffiti();
+    io.emit('graffiti_state',{graffiti});
+  });
+
+  socket.on('graffiti_remove',data=>{
+    // Allow removing only your own graffiti
+    const p=players[socket.id];if(!p)return;
+    const idx=graffiti.findIndex(g=>g.id===data.id&&g.author===p.nickname);
+    if(idx<0)return;
+    graffiti.splice(idx,1);
+    saveGraffiti();
+    io.emit('graffiti_state',{graffiti});
   });
 
   socket.on('market_cancel',data=>{

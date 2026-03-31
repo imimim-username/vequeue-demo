@@ -45,6 +45,9 @@ const G = {
   accessory:null,       // 'cape' | 'hat' | 'glasses' | null
   maxInvSlots:8,        // 8–12; upgradeable at Expansion Vendor in marketplace
   quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
+  kills:0,              // total enemy kills (tracked for Hall of Fame)
+  graffiti:[],          // [{id, zone, tileX, tileY, author, text, ts}]
+  hallOfFame:{topXP:[],topKills:[],topGold:[]},
 };
 
 // Cache of server-broadcast queue states
@@ -282,6 +285,14 @@ function tryInteract(){
   {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
   const nearLoot=G.worldLoot.find(l=>l.zone===G.zone&&Math.abs(l.x-px_)<=1&&Math.abs(l.y-py_)<=1);
   if(nearLoot){socket.emit('loot_pickup',{lootId:nearLoot.id});return;}}
+  // Check for nearby graffiti
+  {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
+  const nearG=G.graffiti.find(g=>g.zone===G.zone&&Math.abs(g.tileX-px_)<=1&&Math.abs(g.tileY-py_)<=1);
+  if(nearG){
+    G.npcDialog={npc:{name:'Wall Graffiti',type:'merchant',face:5},lineIdx:0,
+      dialog:[`📝 ${nearG.author} wrote:`,nearG.text,`(type /g <text> to leave your own)`]};
+    G.paused=true;showNpcDialog();return;
+  }}
   const npcs=NPCS[G.zone];if(!npcs)return;
   const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
   // Find the nearest NPC within 1.5 tiles
@@ -297,6 +308,7 @@ function tryInteract(){
   if(nearest.market){ openMarket(); return; }
   if(nearest.invUpgrade){ openInvUpgrade(); return; }
   if(nearest.exchange){ openExchange(); return; }
+  if(nearest.hallOfFame){ showHallOfFame(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
   showNpcDialog();
@@ -1067,6 +1079,7 @@ function doBattleAction(action){
     G.spacebucks += bt.spacebucksGained;
     G.schmeckles += bt.schmecklesGained;
     G.xp+=bt.xpGained;
+    G.kills=(G.kills||0)+1;
     checkLevelUp();
     if(bt.enemy.type==='lich'){
       G.dungeonBossDefeated=true;
@@ -1159,6 +1172,23 @@ function endBattle(){
 let _marketTab='browse';
 function openMarket(){G.paused=true;_marketTab='browse';renderMarketUI();document.getElementById('market-ui').style.display='block';}
 function closeMarket(){G.paused=false;document.getElementById('market-ui').style.display='none';}
+
+function showHallOfFame(){
+  const hof=G.hallOfFame||{};
+  function fmtBoard(title,arr,unit){
+    if(!arr||arr.length===0)return `${title}: (no entries yet)`;
+    return title+'  '+arr.map((e,i)=>`#${i+1} ${e.name} ${e.value}${unit}`).join(' · ');
+  }
+  const dialog=[
+    '🏆 HALL OF FAME — Victory Quest Champions 🏆',
+    fmtBoard('⚔ Most XP',hof.topXP,' xp'),
+    fmtBoard('💀 Top Killers',hof.topKills,' kills'),
+    fmtBoard('🪙 Wealthiest',hof.topGold,' 🪙'),
+    `Your stats — Level ${G.level} · ${G.xp} XP · ${G.kills} kills · ${G.spacebucks} 🪙`,
+  ];
+  G.npcDialog={npc:{name:'Hall of Fame',type:'guard',face:3},lineIdx:0,dialog};
+  G.paused=true;showNpcDialog();
+}
 function marketTab(tab){
   _marketTab=tab;
   ['browse','list'].forEach(t=>{
@@ -1738,6 +1768,19 @@ function renderSpriteLayer(ctx){
       ctx.restore();
     });
   }
+  // Draw graffiti markers
+  if(G.graffiti){
+    G.graffiti.filter(g=>g.zone===G.zone).forEach(g=>{
+      const sx=g.tileX*TS-G.camX+TS/2,sy=g.tileY*TS-G.camY+TS/2;
+      if(sx<-TS||sx>W+TS||sy<-TS||sy>H+TS)return;
+      const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,12);
+      grd.addColorStop(0,'rgba(180,80,255,0.22)');grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);ctx.fill();
+      ctx.save();ctx.font='16px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('📝',sx,sy-4);
+      ctx.restore();
+    });
+  }
 }
 
 // ── HUD ───────────────────────────────────────────────────────────────────────
@@ -1919,8 +1962,14 @@ document.getElementById('chat-input').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     const val=e.target.value.trim();
     if(val){
-      socket?.emit('chat',{text:val});
-      chatLog(`[${G.nickname}] ${val}`,'#FFD700');
+      // /g <text> — leave graffiti at current tile
+      if(val.startsWith('/g ')){
+        const txt=val.slice(3).trim();
+        if(txt&&socket){socket.emit('graffiti_add',{text:txt});chatLog(`📝 Graffiti left at this spot.`,'#B080FF');}
+      } else {
+        socket?.emit('chat',{text:val});
+        chatLog(`[${G.nickname}] ${val}`,'#FFD700');
+      }
     }
     e.target.value='';e.target.blur();e.target.style.display='none';
     e.preventDefault();
@@ -2323,6 +2372,9 @@ function initSocket(){
     if(!result.ok){errEl.textContent=result.error;return;}
     G_accountId=result.username;
     errEl.textContent='';
+    if(result._tampered){
+      chatLog('⚠ Save data integrity check failed. Starting fresh.','#FF4444');
+    }
     if(result.data){
       // Returning player — load state and jump straight into game
       applyServerState(result.data);
@@ -2469,6 +2521,14 @@ function initSocket(){
     socket.on('treasury_update',data=>{
       if(data.treasury)G.treasury={...data.treasury};
     });
+
+    // ── Graffiti ─────────────────────────────────────────────────────────────
+    socket.on('graffiti_state',data=>{G.graffiti=data.graffiti||[];});
+
+    // ── Hall of Fame ──────────────────────────────────────────────────────────
+    socket.on('hall_of_fame',data=>{
+      G.hallOfFame=data||{topXP:[],topKills:[],topGold:[]};
+    });
 }
 
 function joinGameServer(){
@@ -2510,6 +2570,7 @@ function applyServerState(s){
   while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   G.quests=s.quests||{};
   G.dungeonBossDefeated=s.dungeonBossDefeated||false;
+  if(s.kills!=null)G.kills=s.kills;
 }
 
 function saveToServer(){
@@ -2524,6 +2585,7 @@ function saveToServer(){
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
+    kills:G.kills||0,
   });
 }
 function updateOnlineCount(){

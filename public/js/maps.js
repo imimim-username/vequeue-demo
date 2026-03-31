@@ -403,6 +403,9 @@ const NPCS = {
     {type:'wizard', face:0, name:'Exchanger Rex', x:TOWN_OX+24, y:TOWN_OY+8,
      dialog:['Welcome to the Currency Exchange.','Swap any token for any other at a 0.30% fee.'],
      exchange:true},
+    {type:'guard', face:3, name:'Hall of Fame', x:TOWN_OX+27, y:TOWN_OY+10,
+     dialog:['The mightiest heroes of Victory Quest are inscribed here.'],
+     hallOfFame:true},
   ],
   tavern:[
     { id:'barkeep', x:10, y:2, type:'barkeep', face:2, name:'Barkeep Moe', questId:'dark_knight_hunt',
