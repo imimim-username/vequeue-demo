@@ -1,6 +1,6 @@
 # veQueue Game — Ideas & Design Notes
 
-_Last updated: 2026-03-30_
+_Last updated: 2026-03-31_
 
 ---
 
@@ -8,7 +8,7 @@ _Last updated: 2026-03-30_
 
 ### Name
 Should tie to "vq" (veQueue) somehow. Candidates:
-- **Victory Quest** — VQ as initialism, heroic/adventurous feel
+- **Victory Quest** — VQ as initialism, heroic/adventurous feel ✅ *(current implementation)*
 - **VaultQuest** — nods to treasury/governance theme
 - **QuestMark** — references the queue watermark mechanic
 - **vqRealm** — fantasy flavor
@@ -16,30 +16,176 @@ Should tie to "vq" (veQueue) somehow. Candidates:
 - **Que Town** — playful pun on queue + frontier town
 - **The vQ** — stylized, short
 
-### Currency
-Silly pop-culture-inspired units rather than generic "gold" or "tokens". Inspiration: Rick and Morty's Flurbos/Schmeckles, Spaceballs' Spacebucks, Futurama's Nixonbucks. Candidates:
-- **Queeblos** — original, riffs on "queue", sounds absurd
-- **Schmeckles** — classic R&M, already has cultural recognition
-- **Quoins** — pun on "coins" + "queue" (also an archaic word for coins)
-- **Vörks** — short, punchy, vaguely vq-adjacent
-- **Schmov** — mashup of Schmeckle + GOV
-- **Flurbs** — R&M adjacent
-- Could have multiple denominations with different silly names (e.g. 100 Queeblos = 1 Vörk)
+---
+
+## Currency System — Five Tokens (Alchemix-Inspired)
+
+The game uses five distinct currencies that mirror the real Alchemix protocol token ecosystem. Live prices for alUSD, alETH, and ALCX are fetched from CoinGecko and updated approximately once per hour.
+
+### The Five Currencies
+
+| Token | Symbol | How Obtained | Role |
+|-------|--------|--------------|------|
+| **Spacebucks** | 🪙 | Common enemy drops (wolves, goblins) | Raw collateral; deposited in bank to borrow alUSD |
+| **Schmeckles** | 💀 | Rare enemy drops (dark knights, Lich) | Premium collateral; deposited in bank to borrow alETH |
+| **alUSD** | $aUSD | Borrowed from bank against Spacebucks | Everyday spending — common/mid-tier items, potions |
+| **alETH** | ⟠ | Borrowed from bank against Schmeckles | Premium spending — rare/high-power items |
+| **ALCX** | ⚗️ | Queue participation drip; buyable at exchange | Protocol token — locked for veQueue entry, spent to jump lines |
+
+### Currency Design Notes
+- **Spacebucks** are common; **Schmeckles** are rare and more valuable — mirrors the ETH/stablecoin collateral split in real Alchemix
+- **alUSD** and **alETH** are never dropped by enemies — they must be borrowed from the bank
+- **ALCX** is never earned from combat — it is earned by participating in the queue (time-in-queue drip) and can be purchased at the currency exchange
+- Items can be purchased cross-currency (e.g. pay alETH for an alUSD-priced item), but a conversion fee applies at the point of sale
+
+### Live Price Feed
+- alUSD, alETH, and ALCX prices fetched from CoinGecko API approximately once per hour
+- Price movements create in-game events (see **Price Feed Events** below)
+- Spacebucks and Schmeckles are purely in-game tokens with no external price
+
+---
+
+## The Bank — Alchemix v3 Self-Repaying Loans
+
+The Bank is located inside the veQueue economic zone (requires queue entry to access). It is the central financial mechanic of the game and a direct playable simulation of Alchemix v3.
+
+### How It Works
+
+**Depositing collateral and borrowing:**
+1. Player deposits Spacebucks → can borrow up to **90% of deposit value** as alUSD immediately
+2. Player deposits Schmeckles → can borrow up to **90% of deposit value** as alETH immediately
+3. No interest is charged — the loan is **self-repaying** via yield generated on the deposited collateral
+4. Yield slowly ticks the outstanding debt down automatically, visible as a progress bar in the bank UI
+5. The bank UI shows: collateral deposited, alUSD/alETH borrowed, % repaid, estimated time to full repayment
+
+**When the loan is fully repaid:**
+- The position flips from debt-generating to yield-generating
+- Yield continues to accumulate in alUSD (for Spacebucks positions) or alETH (for Schmeckles positions)
+- Collateral is **not automatically returned** — player must visit the bank and actively claim it
+- While unclaimed, the collateral continues earning yield (now pure profit with no debt)
+
+**No liquidation from price swings:**
+- Spacebucks and Schmeckles are in-game tokens with no market price fluctuation
+- Liquidation risk does not apply as long as the player does not borrow more than the 90% ceiling
+- Teaches Alchemix's core safety guarantee: *your collateral is safe, your debt repays itself*
+
+### Bank UI Elements
+- Portfolio view: all active and cleared positions
+- Each position shows: collateral type, amount deposited, debt remaining, % repaid, est. time to full repayment
+- Cleared positions show: collateral available to claim, yield accumulated since payoff
+- Glowing "CLAIM" button when collateral is claimable
+- "Your loan will be fully repaid in approximately X hours" projection
+
+### Alchemix v3 Protocol Analogs
+
+| Game mechanic | Real Alchemix v3 equivalent |
+|--------------|----------------------------|
+| Spacebucks collateral → borrow alUSD | yvDAI / yield-bearing stablecoin → mint alUSD |
+| Schmeckles collateral → borrow alETH | yvETH / yield-bearing ETH → mint alETH |
+| 90% max LTV | Alchemix v3 max borrowing LTV (90%) |
+| Self-repaying via yield | MYT (Mix-Yield Token) yield driving debt repayment |
+| Yield on cleared positions | Depositor yield after full self-repayment |
+| 15% yield fee to treasury | MYT Yield Fee (15% performance fee on gross yield) |
+
+---
+
+## Fee Structure — Matching Alchemix v3
+
+All game treasury fees are set to match published Alchemix v3 fee rates exactly.
+
+| Fee | Rate | Trigger | Where fee goes |
+|-----|------|---------|---------------|
+| **Bank Yield Fee** | **15%** | Taken on all yield generated by collateral deposits before crediting debt repayment | Protocol treasury (visible in Governance Hall) |
+| **Borrower Redemption Fee** | **0.50%** | Charged in collateral tokens when the Transmuter settles a redemption against a player's position | Protocol treasury |
+| **Early Transmutation Fee** | **1.00%** | Player exits Transmuter before the 24-hour term ends; applied only to unsettled (not yet matured) funds | Protocol treasury |
+| **Normal Transmuter Exit** | **0%** | Player waits the full 24-hour term | N/A |
+| **Currency Exchange Fee** | **0.30%** | All currency swaps at the exchange | Protocol treasury |
+| **Queue Jump Fee** | Market price | Player spends ALCX to skip ahead in the veQueue | Distributed to all players currently waiting in queue |
+
+*Note: The 15%, 0.50%, and 1% fees are the three publicly documented user-facing rates in the Alchemix v3 docs. The 0.30% exchange fee is modeled on standard DEX swap fees.*
+
+### Treasury Visibility
+- All fee inflows are displayed live in the Governance Hall as a running counter
+- Queue members can see their pro-rata share of treasury revenue ticking upward in real time
+- Teaches: tax loop — protocol revenue automatically funding the cooperative
+
+---
+
+## The Transmuter
+
+The Transmuter is a separate station inside the economic zone. It allows players to convert alUSD or alETH back to their underlying collateral tokens (Spacebucks / Schmeckles) at a guaranteed 1:1 rate, with no slippage — but with a fixed waiting period.
+
+### Mechanics
+- Player deposits alUSD → receives Spacebucks 1:1 after **24 hours** (fixed term, DAO-configurable in lore)
+- Player deposits alETH → receives Schmeckles 1:1 after **24 hours**
+- Early exit at any time: **1% fee on unsettled (unmatured) funds**
+- Exit at maturity: **0% fee** — full 1:1 redemption
+- When the Transmuter settles a redemption, the corresponding borrower whose collateral is used pays the **0.50% Borrower Redemption Fee**
+
+### Peg Stabilization
+- When alUSD depegs below $1 at the currency exchange (driven by the live CoinGecko feed), the Transmuter's guaranteed 1:1 redemption creates an arbitrage opportunity
+- Players who buy cheap alUSD at the exchange and deposit it in the Transmuter earn the spread at maturity — no fee if they wait the full 24 hours
+- This arbitrage pressure is what keeps alUSD near peg; players discover this organically
+- Same dynamic applies to alETH vs. Schmeckles
+
+---
+
+## The Currency Exchange
+
+Located in the town square, **outside** the veQueue economic zone — freely accessible without queuing.
+
+### What It Trades
+All five currencies can be exchanged in any direction:
+- Spacebucks ↔ Schmeckles
+- Spacebucks ↔ alUSD
+- Schmeckles ↔ alETH
+- alUSD ↔ alETH
+- Any token ↔ ALCX (including buying ALCX with Spacebucks or alUSD)
+
+### Fee & Rates
+- **0.30% fee** on all swaps, goes to protocol treasury
+- Exchange rates for alUSD/alETH/ALCX reflect live CoinGecko prices (updated ~hourly)
+- Spacebucks/Schmeckles exchange rates are set by in-game supply/demand mechanics
+
+### Price Feed Events
+When live prices move significantly, the town crier NPC announces it and exchange dynamics shift:
+- **alUSD depegs below $0.98** → Transmuter arbitrage window opens; crier announces it
+- **alETH drops >5% in 24h** → Exchange is busier (simulated queue); harder to swap
+- **ALCX pumps >10%** → Queue-jumping becomes more expensive; players in queue earn more from others jumping
+
+---
+
+## ALCX — The Protocol Token
+
+ALCX is the veQueue/Alchemix governance and protocol token. It is not earned from combat and cannot be dropped by enemies — it is earned through protocol participation and bought at the exchange.
+
+### How ALCX Is Earned
+- **Queue participation drip** — every minute a player spends waiting in the veQueue earns a small ALCX drip. The longer you wait, the more you accumulate
+- **Queue seniority multiplier** — players who have been in the queue longer without leaving earn a higher drip rate (teaches compounding seniority)
+- **Purchasable** at the currency exchange for a modest fee (any token → ALCX)
+
+### How ALCX Is Spent
+- **Locked to enter veQueue** — a fixed ALCX amount is locked as the queue deposit (returned on entry or exit)
+- **Queue jumping** — spend ALCX to skip ahead in the line; that ALCX is distributed to all current queue members proportionally. The more congested the queue, the more expensive the jump
+- **Governance votes** — ALCX weight determines vote power in Governance Hall decisions
+
+### ALCX Is Never Used to Buy Items Directly
+Items in the market are priced in alUSD or alETH only. ALCX is purely a protocol/governance token.
 
 ---
 
 ## Core Mechanic — veQueue as Economic Gate
 
-- All economic activity (buying weapons, selling loot, upgrading armor, trading) happens in a zone gated behind a veQueue
-- To enter the Marketplace / Treasury, players must lock tokens into the queue and wait their turn
+- All economic activity (buying weapons, banking, Transmuter, consignment marketplace) happens in a zone gated behind a veQueue
+- To enter the Marketplace / Treasury, players must lock **ALCX** into the queue and wait their turn
 - Makes the veQueue mechanic not just a tutorial step but a lived, repeated experience central to gameplay
 - Creates natural scarcity and pacing — you can't spam-buy items; you have to queue
-- Players with more tokens locked earn higher-priority queue positions (teaches watermark/principal protection)
+- Players with more ALCX locked earn higher-priority queue positions (teaches watermark/principal protection)
 - Real-time queue visualization: see other players waiting, watch the serving counter advance
-- Entering releases your locked tokens (teaches entry/exit queue mechanics)
-- vqShares: players who stay locked in longer accumulate "queue seniority" giving them discounts or early access to rare items
+- Entering releases your locked ALCX (teaches entry/exit queue mechanics)
+- vqShares: players who stay locked in longer accumulate "queue seniority" giving them higher ALCX drip and discounts
 - To **leave** the economic zone, players must join an exit queue — you can't just walk out; teaches exit queue as a lived experience
-- Creates a genuine decision: stay longer for better deals, or exit sooner to get back to fighting?
+- Creates a genuine decision: stay longer for better ALCX yield, or exit sooner to get back to fighting?
 
 ---
 
@@ -76,7 +222,7 @@ Reference: Mega Man X (Capcom, 1993) on SNES. This is the visual bar to hit.
 
 **UI — minimal but pixel-perfect**
 - Health bar: vertical or horizontal row of segmented pixel blocks (heart containers or HP bar)
-- Token/currency counter with a small coin icon
+- Token/currency counter with a small coin icon (all 5 currencies shown on HUD)
 - Weapon/item slots: small icon grid in corner
 - No floating text clutter — everything is iconographic
 - HUD elements have a subtle dark border or panel behind them to stay readable
@@ -106,16 +252,16 @@ Reference: Mega Man X (Capcom, 1993) on SNES. This is the visual bar to hit.
 - The town (and all its interiors) is a **combat-free safe zone** — no enemies can enter
 - Leaving town via exits on the map edge transitions the player into the **Wilderness**
 - The Wilderness is a larger, scrolling overworld map with hostile zones, ruins, dungeons
-- Players return to town to sell loot, queue for the economic zone, recover HP, and interact
+- Players return to town to bank, queue, recover HP, and interact
 - Visual cue at town boundary: the art style subtly shifts (darker palette, more jagged tiles) as you cross into danger
 - NPCs in town can comment on what's happening in the wilderness ("adventurers haven't returned from the eastern ruins...")
 
 ### Zones
-- **Town Square** — safe hub, shops, social, veQueue entry points
-- **Town Interiors** — Tavern, Governance Hall, Marketplace, Treasury (all safe)
+- **Town Square** — safe hub, currency exchange, social, veQueue entry point
+- **Town Interiors** — Tavern, Governance Hall (all safe, free to enter)
 - **Wilderness / Overworld** — dangerous open world, enemies roam freely, multiple biomes
 - **Dungeons / Ruins** — fixed-location deep-danger zones with rare loot and boss-level adversaries
-- **Economic Zone** (Marketplace + Treasury interior) — gated behind veQueue, safe once inside
+- **Economic Zone** (Marketplace + Bank + Transmuter) — gated behind veQueue; safe once inside
 
 ---
 
@@ -135,10 +281,19 @@ Reference: Mega Man X (Capcom, 1993) on SNES. This is the visual bar to hit.
 - Enemy has a visible name, level, and loot preview (what they're carrying)
 - Stat system feeds directly into combat: STR → damage, END → damage reduction, AGI → flee chance / who goes first, LCK → crit chance, VIT → max HP
 
+### Enemy Loot by Tier
+
+| Enemy | Currency Dropped | Notes |
+|-------|-----------------|-------|
+| Wolf, Goblin | Spacebucks | Common collateral |
+| Skeleton | Spacebucks (more) | Mid-tier |
+| Dark Knight | Schmeckles | Rare collateral |
+| Ancient Lich | Schmeckles (large) | Boss; most valuable drop |
+
 ### General Combat Rules
 - Adversaries are all NPCs — no PvP
 - Player starts with a basic weapon (e.g. sword) and shield/armor
-- Defeating adversaries earns currency (variable amounts by enemy type/difficulty)
+- Defeating adversaries earns Spacebucks or Schmeckles depending on enemy tier
 - Adversary populations regenerate slowly over real time; clearing an area makes it safer for others temporarily
 
 ---
@@ -159,14 +314,16 @@ Full RPG-style creation screen at game start:
 
 ### Starting Loadout
 - Basic sword, basic shield, 3 hearts, 8 inventory slots
+- Starting wallet: 100 Spacebucks, 0 Schmeckles, 0 alUSD, 0 alETH, 20 ALCX
 
 ### Stats & Leveling
-Upgrades purchased in the economic zone (requiring entry/exit queue — reinforces core mechanic):
-- Max health (more hearts)
-- Attack power (weapon damage)
-- Defense (shield/armor reduction)
-- Inventory capacity (more item slots)
-- Speed (movement rate)
+- Gain XP from combat; level up grants stat points
+- Upgrades from bank/market (requiring veQueue entry — reinforces core mechanic):
+  - Max health (more hearts)
+  - Attack power (weapon damage)
+  - Defense (shield/armor reduction)
+  - Inventory capacity (more item slots)
+  - Speed (movement rate)
 
 ### Inventory
 - Fixed number of item slots (e.g. 8 to start, upgradeable)
@@ -175,7 +332,7 @@ Upgrades purchased in the economic zone (requiring entry/exit queue — reinforc
 
 ### Pause = Character Screen
 - Pausing opens the character/inventory screen — same button, dual purpose (Zelda-style)
-- Shows: equipped items, inventory grid, current stats, token balance, quest log
+- Shows: equipped items, inventory grid, current stats, all token balances, quest log, active bank positions
 - Player can equip/unequip items and review stats
 - No separate menu flow — pause IS the character screen
 
@@ -204,10 +361,18 @@ Upgrades purchased in the economic zone (requiring entry/exit queue — reinforc
 - Players list items on consignment in the economic zone; no selling directly to NPCs at fixed prices
 - Items sit in shared marketplace (server memory) until another player buys them asynchronously
 - Server takes a percentage cut of each sale — mirrors a protocol fee (veQueue mechanic analogy)
-- Seller sets asking price; buyer pays it whenever they next enter the economic zone
+- Seller sets asking price in alUSD or alETH; buyer pays it whenever they next enter the economic zone
 - Rare loot from powerful adversaries commands higher prices
 - Items unsold for too long decay in value — encourages realistic pricing
 - Creates a real player-driven economy: prices fluctuate based on supply/demand across sessions
+
+### Item Pricing Tiers
+
+| Tier | Priced In | Example Items |
+|------|-----------|---------------|
+| Common | alUSD | Health potions, Iron Sword, Wooden Shield |
+| Premium | alETH | Flame Blade, Shadow Blade, Elven Ward |
+| Cross-currency | Either, with conversion fee | Player's choice; 0.30% conversion fee applies |
 
 ---
 
@@ -226,13 +391,13 @@ Inspired by classic BBS door games (Trade Wars, Legend of the Red Dragon). Playe
 
 ---
 
-## Persistence — No Database
+## Persistence — Server Accounts + Local Fallback
 
-- All world state lives in server memory (resets on restart — acceptable, world regenerating feels natural)
-- Per-player state (tokens, inventory, quests, position) stored in browser cookie or localStorage
-- No database setup, migrations, or persistence layer to maintain
-- Stack stays dead simple: Node.js + Socket.io, no file I/O required
-- Player progress survives server restarts via their own cookie
+- Server-side accounts: username + SHA-256 PIN hash stored in flat JSON file (`players.json`)
+- Character state saved to server on regular interval and on zone change
+- Local localStorage fallback for guest players (progress not guaranteed across sessions)
+- Future: HMAC-signed state payload to prevent client-side tampering
+- Bank positions and Transmuter deposits must persist server-side (not just localStorage)
 
 ---
 
@@ -299,9 +464,9 @@ Players should finish a session feeling: *"I understand why you'd want a queue l
 
 ## Idle Treasury — Tax Loop Viability
 
-- Live treasury counter in the Governance Hall: a running total of the % of economic activity flowing back to queue members
-- All revenue sources feed it visibly: rare item auction premiums, fast-lane bypass fees, exit donations, Black Market parent tax
-- Queue members see their "passive share" tick upward in real time even while just exploring the world — no action required
+- Live treasury counter in the Governance Hall: a running total of all protocol fees collected
+- Revenue sources: 15% bank yield fee, 0.50% borrower redemption fee, 1% early transmutation fee, 0.30% exchange fee, ALCX queue-jump fees
+- Queue members see their pro-rata share ticking upward in real time even while just exploring the world — no action required
 - **Balance:** reinforces that staying in the queue has low-friction reward; not game-breaking, just a constant small drip; keeps the veQueue from feeling like pure cost/friction
 - **Teaches:** tax loop — protocol revenue automatically funding the cooperative, without governance votes required
 
@@ -309,10 +474,10 @@ Players should finish a session feeling: *"I understand why you'd want a queue l
 
 ## NPC "Whale Arrival" Event — Flow-Rate Dilution Resistance
 
-- Occasionally an NPC whale announces they're entering the queue with a massive token stake
+- Occasionally an NPC whale announces they're entering the queue with a massive ALCX stake
 - Players can see the projected impact on queue wait times *before* it happens (entry is rate-limited, so the math is visible)
 - Players already in queue have time to react: stay for the seniority advantage, or exit now before wait times extend?
-- The whale cannot skip the queue — even with 100× tokens they enter at the same rate as everyone else; their presence changes dynamics but can't harm existing players
+- The whale cannot skip the queue — even with 100× ALCX they enter at the same rate as everyone else; their presence changes dynamics but can't harm existing players
 - **Balance:** creates emergent strategic moments without the whale actually being able to harm existing players; the rate limit is the protection
 - **Teaches:** flow-rate dilution resistance — you can see the threat coming, principal is protected, orderly entry even for large capital
 
@@ -333,17 +498,19 @@ Players should finish a session feeling: *"I understand why you'd want a queue l
   - "Should the Tavern sell XP potions this week?"
   - "Should adversary spawn rate increase for 24 hours (more loot, more danger)?"
   - "Should the exit queue fee be lowered?"
-- Players vote with their locked token weight — more tokens locked = more vote weight
+  - "Should the bank yield rate increase?" (mirrors Alchemix DAO setting MYT APR)
+  - "Should the Transmuter term be shortened to 12 hours?" (mirrors DAO-configurable redemption period)
+- Players vote with their locked ALCX weight — more ALCX locked = more vote weight
 - Players in the exit queue forfeit voting rights until they re-enter
-- Results display as a token-weighted tally in real time as votes come in
-- **Balance:** large lockers get governance power but outcomes affect everyone equally (economy-wide, not individual-targeted); players who care lock more, players who don't can freeload on the outcome
+- Results display as an ALCX-weighted tally in real time as votes come in
+- **Balance:** large lockers get governance power but outcomes affect everyone equally (economy-wide, not individual-targeted)
 - **Teaches:** proportional governance, exit queue = governance forfeit, why long-term commitment has value
 
 ---
 
 ## rvqALCX SubZones — Recursive veQueue / Specialized Revenue
 
-Specialized sub-zones inside the economic zone, each requiring you to commit your queue position (vqShares) to enter. Only one sub-zone at a time — you gave up your general queue position to specialize; you can return to the general queue later but must re-queue.
+Specialized sub-zones inside the economic zone, each requiring you to commit your queue position (vqShares) to enter. Only one sub-zone at a time.
 
 | Sub-Zone | Cost | Upside | Tradeoff |
 |----------|------|--------|----------|
@@ -359,7 +526,7 @@ Specialized sub-zones inside the economic zone, each requiring you to commit you
 
 ## Exit Queue Donations — Below-Peg Mechanic
 
-- When leaving the economic zone, if the exit queue is long/congested, players can optionally "donate" part of their tokens to jump ahead — donations go to the remaining players in the queue, enriching them
+- When leaving the economic zone, if the exit queue is long/congested, players can optionally "donate" ALCX to the remaining queue members to jump ahead
 - Alternatively framed as: an "early exit fee" paid by impatient leavers, distributed to remaining members
 - **Balance:** staying longer earns queue seniority + potentially receives donations from impatient exiters; exiting fast costs a bit; neither is wrong — depends what you're optimizing for
 - **Teaches:** exit queue below-peg donation mechanics — remaining holders are enriched when others leave early
@@ -368,11 +535,11 @@ Specialized sub-zones inside the economic zone, each requiring you to commit you
 
 ## Auction Fast Lane — Queue Bypass Mechanic
 
-- Players who don't want to wait in the entry queue can bid in a live Queue Auction — pay above the current queue price to skip ahead
-- The premium goes into the treasury
+- Players who don't want to wait in the entry queue can bid ALCX in a live Queue Auction — pay above the current queue price to skip ahead
+- The ALCX premium is distributed proportionally to all players currently waiting in queue (they earn from others jumping)
 - Other players see the queue jump happening in real time
-- **Balance:** auction price scales with queue depth — crowded queue = expensive bypass; patient players benefit from accumulating queue seniority while spenders burn currency; neither strategy is strictly dominant
-- **Teaches:** entry queue premium capture — the mechanism earns from demand volatility
+- **Balance:** auction price scales with queue depth — crowded queue = expensive bypass; patient players benefit from accumulating queue seniority while spenders burn ALCX; neither strategy is strictly dominant
+- **Teaches:** entry queue premium capture — the mechanism earns from demand volatility; queue members are enriched by jumpers
 
 ---
 
