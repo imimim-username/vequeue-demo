@@ -83,8 +83,8 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 #screen-game{background:#000;flex-direction:column}
 #game-wrap{position:relative;image-rendering:pixelated}
 #game-wrap canvas{position:absolute;top:0;left:0;image-rendering:pixelated}
-#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}#cv-ceiling{z-index:4;pointer-events:none}
-#cv-ui{z-index:5;pointer-events:none}
+#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}#cv-fg{z-index:4;pointer-events:none}#cv-ceiling{z-index:5;pointer-events:none}
+#cv-ui{z-index:6;pointer-events:none}
 #cv-ui[style*="pointer-events: auto"]{cursor:pointer}
 
 /* ── HUD ── */
@@ -299,6 +299,7 @@ body.touch #mobile-act{display:flex}
     <canvas id="cv-bg"></canvas>
     <canvas id="cv-tiles"></canvas>
     <canvas id="cv-sprites"></canvas>
+    <canvas id="cv-fg"></canvas>
     <canvas id="cv-ceiling"></canvas>
     <canvas id="cv-ui"></canvas>
   </div>
@@ -3884,6 +3885,33 @@ function renderTileLayer(){
   }
 }
 
+// ── FOREGROUND TILE LAYER (cv-fg, z:4) ───────────────────────────────────────
+// Tiles whose upper portion renders ABOVE sprites, creating depth/occlusion.
+// The tile layer draws the full tile; this layer redraws just the top N pixels
+// on a higher z-canvas so the player appears to walk behind tree canopies, etc.
+const FG_TILES=new Set([T.TREE,T.COLUMN,T.STALL]);
+// Pixels from tile top to include in the foreground layer
+const FG_HEIGHTS={[T.TREE]:18,[T.COLUMN]:8,[T.STALL]:10};
+
+function renderFgLayer(ctx){
+  ctx.clearRect(0,0,W,H);
+  const z=ZONES[G.zone];if(!z)return;
+  const m=z.map;
+  const startC=Math.floor(G.camX/TS),startR=Math.floor(G.camY/TS);
+  for(let row=startR;row<=startR+TH+1;row++){
+    for(let col=startC;col<=startC+TW+1;col++){
+      if(row<0||row>=z.h||col<0||col>=z.w)continue;
+      const tile=m[row][col];
+      if(!FG_TILES.has(tile))continue;
+      const fgH=FG_HEIGHTS[tile];
+      const cached=TILE_CACHE[tile];
+      if(!cached)continue;
+      // Draw only the top fgH pixels of this tile, in screen space
+      ctx.drawImage(cached,0,0,TS,fgH,col*TS-G.camX,row*TS-G.camY,TS,fgH);
+    }
+  }
+}
+
 // ── MINIMAP ────────────────────────────────────────────────────────────────────
 const MINI_COLORS={
   0:'#111',1:'#3a5a2a',2:'#8a8070',3:'#3a3a3a',4:'#1a3a0a',5:'#8a6040',
@@ -4339,7 +4367,9 @@ function gameLoop(ts){
     drawBackground(ctxBG,G.zone,G.camX,G.camY,W,H,G.tick);
     // render sprites
     renderSpriteLayer(ctxSprites);
-    // ceiling layer (above sprites, z:4) — shows only for interior zones
+    // foreground tile layer (z:4) — tree canopies, column capitals above player
+    renderFgLayer(ctxFg);
+    // ceiling layer (z:5) — interior zone ceiling art above everything
     renderCeiling(ctxCeiling,G.zone,W,H,G.tick);
     // HUD + minimap
     renderHUD();
@@ -4379,7 +4409,7 @@ function gameLoop(ts){
 }
 
 // ── CANVAS SETUP ─────────────────────────────────────────────────────────────
-let ctxBG,ctxSprites,ctxUI,ctxCeiling;
+let ctxBG,ctxSprites,ctxUI,ctxCeiling,ctxFg;
 function setupCanvases(){
   const wrap=document.getElementById('game-wrap');
   const dpr=Math.min(window.devicePixelRatio||1,2);
@@ -4387,7 +4417,7 @@ function setupCanvases(){
   const scale=Math.min(aw/W,ah/H,2);
   const dw=Math.round(W*scale),dh=Math.round(H*scale);
   wrap.style.width=dw+'px';wrap.style.height=dh+'px';
-  ['cv-bg','cv-tiles','cv-sprites','cv-ceiling','cv-ui'].forEach(id=>{
+  ['cv-bg','cv-tiles','cv-sprites','cv-fg','cv-ceiling','cv-ui'].forEach(id=>{
     const cv=document.getElementById(id);
     cv.width=W;cv.height=H;
     cv.style.width=dw+'px';cv.style.height=dh+'px';
@@ -4396,6 +4426,7 @@ function setupCanvases(){
   ctxTiles=cvTiles.getContext('2d');
   ctxBG=document.getElementById('cv-bg').getContext('2d');
   ctxSprites=document.getElementById('cv-sprites').getContext('2d');
+  ctxFg=document.getElementById('cv-fg').getContext('2d');
   ctxCeiling=document.getElementById('cv-ceiling').getContext('2d');
   ctxUI=document.getElementById('cv-ui').getContext('2d');
 }
