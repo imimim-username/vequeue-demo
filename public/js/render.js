@@ -1244,19 +1244,31 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
     ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx-2,oy+hy+2,1,2); // ear tip
     ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx+hw,oy+hy+3,3,6);
     ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx+hw+1,oy+hy+2,1,2);
+    // elven hair: long flowing locks below helmet
+    ctx.fillStyle=hairSh;ctx.fillRect(ox+hx-1,  oy+hy+hh,4,10);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,    oy+hy+hh+1,3,8);
+    ctx.fillStyle=hairSh;ctx.fillRect(ox+hx+hw-3,oy+hy+hh,4,10);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx+hw-3,oy+hy+hh+1,3,8);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx+1,  oy+hy+hh,hw-2,5);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,    oy+hy,hw,3); // top fringe
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+1,  oy+hy,hw-2,1);
   } else if(sp==='dwarf'){
     // bushy beard below helmet
     ctx.fillStyle=hairSh;ctx.fillRect(ox+hx,  oy+hy+hh,  hw,  8);
     ctx.fillStyle=hair;  ctx.fillRect(ox+hx+1,oy+hy+hh+1,hw-2,6);
     ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+2,oy+hy+hh+1,5,   2);
     // hair tuft at top
-    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,     hw,  2);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,     hw,  3);
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+1,oy+hy,     hw-2,1);
   } else if(sp==='goblin'){
     // big round ears with inner detail
     ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx-5,oy+hy+2,5,8);
     ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx-4,oy+hy+3,3,6);
     ctx.fillStyle=sk.sk2; ctx.fillRect(ox+hx+hw,oy+hy+2,5,8);
     ctx.fillStyle=sk.skin;ctx.fillRect(ox+hx+hw+1,oy+hy+3,3,6);
+    // goblin mohawk on helmet top
+    ctx.fillStyle=hair;  ctx.fillRect(ox+cx2-2,oy+hy-4,4,5);
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+cx2-1,oy+hy-4,2,2);
   } else if(sp==='orc'){
     // tusks below visor
     ctx.fillStyle='#EEE0A0';
@@ -1279,9 +1291,18 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
     ctx.fillStyle='#606060';ctx.fillRect(ox+hx-2,oy+hy+3,1,2);
     ctx.fillStyle='#606060';ctx.fillRect(ox+hx+hw,oy+hy+3,1,2);
   } else {
-    // human / mage / rogue etc — hair visible above visor at helmet top
-    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,hw,2);
+    // human / mage / rogue etc — hair at helmet top + flowing from under helmet sides/back
+    // top fringe (peeking above visor)
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,hw,3);
     ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+1,oy+hy,hw-2,1);
+    // hair flowing out below helmet on the sides and back
+    const hBot=hy+hh; // y of helmet bottom
+    ctx.fillStyle=hairSh;ctx.fillRect(ox+hx-1,  oy+hBot,  4, 7); // left side
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx,    oy+hBot+1,3, 5);
+    ctx.fillStyle=hairSh;ctx.fillRect(ox+hx+hw-3,oy+hBot, 4, 7); // right side
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx+hw-3,oy+hBot+1,3,5);
+    ctx.fillStyle=hair;  ctx.fillRect(ox+hx+1,  oy+hBot,  hw-2,4); // back centre
+    ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+2,  oy+hBot,  4,   2); // highlight
   }
 
   // ─ Hat (wizard hat — above helmet) ─
