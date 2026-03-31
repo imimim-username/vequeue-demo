@@ -91,7 +91,7 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 #hud{position:fixed;top:0;left:0;right:0;height:36px;background:linear-gradient(#000a,#0006);
   display:flex;align-items:center;padding:0 12px;gap:16px;z-index:10;font-size:.75rem}
 #hud-zone{color:#87CEEB;letter-spacing:.1em;flex:1}
-#hud-hearts{display:flex;gap:2px}
+#hud-hearts,#hud-mp{display:flex;gap:2px}
 #hud-spacebucks,#hud-alusd,#hud-alcx{font-size:.75rem}
 #hud-players{color:#888;font-size:.7rem}
 #hud-level{color:#8BC34A;font-weight:bold;font-size:.75rem;min-width:36px;text-align:center}
@@ -306,6 +306,7 @@ body.touch #mobile-act{display:flex}
   <div id="hud">
     <span id="hud-zone">TOWN SQUARE</span>
     <span id="hud-hearts"></span>
+    <span id="hud-mp"></span>
     <span id="hud-level">Lv.1</span>
     <span id="hud-spacebucks" style="color:#FDD835" title="Spacebucks">🪙0</span>
     <span id="hud-alusd" style="color:#4CAF50;margin-left:6px" title="alUSD">$0</span>
@@ -2807,6 +2808,7 @@ const G = {
   dir:2, // 0=up,1=right,2=down,3=left
   frame:0, moveTimer:0, moving:false,
   hp:6, maxHp:6,
+  mp:6, maxMp:6,
   spacebucks: CFG.START_SPACEBUCKS,
   schmeckles: 0,
   alUSD: CFG.START_ALUSD,
@@ -3649,9 +3651,16 @@ function renderBattleScreen(){
   ctxUI.strokeStyle='#604010';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+16,155,10);
   ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
   ctxUI.fillText(`HP ${G.hp}/${G.maxHp}`,piX+158,piY+25);
+  // MP bar
+  ctxUI.fillStyle='#001830';ctxUI.fillRect(piX,piY+29,155,8);
+  const mf=Math.max(0,G.mp/G.maxMp);
+  ctxUI.fillStyle='#4FC3F7';ctxUI.fillRect(piX,piY+29,Math.floor(155*mf),8);
+  ctxUI.strokeStyle='#1A4060';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+29,155,8);
+  ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
+  ctxUI.fillText(`MP ${G.mp}/${G.maxMp}`,piX+158,piY+37);
   // Mini stats
   ctxUI.fillStyle='#7A5830';
-  ctxUI.fillText(`STR${G.stats.str} AGI${G.stats.agi} LCK${G.stats.lck}`,piX,piY+38);
+  ctxUI.fillText(`STR${G.stats.str} AGI${G.stats.agi} LCK${G.stats.lck}`,piX,piY+50);
   // Turn indicator
   if(!bt.result){
     ctxUI.fillStyle=bt.phase==='player_turn'?'#FFD080':'#FF6060';
@@ -3678,6 +3687,13 @@ function renderBattleScreen(){
     ctxUI.fillText('[ Space / Enter / Click to continue ]',W/2,H/2+40);
     ctxUI.textAlign='left';
   }
+}
+
+// ── Magic Points ──────────────────────────────────────────────────────────────
+function spendMp(cost){
+  if(G.mp<cost)return false;
+  G.mp=Math.max(0,G.mp-cost);
+  return true;
 }
 
 // ── Combat math ───────────────────────────────────────────────────────────────
@@ -4188,6 +4204,16 @@ function renderHUD(){
     span.style.fontSize='1rem';
     hearts.appendChild(span);
   }
+  const mpEl=document.getElementById('hud-mp');
+  mpEl.innerHTML='';
+  for(let i=0;i<G.maxMp;i++){
+    const full=i<G.mp;
+    const s=document.createElement('span');
+    s.textContent=full?'◆':'◇';
+    s.style.color=full?'#4FC3F7':'#334';
+    s.style.fontSize='.7rem';
+    mpEl.appendChild(s);
+  }
   document.getElementById('hud-spacebucks').textContent = `🪙${G.spacebucks}`;
   document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
   const alcxTxt = G.lockedAlcx>0 ? `⚗${G.alcx} 🔒${G.lockedAlcx}` : `⚗${G.alcx}`;
@@ -4498,6 +4524,8 @@ function buildCreateScreen(){
     const sp2=SPECIES[G.species||'human'];
     G.maxHp=sp2.baseHp+Math.max(0,Math.floor((G.stats.vit-2)*0.5));
     G.hp=G.maxHp;
+    G.maxMp=4+G.stats.lck;
+    G.mp=G.maxMp;
     // give starting weapon
     G.inventory[0]=cl.startWeapon;
     if(cl.startShield)G.inventory[1]=cl.startShield;
@@ -4566,6 +4594,7 @@ function gameLoop(ts){
       });
     }
     // persist
+    if(G.tick%90===0&&G.mp<G.maxMp){G.mp=Math.min(G.maxMp,G.mp+1);}
     if(G.tick%300===0){if(G.persist)saveState(); saveToServer();}
   }
   // Battle screen renders while paused (transition phases handled by their own rAF)
@@ -4640,6 +4669,8 @@ function loadState(){
     G.level=s.level??1;
     G.statPoints=s.statPoints??0;
     if(s.maxHp)G.maxHp=s.maxHp;
+    if(s.maxMp)G.maxMp=s.maxMp;
+    if(s.mp!=null)G.mp=Math.min(s.mp,G.maxMp);
     if(s.quests)G.quests=s.quests;
     if(s.dungeonBossDefeated)G.dungeonBossDefeated=s.dungeonBossDefeated;
   }catch(e){}
@@ -4762,7 +4793,7 @@ function saveToServer(){
     species:G.species,class_:G.class_,
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
-    stats:G.stats,hp:G.hp,maxHp:G.maxHp,
+    stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
