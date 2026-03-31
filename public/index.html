@@ -3013,8 +3013,9 @@ function gameLoop(ts){
     drawBackground(ctxBG,G.zone,G.camX,G.camY,W,H,G.tick);
     // render sprites
     renderSpriteLayer(ctxSprites);
-    // HUD
+    // HUD + minimap
     renderHUD();
+    ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
     // persist
     if(G.persist&&G.tick%300===0)saveState();
