@@ -285,7 +285,7 @@ The Transmuter is a separate station inside the economic zone. It is the mechani
 3. Depositors receive their share of redeemed collateral at 1:1, pro-rata based on their share of the Transmuter pool
 4. Player withdraws their Spacebucks/Schmeckles whenever they want — no lockup on the exit side
 
-> **Open design question:** Is distribution to Transmuter depositors **pro-rata** (everyone receives proportionally to their deposit) or **FIFO queue** (first depositor gets filled first)? Pro-rata is simpler and fairer; FIFO creates interesting strategy around timing. Recommend pro-rata for v1, optional FIFO upgrade later.
+> **Distribution model:** Pro-rata — everyone receives proportionally to their deposit size. FIFO is a possible future upgrade (togglable by admin dashboard).
 
 ### The Earmarking Rate — Governance Lever
 - The earmarking rate controls how quickly borrower collateral gets earmarked per redemption cycle
@@ -568,6 +568,8 @@ A password-protected operator panel served at `/admin` on the same Node.js serve
 | Exchange fee % | 0.30% | Slider 0–5% |
 | ALCX queue drip rate | 1 per 5s | Slider |
 | MP regen rate | configurable | Slider |
+| Transmuter distribution mode | pro-rata | Toggle: pro-rata / FIFO |
+| Earmarking rate | configurable | Slider (slow / medium / fast) |
 | Enemy difficulty multiplier | 1× | Slider 0.5–5× |
 | XP multiplier | 1× | Slider 0.5–5× |
 | Shop prices multiplier | 1× | Slider 0.25–3× |
