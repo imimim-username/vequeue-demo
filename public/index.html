@@ -92,7 +92,7 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
   display:flex;align-items:center;padding:0 12px;gap:16px;z-index:10;font-size:.75rem}
 #hud-zone{color:#87CEEB;letter-spacing:.1em;flex:1}
 #hud-hearts{display:flex;gap:2px}
-#hud-gold{color:#FFD700;min-width:80px;text-align:right}
+#hud-spacebucks,#hud-alusd,#hud-alcx{font-size:.75rem}
 #hud-players{color:#888;font-size:.7rem}
 #hud-level{color:#8BC34A;font-weight:bold;font-size:.75rem;min-width:36px;text-align:center}
 #hud-xp-bar{position:fixed;top:36px;left:0;right:0;height:5px;background:#111;z-index:10}
@@ -204,6 +204,9 @@ body.touch #mobile-act{display:flex}
   padding:3px 10px;font-family:inherit;font-size:.68rem;cursor:pointer;letter-spacing:.05em}
 .shop-buy-btn:hover:not(:disabled){background:#2a6a2a}
 .shop-buy-btn:disabled{background:#1a1a1a;border-color:#333;color:#444;cursor:default}
+.bank-pos{background:#111;border:1px solid #2a2a2a;border-radius:6px;padding:10px;margin:6px 0;font-size:.8rem}
+.bank-bar{background:#1a1a1a;border-radius:4px;height:7px;margin:6px 0}
+.bank-bar-fill{background:linear-gradient(90deg,#388E3C,#81C784);height:7px;border-radius:4px}
 </style>
 </head>
 <body>
@@ -302,7 +305,9 @@ body.touch #mobile-act{display:flex}
     <span id="hud-zone">TOWN SQUARE</span>
     <span id="hud-hearts"></span>
     <span id="hud-level">Lv.1</span>
-    <span id="hud-gold">0 ₴</span>
+    <span id="hud-spacebucks" style="color:#FDD835" title="Spacebucks">🪙0</span>
+    <span id="hud-alusd" style="color:#4CAF50;margin-left:6px" title="alUSD">$0</span>
+    <span id="hud-alcx" style="color:#9C27B0;margin-left:6px" title="ALCX">⚗0</span>
     <span id="hud-players">1 online</span>
     <button id="hud-mute" title="Toggle sound" onclick="toggleMute()" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 2px;opacity:.8">🔊</button>
   </div>
@@ -351,10 +356,68 @@ body.touch #mobile-act{display:flex}
   <div id="shop-box">
     <div id="shop-header-row">
       <span id="shop-title">SHOP</span>
-      <span id="shop-gold-display">💰 0 ₴</span>
+      <span id="shop-gold-display">💵 0 alUSD</span>
     </div>
     <div id="shop-items-list"></div>
     <div style="margin-top:.8rem;font-size:.65rem;color:#445;text-align:right">[ ESC ] Close</div>
+  </div>
+</div>
+
+<!-- BANK UI -->
+<div id="bank-ui" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:200;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee">
+  <div style="background:#0d1117;border:2px solid #4CAF50;border-radius:10px;padding:22px;max-width:540px;width:92%;max-height:82vh;overflow-y:auto">
+    <h2 style="color:#4CAF50;margin:0 0 6px">🏦 Alchemix Bank</h2>
+    <p style="color:#888;font-size:.78rem;margin:0 0 14px">Self-repaying loans · No liquidations · 90% LTV · 15% yield fee</p>
+    <div style="font-size:.82rem;margin-bottom:14px;padding:8px;background:#111;border-radius:6px">
+      🪙 <b id="bank-sb-bal">0</b> Spacebucks &nbsp;·&nbsp; 💀 <b id="bank-sm-bal">0</b> Schmeckles<br>
+      $ <b id="bank-alusd-bal">0</b> alUSD &nbsp;·&nbsp; ⟠ <b id="bank-aleth-bal">0</b> alETH
+    </div>
+    <div style="margin-bottom:16px">
+      <b style="color:#81C784">Deposit &amp; Borrow</b><br>
+      <input id="bank-deposit-amt" type="number" min="1" step="1" placeholder="Amount" style="width:90px;background:#111;color:#eee;border:1px solid #444;padding:5px 8px;border-radius:4px;margin:6px 4px 6px 0">
+      <button onclick="depositBank('spacebucks')" style="background:#1565C0;color:#fff;border:none;padding:7px 12px;border-radius:4px;cursor:pointer;margin:3px;font-size:.82rem">🪙 Spacebucks → $ alUSD</button>
+      <button onclick="depositBank('schmeckles')" style="background:#6A1B9A;color:#fff;border:none;padding:7px 12px;border-radius:4px;cursor:pointer;margin:3px;font-size:.82rem">💀 Schmeckles → ⟠ alETH</button>
+    </div>
+    <div>
+      <b style="color:#81C784">Active Positions</b>
+      <div id="bank-positions" style="margin-top:8px"></div>
+    </div>
+    <p style="font-size:.7rem;color:#555;margin:12px 0 4px">Loan repays itself from yield · Claim collateral after full repayment</p>
+    <button onclick="closeBank()" style="background:#1a1a1a;color:#aaa;border:1px solid #444;padding:8px 28px;border-radius:4px;cursor:pointer;margin-top:4px">Close  [Esc]</button>
+  </div>
+</div>
+
+<!-- EXCHANGE UI -->
+<div id="exchange-ui" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:200;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee">
+  <div style="background:#0d1117;border:2px solid #FF9800;border-radius:10px;padding:22px;max-width:460px;width:92%">
+    <h2 style="color:#FF9800;margin:0 0 6px">⚗ Currency Exchange</h2>
+    <p style="color:#888;font-size:.78rem;margin:0 0 14px">0.30% fee on all swaps · Fee goes to protocol treasury</p>
+    <div style="font-size:.82rem;margin-bottom:14px;padding:8px;background:#111;border-radius:6px;line-height:2">
+      🪙 <b id="ex-sb">0</b> &nbsp;·&nbsp; 💀 <b id="ex-sm">0</b><br>
+      $ <b id="ex-alusd">0</b> alUSD &nbsp;·&nbsp; ⟠ <b id="ex-aleth">0</b> alETH &nbsp;·&nbsp; ⚗ <b id="ex-alcx">0</b> ALCX
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <select id="ex-from" style="background:#111;color:#eee;border:1px solid #555;padding:7px;border-radius:4px;font-family:monospace">
+        <option value="spacebucks">🪙 Spacebucks</option>
+        <option value="schmeckles">💀 Schmeckles</option>
+        <option value="alUSD">$ alUSD</option>
+        <option value="alETH">⟠ alETH</option>
+        <option value="alcx">⚗ ALCX</option>
+      </select>
+      <span style="font-size:1.2rem">→</span>
+      <select id="ex-to" style="background:#111;color:#eee;border:1px solid #555;padding:7px;border-radius:4px;font-family:monospace">
+        <option value="alUSD">$ alUSD</option>
+        <option value="spacebucks">🪙 Spacebucks</option>
+        <option value="schmeckles">💀 Schmeckles</option>
+        <option value="alETH">⟠ alETH</option>
+        <option value="alcx">⚗ ALCX</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px">
+      <input id="ex-amount" type="number" min="0" step="any" placeholder="Amount" style="width:110px;background:#111;color:#eee;border:1px solid #555;padding:7px;border-radius:4px;font-family:monospace">
+      <button onclick="doExchange()" style="background:#FF9800;color:#000;border:none;padding:9px 22px;border-radius:4px;cursor:pointer;font-weight:bold;font-family:monospace">SWAP</button>
+    </div>
+    <button onclick="closeExchange()" style="background:#1a1a1a;color:#aaa;border:1px solid #444;padding:8px 28px;border-radius:4px;cursor:pointer">Close  [Esc]</button>
   </div>
 </div>
 
@@ -382,8 +445,9 @@ const CFG = {
   TS:32,                 // tile size (logical px)
   TW:20, TH:13,          // viewport in tiles
   SPEED:2.2,             // player speed px/frame
-  CURRENCY:'Schmeckles',
-  START_GOLD:100,
+  START_SPACEBUCKS:100,
+  START_ALUSD:50,
+  START_ALCX:20,
   MAX_HP:6,
   KONAMI:[38,38,40,40,37,39,37,39,66,65],
 };
@@ -495,27 +559,27 @@ const CLASSES = {
 const ENEMIES = {
   wolf: {
     type:'wolf', name:'Dire Wolf', maxHp:12, atk:4, def:1, spd:5,
-    xp:12, gold:6,
+    xp:12, drops:{spacebucks:8},
     msg:'A Dire Wolf lunges from the shadows!',
   },
   skeleton: {
     type:'skeleton', name:'Skeleton', maxHp:16, atk:5, def:2, spd:2,
-    xp:20, gold:10,
+    xp:20, drops:{spacebucks:15},
     msg:'A Skeleton rises from the ancient earth!',
   },
   goblin: {
     type:'goblin', name:'Cave Goblin', maxHp:9, atk:3, def:1, spd:6,
-    xp:10, gold:18,
+    xp:10, drops:{spacebucks:12},
     msg:'A Cave Goblin springs an ambush!',
   },
   darkKnight: {
     type:'darkKnight', name:'Dark Knight', maxHp:28, atk:7, def:5, spd:2,
-    xp:40, gold:30,
+    xp:40, drops:{schmeckles:5},
     msg:'A Dark Knight bars your path!',
   },
   lich: {
     type:'lich', name:'Ancient Lich', maxHp:80, atk:15, def:8, spd:1,
-    xp:500, gold:200,
+    xp:500, drops:{schmeckles:25},
     msg:'The Ancient Lich rises from its obsidian throne!',
   },
 };
@@ -571,7 +635,7 @@ const QUEST_DEFS = {
   wolf_hunt:{
     id:'wolf_hunt', title:'Wolf Culling', giver:'Town Crier',
     type:'kill', target:'wolf', required:5,
-    reward:{xp:150,gold:80},
+    reward:{xp:150,alUSD:80},
     offerLines:[
       "Traveller, a word. The Dire Wolves south of the river grow bolder.",
       "They've attacked three merchant caravans this month alone.",
@@ -587,7 +651,7 @@ const QUEST_DEFS = {
   goblin_hunt:{
     id:'goblin_hunt', title:'Goblin Problem', giver:'Grizzled Regular',
     type:'kill', target:'goblin', required:5,
-    reward:{xp:120,gold:60},
+    reward:{xp:120,alUSD:60},
     offerLines:[
       "Those damned goblins keep springing out of the wilderness at traders.",
       "I lost three good friends to goblin ambushes. Three.",
@@ -603,7 +667,7 @@ const QUEST_DEFS = {
   dark_knight_hunt:{
     id:'dark_knight_hunt', title:'Knight Slayer', giver:'Barkeep Moe',
     type:'kill', target:'darkKnight', required:1,
-    reward:{xp:300,gold:150},
+    reward:{xp:300,alUSD:150},
     offerLines:[
       "Word is a Dark Knight prowls the deep south — past the second river.",
       "It's terrorized every poor soul who wandered that far.",
@@ -619,7 +683,7 @@ const QUEST_DEFS = {
   lich_quest:{
     id:'lich_quest', title:'The Ancient Evil', giver:'Senior Clerk Praxis',
     type:'kill', target:'lich', required:1,
-    reward:{xp:800,gold:500},
+    reward:{xp:800,alUSD:500},
     offerLines:[
       "The records speak of an Ancient Lich entombed beneath the dungeon entrance.",
       "It predates this town, the rivers, perhaps civilization itself.",
@@ -638,20 +702,20 @@ const QUEST_DEFS = {
 const SHOP_CATALOG = {
   zelda: [
     // Weapons
-    {name:'Iron Sword',    icon:'⚔',  desc:'Balanced starter blade.',         type:'weapon', dmg:4,  cost:50,  lvl:1},
-    {name:'Steel Sword',   icon:'⚔',  desc:'Forged for seasoned fighters.',   type:'weapon', dmg:7,  cost:160, lvl:2},
-    {name:'War Axe',       icon:'🪓', desc:'Heavy, brutal, effective.',        type:'weapon', dmg:9,  cost:280, lvl:3},
-    {name:'Flame Blade',   icon:'🔥', desc:'Burns with ancient fire magic.',   type:'weapon', dmg:12, cost:500, lvl:5},
-    {name:'Shadow Blade',  icon:'🌑', desc:'Strikes from darkness for big crits.', type:'weapon', dmg:15, cost:900, lvl:8},
+    {name:'Iron Sword',    icon:'⚔',  desc:'Balanced starter blade.',         type:'weapon', dmg:4,  cost:50,  lvl:1, currency:'alUSD'},
+    {name:'Steel Sword',   icon:'⚔',  desc:'Forged for seasoned fighters.',   type:'weapon', dmg:7,  cost:160, lvl:2, currency:'alUSD'},
+    {name:'War Axe',       icon:'🪓', desc:'Heavy, brutal, effective.',        type:'weapon', dmg:9,  cost:280, lvl:3, currency:'alUSD'},
+    {name:'Flame Blade',   icon:'🔥', desc:'Burns with ancient fire magic.',   type:'weapon', dmg:12, cost:0.5, lvl:5, currency:'alETH'},
+    {name:'Shadow Blade',  icon:'🌑', desc:'Strikes from darkness for big crits.', type:'weapon', dmg:15, cost:0.9, lvl:8, currency:'alETH'},
     // Potions
-    {name:'Health Potion', icon:'🧪', desc:'Restores 5 HP.',                  type:'potion', heal:5,       cost:25, lvl:1},
-    {name:'Mega Potion',   icon:'💊', desc:'Fully restores HP.',               type:'potion', healFull:true,cost:80, lvl:3},
+    {name:'Health Potion', icon:'🧪', desc:'Restores 5 HP.',                  type:'potion', heal:5,       cost:25, lvl:1, currency:'alUSD'},
+    {name:'Mega Potion',   icon:'💊', desc:'Fully restores HP.',               type:'potion', healFull:true,cost:80, lvl:3, currency:'alUSD'},
   ],
   flint: [
-    {name:'Wooden Shield', icon:'🛡', desc:'Better than nothing.',             type:'shield', def:1, cost:40,  lvl:1},
-    {name:'Iron Shield',   icon:'🛡', desc:'Solid protection.',                type:'shield', def:3, cost:150, lvl:2},
-    {name:'Steel Shield',  icon:'🛡', desc:'Heavy but tough.',                 type:'shield', def:5, cost:350, lvl:4},
-    {name:'Elven Ward',    icon:'✨', desc:'Magical barrier. Rare find.',       type:'shield', def:8, cost:700, lvl:7},
+    {name:'Wooden Shield', icon:'🛡', desc:'Better than nothing.',             type:'shield', def:1, cost:40,  lvl:1, currency:'alUSD'},
+    {name:'Iron Shield',   icon:'🛡', desc:'Solid protection.',                type:'shield', def:3, cost:150, lvl:2, currency:'alUSD'},
+    {name:'Steel Shield',  icon:'🛡', desc:'Heavy but tough.',                 type:'shield', def:5, cost:350, lvl:4, currency:'alUSD'},
+    {name:'Elven Ward',    icon:'✨', desc:'Magical barrier. Rare find.',       type:'shield', def:8, cost:0.7, lvl:7, currency:'alETH'},
   ],
 };
 
@@ -1462,6 +1526,9 @@ const NPCS = {
         "...No, I don't know what 'proper channels' means exactly. Ask the clerk.",
       ]
     },
+    {type:'wizard', face:0, name:'Exchanger Rex', x:TOWN_OX+24, y:TOWN_OY+8,
+     dialog:['Welcome to the Currency Exchange.','Swap any token for any other at a 0.30% fee.'],
+     exchange:true},
   ],
   tavern:[
     { id:'barkeep', x:10, y:2, type:'barkeep', face:2, name:'Barkeep Moe', questId:'dark_knight_hunt',
@@ -1524,12 +1591,15 @@ const NPCS = {
   treasury:[
     { id:'treasurer', x:10, y:3, type:'clerk', face:2, name:'Treasurer Vox',
       dialog:[
-        "The Treasury manages all Schmeckle deposits and fiscal records.",
-        "Schmeckles locked while in queue are held in escrow — completely safe.",
+        "The Treasury manages all token deposits and fiscal records.",
+        "ALCX locked while in queue are held in escrow — completely safe.",
         "No funds leave the Treasury without proper queue clearance. It's protocol.",
         "The 20% lock is a skin-in-the-game mechanism. Keeps queue-hoppers out.",
       ]
     },
+    {type:'clerk', face:1, name:'Banker Alyx', x:6, y:6,
+     dialog:['Welcome to the Alchemix Bank.','Deposit Spacebucks to borrow alUSD, or Schmeckles to borrow alETH.','Self-repaying loans. No interest. No liquidation risk. Ever.'],
+     bank:true},
   ],
 };
 
@@ -2152,8 +2222,13 @@ const G = {
   dir:2, // 0=up,1=right,2=down,3=left
   frame:0, moveTimer:0, moving:false,
   hp:6, maxHp:6,
-  gold:CFG.START_GOLD,
-  schmeckles:CFG.START_GOLD,
+  spacebucks: CFG.START_SPACEBUCKS,
+  schmeckles: 0,
+  alUSD: CFG.START_ALUSD,
+  alETH: 0,
+  alcx: CFG.START_ALCX,
+  bankPositions: [],
+  _queueAlcxDripTick: 0,
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
   xp:0,
@@ -2170,7 +2245,7 @@ const G = {
   tick:0,
   camX:0,camY:0,
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
-  lockedSchmeckles:0,   // schmeckles locked while in entry queue
+  lockedAlcx:0,         // ALCX locked while in entry queue
   battle:null,          // active battle state or null
   showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
@@ -2225,6 +2300,8 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.key==='Escape'){
+    if(document.getElementById('bank-ui').style.display!=='none'){ closeBank(); return; }
+    if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
     if(G.shop){ closeShop(); e.preventDefault(); }
     else if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
     else {
@@ -2302,7 +2379,7 @@ function getQuestDialog(npc){
     return[`${qdef.inProgressLine} (${qs.progress}/${qdef.required})`];
   }
   if(qs.status==='ready'){
-    return[...qdef.readyLines,`[ Claim reward: +${qdef.reward.xp} XP, +${qdef.reward.gold} ₴ ]`];
+    return[...qdef.readyLines,`[ Claim reward: +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD ]`];
   }
   // completed
   return qdef.completedLines;
@@ -2321,13 +2398,13 @@ function handleQuestDialogClose(npc){
     chatLog(`★ Quest accepted: "${qdef.title}" — ${qdef.inProgressLine}`,'#FFD700');
   } else if(qs.status==='ready'){
     // Turn in the quest
-    G.schmeckles+=qdef.reward.gold;
+    G.alUSD+=qdef.reward.alUSD;
     G.xp+=qdef.reward.xp;
     checkLevelUp();
     qs.status='completed';
     SFX.questComplete();
     SFX.coin();
-    chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.gold} ₴`,'#4CAF50');
+    chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD`,'#4CAF50');
     if(G.paused)renderInventoryScreen();
   }
 }
@@ -2362,6 +2439,8 @@ function tryInteract(){
   }
   if(!nearest)return;
   if(nearest.shop){openShop(nearest.shop);return;}
+  if(nearest.bank){ openBank(); return; }
+  if(nearest.exchange){ openExchange(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
   showNpcDialog();
@@ -2433,7 +2512,7 @@ function handleQueueDoor(key,door){
     if(G.queueState.served){
       // Served — pass through
       socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type});
-      G.lockedSchmeckles=0;G.queueState=null;
+      G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
       updateQueuePanel();
       changeZone(door.to,door.sx,door.sy);
     }
@@ -2444,12 +2523,13 @@ function handleQueueDoor(key,door){
 
 function joinQueue(zone,type){
   if(G.queueState)return; // already in a queue
-  const lockAmt=type==='entry'?Math.max(10,Math.floor(G.schmeckles*0.2)):0;
-  G.lockedSchmeckles=lockAmt;
+  const lockAmt=type==='entry'?Math.max(5,Math.floor(G.alcx*0.20)):0;
+  G.alcx=Math.max(0,G.alcx-lockAmt);
+  G.lockedAlcx=lockAmt;
   G.queueState={zone,type,ticket:null,served:false};
   socket?.emit('queue_join',{zone,queueType:type,locked:lockAmt});
   const zl=zone[0].toUpperCase()+zone.slice(1);
-  chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' '+lockAmt+' ₴ locked.':''}`, '#FFD700');
+  chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' ⚗'+lockAmt+' ALCX locked.':''}`, '#FFD700');
   updateQueuePanel();
 }
 
@@ -2484,8 +2564,8 @@ function updateQueuePanel(){
     document.getElementById('queue-list').innerHTML='';
   }
   const lockEl=document.getElementById('queue-locked-line');
-  if(G.lockedSchmeckles>0){
-    lockEl.textContent=`🔒 ${G.lockedSchmeckles} ₴ locked`;
+  if(G.lockedAlcx>0){
+    lockEl.textContent=`🔒 ${G.lockedAlcx} ⚗ ALCX locked`;
     lockEl.style.display='block';
   } else {
     lockEl.style.display='none';
@@ -2618,7 +2698,7 @@ function triggerBattle(key,depth=0){
     hitShake:0,
     log:[tmpl.msg,'What will you do?'],
     result:null,
-    xpGained:0,goldGained:0,
+    xpGained:0,spacebucksGained:0,schmecklesGained:0,
     savedX:G.x,savedY:G.y,
   };
   G.paused=true;
@@ -2996,7 +3076,8 @@ function renderBattleScreen(){
     ctxUI.fillText(msg,W/2,H/2-24);
     if(bt.result==='win'){
       ctxUI.fillStyle='#C8B860';ctxUI.font='16px monospace';
-      ctxUI.fillText(`+${bt.xpGained} XP   +${bt.goldGained} ₴`,W/2,H/2+6);
+      const winDropStr=bt.spacebucksGained>0?`+${bt.spacebucksGained} 🪙`:bt.schmecklesGained>0?`+${bt.schmecklesGained} 💀`:'';
+      ctxUI.fillText(`+${bt.xpGained} XP   ${winDropStr}`,W/2,H/2+6);
     } else if(bt.result==='lose'){
       ctxUI.fillStyle='#FF8080';ctxUI.font='13px monospace';
       ctxUI.fillText('Respawning in town...',W/2,H/2+6);
@@ -3085,8 +3166,11 @@ function doBattleAction(action){
     setTimeout(()=>SFX.victory(),500);
     bt.result='win';
     bt.xpGained=bt.enemy.xp;
-    bt.goldGained=bt.enemy.gold;
-    G.schmeckles+=bt.goldGained;
+    const drops = bt.enemy.drops || {};
+    bt.spacebucksGained = drops.spacebucks || 0;
+    bt.schmecklesGained = drops.schmeckles || 0;
+    G.spacebucks += bt.spacebucksGained;
+    G.schmeckles += bt.schmecklesGained;
     G.xp+=bt.xpGained;
     checkLevelUp();
     if(bt.enemy.type==='lich'){
@@ -3095,7 +3179,8 @@ function doBattleAction(action){
     }
     updateQuestProgress(bt.enemy.type);
     SFX.coin();
-    chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
+    const dropStr = bt.spacebucksGained>0?`+${bt.spacebucksGained} 🪙`:bt.schmecklesGained>0?`+${bt.schmecklesGained} 💀`:'';
+    chatLog(`Battle won! +${bt.xpGained} XP  ${dropStr}`,'#FFD700');
     saveToServer();
     // Wait for player input — do NOT auto-advance
     return;
@@ -3136,13 +3221,13 @@ function endBattle(){
   _snapCtx.fillStyle='#000';_snapCtx.fillRect(0,0,W,H);
   bt.phase='transition_out';
   if(bt.result==='lose'){
-    const pen=Math.floor(G.schmeckles*0.10);
-    G.schmeckles=Math.max(0,G.schmeckles-pen);
+    const pen=Math.floor(G.alUSD*0.10);
+    G.alUSD=Math.max(0,G.alUSD-pen);
     G.hp=Math.max(1,Math.floor(G.maxHp*0.3));
     runPixelTransition('out',()=>{
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
       changeZone('world',TOWN_OX+20,TOWN_OY+14);
-      chatLog(`Defeated! Lost ${pen} ₴. Respawned in town.`,'#FF4040');
+      chatLog(`Defeated! Lost ${pen} alUSD. Respawned in town.`,'#FF4040');
     });
   } else {
     runPixelTransition('out',()=>{
@@ -3157,6 +3242,108 @@ function endBattle(){
       }
     });
   }
+}
+
+// ── BANK ──────────────────────────────────────────────────────────────────────
+function openBank(){
+  G.paused=true;
+  renderBankUI();
+  document.getElementById('bank-ui').style.display='flex';
+}
+function closeBank(){
+  G.paused=false;
+  document.getElementById('bank-ui').style.display='none';
+}
+function renderBankUI(){
+  let posHTML='';
+  G.bankPositions.forEach((pos,i)=>{
+    if(pos.claimed)return;
+    const pct=pos.borrowed>0?Math.min(100,Math.round((1-pos.debt/pos.borrowed)*100)):100;
+    const colLabel=pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles';
+    const syn=pos.collateral==='spacebucks'?'alUSD':'alETH';
+    const claimable=pos.debt<=0.001;
+    posHTML+=`<div class="bank-pos">
+      <b>${colLabel}</b> deposited: ${pos.deposited} | borrowed: ${pos.borrowed.toFixed(2)} ${syn} | debt: ${pos.debt.toFixed(2)} ${syn}<br>
+      <div class="bank-bar"><div class="bank-bar-fill" style="width:${pct}%"></div></div>
+      <span style="font-size:.75rem">${pct}% repaid</span>
+      ${claimable?`<button onclick="claimBankPosition(${i})" style="background:#4CAF50;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙':'💀'}</button>`:''}
+    </div>`;
+  });
+  const active=G.bankPositions.filter(p=>!p.claimed);
+  if(!active.length) posHTML='<p style="color:#aaa;font-size:.85rem">No active positions. Deposit tokens below to borrow synthetics.</p>';
+  document.getElementById('bank-positions').innerHTML=posHTML;
+  document.getElementById('bank-sb-bal').textContent=G.spacebucks;
+  document.getElementById('bank-sm-bal').textContent=G.schmeckles;
+  document.getElementById('bank-alusd-bal').textContent=G.alUSD.toFixed(2);
+  document.getElementById('bank-aleth-bal').textContent=G.alETH.toFixed(4);
+}
+function depositBank(collateral){
+  const amt=parseInt(document.getElementById('bank-deposit-amt').value)||0;
+  if(amt<=0){chatLog('Enter a deposit amount.','#FF8800');return;}
+  if(collateral==='spacebucks'&&G.spacebucks<amt){chatLog('Not enough Spacebucks!','#FF4444');return;}
+  if(collateral==='schmeckles'&&G.schmeckles<amt){chatLog('Not enough Schmeckles!','#FF4444');return;}
+  const borrow=Math.floor(amt*0.9*100)/100;
+  if(collateral==='spacebucks'){G.spacebucks-=amt;G.alUSD=Math.round((G.alUSD+borrow)*100)/100;}
+  else{G.schmeckles-=amt;G.alETH=Math.round((G.alETH+borrow)*10000)/10000;}
+  G.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,claimed:false});
+  chatLog(`🏦 Deposited ${amt} ${collateral==='spacebucks'?'Spacebucks':'Schmeckles'} → borrowed ${borrow} ${collateral==='spacebucks'?'alUSD':'alETH'} (90% LTV)`,'#4CAF50');
+  SFX.buy();
+  renderBankUI();
+}
+function claimBankPosition(idx){
+  const pos=G.bankPositions[idx];
+  if(!pos||pos.debt>0.001||pos.claimed)return;
+  pos.claimed=true;
+  if(pos.collateral==='spacebucks')G.spacebucks+=pos.deposited;
+  else G.schmeckles+=pos.deposited;
+  chatLog(`✅ Claimed ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles'} from fully repaid position!`,'#FFD700');
+  SFX.coin();
+  renderBankUI();
+}
+
+// ── EXCHANGE ──────────────────────────────────────────────────────────────────
+// Exchange rates (relative to alUSD)
+const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1,alcx:5};
+function openExchange(){
+  G.paused=true;
+  renderExchangeUI();
+  document.getElementById('exchange-ui').style.display='flex';
+}
+function closeExchange(){
+  G.paused=false;
+  document.getElementById('exchange-ui').style.display='none';
+}
+function doExchange(){
+  const from=document.getElementById('ex-from').value;
+  const to=document.getElementById('ex-to').value;
+  const amt=parseFloat(document.getElementById('ex-amount').value)||0;
+  if(from===to){chatLog('Select different tokens to swap.','#FF8800');return;}
+  if(amt<=0){chatLog('Enter an amount.','#FF8800');return;}
+  const bal={spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,alcx:G.alcx}[from];
+  if(bal<amt){chatLog('Insufficient balance!','#FF4444');SFX.error();return;}
+  const gross=amt*(EXCHANGE_RATES[from]/EXCHANGE_RATES[to]);
+  const fee=gross*0.003;
+  const received=gross-fee;
+  if(from==='spacebucks')G.spacebucks-=amt;
+  else if(from==='schmeckles')G.schmeckles-=amt;
+  else if(from==='alUSD')G.alUSD-=amt;
+  else if(from==='alETH')G.alETH-=amt;
+  else if(from==='alcx')G.alcx-=amt;
+  if(to==='spacebucks')G.spacebucks=Math.round((G.spacebucks+received)*100)/100;
+  else if(to==='schmeckles')G.schmeckles=Math.round((G.schmeckles+received)*100)/100;
+  else if(to==='alUSD')G.alUSD=Math.round((G.alUSD+received)*100)/100;
+  else if(to==='alETH')G.alETH=Math.round((G.alETH+received)*10000)/10000;
+  else if(to==='alcx')G.alcx=Math.round((G.alcx+received)*100)/100;
+  chatLog(`⚗ Swapped ${amt} ${from} → ${received.toFixed(4)} ${to} (fee: ${fee.toFixed(4)})`, '#4CAF50');
+  SFX.buy();
+  renderExchangeUI();
+}
+function renderExchangeUI(){
+  document.getElementById('ex-sb').textContent=G.spacebucks;
+  document.getElementById('ex-sm').textContent=G.schmeckles.toFixed?G.schmeckles.toFixed(2):G.schmeckles;
+  document.getElementById('ex-alusd').textContent=G.alUSD.toFixed(2);
+  document.getElementById('ex-aleth').textContent=G.alETH.toFixed(4);
+  document.getElementById('ex-alcx').textContent=(G.alcx||0).toFixed(2);
 }
 
 // ── SHOP ──────────────────────────────────────────────────────────────────────
@@ -3178,11 +3365,13 @@ function renderShop(){
   const items=SHOP_CATALOG[v]||[];
   const title=v==='zelda'?'VENDOR ZELDA — Weapons & Potions':'ARMORER FLINT — Shields';
   document.getElementById('shop-title').textContent=title;
-  document.getElementById('shop-gold-display').textContent=`💰 ${G.schmeckles} ₴`;
+  document.getElementById('shop-gold-display').textContent=`💵 ${G.alUSD.toFixed(0)} alUSD  ·  ⟠ ${G.alETH.toFixed(3)} alETH`;
   const list=document.getElementById('shop-items-list');
   list.innerHTML='';
   items.forEach((item,i)=>{
-    const canAfford=G.schmeckles>=item.cost;
+    const itemCurrency=item.currency||'alUSD';
+    const balance=itemCurrency==='alETH'?G.alETH:G.alUSD;
+    const canAfford=balance>=item.cost;
     const meetsLvl=G.level>=item.lvl;
     const canBuy=canAfford&&meetsLvl;
     let statStr='';
@@ -3190,6 +3379,8 @@ function renderShop(){
     else if(item.type==='shield')statStr=`+${item.def} DEF`;
     else if(item.healFull)statStr='Full HP restore';
     else statStr=`+${item.heal} HP`;
+    const currencySymbol=itemCurrency==='alETH'?'⟠':'$';
+    const priceStr=itemCurrency==='alETH'?`${item.cost} alETH`:`${item.cost} alUSD`;
     const row=document.createElement('div');
     row.className='shop-row';
     row.innerHTML=`
@@ -3200,7 +3391,7 @@ function renderShop(){
         <div class="shop-row-req" style="color:${meetsLvl?'#556':'#FF6600'}">Requires Lv.${item.lvl}</div>
       </div>
       <div class="shop-row-right">
-        <div class="shop-row-price">${item.cost} ₴</div>
+        <div class="shop-row-price">${currencySymbol}${priceStr}</div>
         <button class="shop-buy-btn" onclick="buyItem('${v}',${i})" ${canBuy?'':'disabled'}>BUY</button>
       </div>
     `;
@@ -3210,9 +3401,12 @@ function renderShop(){
 function buyItem(vendorId,idx){
   const item=SHOP_CATALOG[vendorId]?.[idx];
   if(!item)return;
-  if(G.schmeckles<item.cost){SFX.error();chatLog('Not enough Schmeckles!','#FF4444');return;}
+  const currency=item.currency||'alUSD';
+  const balance=currency==='alETH'?G.alETH:G.alUSD;
+  if(balance<item.cost){SFX.error();chatLog(`Not enough ${currency}!`,'#FF4444');return;}
   if(G.level<item.lvl){SFX.error();chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
-  G.schmeckles-=item.cost;
+  if(currency==='alETH')G.alETH-=item.cost;
+  else G.alUSD-=item.cost;
   if(item.type==='weapon'){
     G.inventory[0]={...item};
     SFX.buy();
@@ -3223,7 +3417,11 @@ function buyItem(vendorId,idx){
     chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
   } else if(item.type==='potion'){
     const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
-    if(slot===-1){G.schmeckles+=item.cost;SFX.error();chatLog('Inventory full! No room for potions.','#FF4444');return;}
+    if(slot===-1){
+      if(currency==='alETH')G.alETH+=item.cost;
+      else G.alUSD+=item.cost;
+      SFX.error();chatLog('Inventory full! No room for potions.','#FF4444');return;
+    }
     G.inventory[slot]={...item};
     SFX.buy();
     chatLog(`Bought ${item.name}!`,'#4CAF50');
@@ -3369,9 +3567,10 @@ function renderHUD(){
     span.style.fontSize='1rem';
     hearts.appendChild(span);
   }
-  const locked=G.lockedSchmeckles;
-  document.getElementById('hud-gold').textContent=
-    locked>0?`${G.schmeckles} ₴  🔒${locked}`:`${G.schmeckles} ₴`;
+  document.getElementById('hud-spacebucks').textContent = `🪙${G.spacebucks}`;
+  document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
+  const alcxTxt = G.lockedAlcx>0 ? `⚗${G.alcx} 🔒${G.lockedAlcx}` : `⚗${G.alcx}`;
+  document.getElementById('hud-alcx').textContent = alcxTxt;
   document.getElementById('hud-level').textContent=`Lv.${G.level}`;
   // Quest-ready badge
   const hasReady=Object.values(G.quests).some(q=>q.status==='ready');
@@ -3430,7 +3629,11 @@ function renderInventoryScreen(){
     ${G.statPoints>0?`<div class="stat-line" style="color:#FFD700"><span>Unspent Points</span><span>${G.statPoints} ★</span></div>`:''}
     ${statRows}
     <div class="stat-line" style="margin-top:6px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
-    <div class="stat-line"><span>Schmeckles</span><span>${G.schmeckles} ₴</span></div>
+    <div class="stat-line" style="margin-top:6px;color:#FDD835"><span>🪙 Spacebucks</span><span>${G.spacebucks}</span></div>
+    <div class="stat-line" style="color:#888"><span>💀 Schmeckles</span><span>${G.schmeckles}</span></div>
+    <div class="stat-line" style="color:#4CAF50"><span>$ alUSD</span><span>${G.alUSD.toFixed(2)}</span></div>
+    <div class="stat-line" style="color:#7B68EE"><span>⟠ alETH</span><span>${G.alETH.toFixed(4)}</span></div>
+    <div class="stat-line" style="color:#9C27B0"><span>⚗ ALCX${G.lockedAlcx>0?' (🔒'+G.lockedAlcx+' locked)':''}</span><span>${G.alcx}</span></div>
   `;
   // Quest log
   const qBox=document.getElementById('quest-log-box');
@@ -3716,6 +3919,25 @@ function gameLoop(ts){
     renderHUD();
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
+    // ALCX queue drip
+    if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%300===0){
+      G.alcx+=1;
+      chatLog('⚗ Queue: +1 ALCX earned','#9C27B0');
+    }
+    // Bank loan auto-repayment
+    if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
+      G.bankPositions.forEach(pos=>{
+        if(pos.debt>0.001){
+          const payment=Math.min(pos.debt,pos.borrowed*0.005);
+          pos.debt=Math.max(0,pos.debt-payment);
+          if(pos.debt<=0.001&&!pos.claimed){
+            pos.debt=0;
+            chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
+            SFX.coin();
+          }
+        }
+      });
+    }
     // persist
     if(G.tick%300===0){if(G.persist)saveState(); saveToServer();}
   }
@@ -3759,7 +3981,9 @@ function saveState(){
   const s={
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     species:G.species,class_:G.class_,
-    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp,
+    spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
+    alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
+    stats:G.stats,hp:G.hp,
     xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated
   };
@@ -3774,7 +3998,13 @@ function loadState(){
     G.hairColor=s.hairColor||G.hairColor;
     G.species=s.species||G.species;
     G.class_=s.class_||G.class_;
-    G.schmeckles=s.schmeckles??G.schmeckles;
+    if(s.spacebucks!=null) G.spacebucks=s.spacebucks;
+    if(s.alUSD!=null) G.alUSD=s.alUSD; else if(s.schmeckles!=null) G.alUSD=s.schmeckles; // backward compat
+    if(s.schmeckles!=null && s.alUSD!=null) G.schmeckles=s.schmeckles; // new meaning only if alUSD also present
+    if(s.alETH!=null) G.alETH=s.alETH;
+    if(s.alcx!=null) G.alcx=s.alcx;
+    if(s.lockedAlcx!=null) G.lockedAlcx=s.lockedAlcx;
+    if(s.bankPositions!=null) G.bankPositions=s.bankPositions;
     G.stats=s.stats||G.stats;
     G.hp=s.hp||G.hp;
     G.xp=s.xp??0;
@@ -3878,7 +4108,13 @@ function applyServerState(s){
   G.hairColor=s.hairColor||G.hairColor;
   G.species=s.species||G.species;
   G.class_=s.class_||G.class_;
-  G.schmeckles=s.schmeckles??G.schmeckles;
+  if(s.spacebucks!=null) G.spacebucks=s.spacebucks;
+  if(s.alUSD!=null) G.alUSD=s.alUSD; else if(s.schmeckles!=null) G.alUSD=s.schmeckles; // backward compat
+  if(s.schmeckles!=null && s.alUSD!=null) G.schmeckles=s.schmeckles; // new meaning only if alUSD also present
+  if(s.alETH!=null) G.alETH=s.alETH;
+  if(s.alcx!=null) G.alcx=s.alcx;
+  if(s.lockedAlcx!=null) G.lockedAlcx=s.lockedAlcx;
+  if(s.bankPositions!=null) G.bankPositions=s.bankPositions;
   G.stats=s.stats||G.stats;
   G.maxHp=s.maxHp||G.maxHp;
   G.hp=Math.min(s.hp||G.hp,G.maxHp);
@@ -3895,7 +4131,9 @@ function saveToServer(){
   socket.emit('save_character',{
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     species:G.species,class_:G.class_,
-    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp,maxHp:G.maxHp,
+    spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
+    alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
+    stats:G.stats,hp:G.hp,maxHp:G.maxHp,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
@@ -3939,7 +4177,7 @@ document.getElementById('queue-enter-btn').addEventListener('click',()=>{
   if(!G.queueState?.served)return;
   const{zone,type}=G.queueState;
   socket?.emit('queue_leave',{zone,queueType:type});
-  G.lockedSchmeckles=0;G.queueState=null;
+  G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
   updateQueuePanel();
   const key=type==='entry'?`world_${zone}`:`${zone}_exit`;
   const door=ZONE_DOORS[key];
@@ -3948,7 +4186,7 @@ document.getElementById('queue-enter-btn').addEventListener('click',()=>{
 document.getElementById('queue-leave-btn').addEventListener('click',()=>{
   if(!G.queueState)return;
   socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
-  G.lockedSchmeckles=0;G.queueState=null;
+  G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
   updateQueuePanel();
   chatLog('Left the queue.','#888');
 });
