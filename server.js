@@ -119,6 +119,10 @@ setInterval(()=>{
   if(changed){saveGov();broadcastGovState();}
 },30000);
 
+// ── Admin-tunable server parameters ──────────────────────────────────────────
+let SNOWBALL_SPAWN_CHANCE=0.40;
+let WHALE_CHANCE=0.35;
+
 // ── Whale Arrival Events ───────────────────────────────────────────────────────
 function triggerWhaleArrival(){
   const zone=QUEUE_ZONES[Math.floor(Math.random()*QUEUE_ZONES.length)];
@@ -140,13 +144,13 @@ function triggerWhaleArrival(){
 }
 function scheduleWhale(){
   const delay=(5+Math.random()*5)*60*1000; // 5-10 min
-  setTimeout(()=>{if(Math.random()<0.35)triggerWhaleArrival();scheduleWhale();},delay);
+  setTimeout(()=>{if(Math.random()<WHALE_CHANCE)triggerWhaleArrival();scheduleWhale();},delay);
 }
 scheduleWhale();
 
 // ── World Loot ────────────────────────────────────────────────────────────────
 let worldLoot=[];
-const LOOT_TTL_MS=10*60*1000;
+let LOOT_TTL_MS=10*60*1000;
 let _lootIdSeq=1;
 setInterval(()=>{
   const now=Date.now();
@@ -484,7 +488,7 @@ io.on('connection',socket=>{
     io.to('world').emit('world_loot_added',{pile});
 
     // 40% chance to spawn/boost a snowball enemy in the world zone
-    if(zone==='world'&&Math.random()<0.40){
+    if(zone==='world'&&Math.random()<SNOWBALL_SPAWN_CHANCE){
       const bonusSb=Math.floor(pile.currencies.spacebucks*0.5);
       const bonusSm=Math.floor(pile.currencies.schmeckles*0.5);
       const bonusAl=parseFloat((pile.currencies.alUSD*0.5).toFixed(2));
@@ -794,6 +798,111 @@ setInterval(()=>{
   saveDb();
   console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
 },60000);
+
+// ── Admin Dashboard ───────────────────────────────────────────────────────────
+const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||'vq-admin-2026';
+
+app.get('/admin',(_req,res)=>res.sendFile(path.join(__dirname,'admin.html')));
+
+function adminState(){
+  return{
+    players:Object.values(players).map(p=>({
+      id:p.id,nickname:p.nickname,zone:p.zone,
+      accountId:Object.keys(socketsByAccount).find(k=>socketsByAccount[k]===p.id)||null,
+    })),
+    accounts:Object.entries(pdb).map(([key,row])=>({
+      username:row.username||key,
+      created:row.created?new Date(row.created).toISOString().slice(0,10):'—',
+      updated:row.updated?new Date(row.updated).toISOString().slice(0,10):'—',
+      online:!!socketsByAccount[key],
+      level:row.data?.level||1,
+      kills:row.data?.kills||0,
+    })).sort((a,b)=>b.online-a.online||a.username.localeCompare(b.username)),
+    treasury,hallOfFame,
+    govProposals,earmarkRate:EARMARK_RATE_LIVE,
+    lootTtlMin:Math.round(LOOT_TTL_MS/60000),
+    snowballChance:SNOWBALL_SPAWN_CHANCE,
+    whaleChance:WHALE_CHANCE,
+    onlineCount:Object.keys(players).length,
+    accountCount:Object.keys(pdb).length,
+  };
+}
+
+const adminNs=io.of('/admin');
+adminNs.use((socket,next)=>{
+  if(socket.handshake.auth.password===ADMIN_PASSWORD)next();
+  else next(new Error('Unauthorized'));
+});
+adminNs.on('connection',socket=>{
+  console.log('[Admin] connected');
+  socket.emit('admin_state',adminState());
+  const iv=setInterval(()=>socket.emit('admin_state',adminState()),5000);
+  socket.on('disconnect',()=>{clearInterval(iv);console.log('[Admin] disconnected');});
+
+  socket.on('admin_kick',({socketId})=>{
+    const p=players[socketId];if(!p)return socket.emit('admin_msg',{ok:false,msg:'Player not found.'});
+    io.to(socketId).emit('kicked',{reason:'Removed by admin.'});
+    io.sockets.sockets.get(socketId)?.disconnect(true);
+    socket.emit('admin_msg',{ok:true,msg:`Kicked ${p.nickname}.`});
+  });
+
+  socket.on('admin_delete_user',({username})=>{
+    const key=username.toLowerCase();
+    if(!pdb[key])return socket.emit('admin_msg',{ok:false,msg:'User not found.'});
+    const sid=socketsByAccount[key];
+    if(sid){io.to(sid).emit('kicked',{reason:'Your account has been deleted.'});io.sockets.sockets.get(sid)?.disconnect(true);}
+    const name=pdb[key].username||key;
+    delete pdb[key];delete socketsByAccount[key];
+    saveDb();
+    socket.emit('admin_msg',{ok:true,msg:`Deleted account: ${name}`});
+  });
+
+  socket.on('admin_broadcast',({msg})=>{
+    const text=String(msg||'').trim().slice(0,200);if(!text)return;
+    io.emit('chat',{nickname:'📢 Admin',text});
+    socket.emit('admin_msg',{ok:true,msg:'Broadcast sent.'});
+  });
+
+  socket.on('admin_set_earmark',({rate})=>{
+    const r=parseFloat(rate);
+    if(isNaN(r)||r<0.001||r>0.05)return socket.emit('admin_msg',{ok:false,msg:'Rate must be 0.1–5%.'});
+    EARMARK_RATE_LIVE=r;broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Earmark rate → ${(r*100).toFixed(2)}%`});
+  });
+
+  socket.on('admin_set_loot_ttl',({minutes})=>{
+    const m=parseInt(minutes);
+    if(isNaN(m)||m<1||m>60)return socket.emit('admin_msg',{ok:false,msg:'Must be 1–60 min.'});
+    LOOT_TTL_MS=m*60*1000;
+    socket.emit('admin_msg',{ok:true,msg:`Loot TTL → ${m} min`});
+  });
+
+  socket.on('admin_set_snowball',({chance})=>{
+    const c=parseFloat(chance);
+    if(isNaN(c)||c<0||c>1)return socket.emit('admin_msg',{ok:false,msg:'Must be 0.0–1.0.'});
+    SNOWBALL_SPAWN_CHANCE=c;
+    socket.emit('admin_msg',{ok:true,msg:`Snowball spawn chance → ${(c*100).toFixed(0)}%`});
+  });
+
+  socket.on('admin_set_whale',({chance})=>{
+    const c=parseFloat(chance);
+    if(isNaN(c)||c<0||c>1)return socket.emit('admin_msg',{ok:false,msg:'Must be 0.0–1.0.'});
+    WHALE_CHANCE=c;
+    socket.emit('admin_msg',{ok:true,msg:`Whale arrival chance → ${(c*100).toFixed(0)}%`});
+  });
+
+  socket.on('admin_trigger_whale',()=>{
+    triggerWhaleArrival();
+    socket.emit('admin_msg',{ok:true,msg:'Whale arrival triggered!'});
+  });
+
+  socket.on('admin_clear_loot',()=>{
+    const count=worldLoot.length;
+    worldLoot.forEach(l=>io.emit('world_loot_removed',{id:l.id}));
+    worldLoot=[];
+    socket.emit('admin_msg',{ok:true,msg:`Cleared ${count} loot piles.`});
+  });
+});
 
 const PORT=3001;
 srv.listen(PORT,'127.0.0.1',()=>console.log(`Victory Quest running on 127.0.0.1:${PORT}`));

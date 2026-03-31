@@ -2663,6 +2663,13 @@ function initSocket(){
       if(data.treasury)G.treasury={...data.treasury};
     });
 
+    // ── Admin kick ───────────────────────────────────────────────────────────
+    socket.on('kicked',data=>{
+      const msg=data?.reason||'You have been removed from the server.';
+      socket.disconnect();
+      document.body.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#050810;color:#FF4444;font-family:monospace;text-align:center;gap:16px"><div style="font-size:1.2rem">⚠ ${msg}</div><a href="/" style="color:#B080FF;font-size:.9rem">← Return to login</a></div>`;
+    });
+
     // ── Snowball Enemies ──────────────────────────────────────────────────────
     socket.on('snowball_init',data=>{G.snowballEnemies=data.enemies||[];});
     socket.on('snowball_spawned',data=>{

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Victory Quest — Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050810;color:#CDD;font-family:monospace;font-size:.82rem;min-height:100vh}
+h1{color:#B080FF;font-size:1.1rem;letter-spacing:.15em;padding:12px 16px;border-bottom:1px solid #222;background:#0A0A18}
+#login{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px}
+#login h2{color:#FFD700;font-size:1.2rem}
+#login input{background:#111;border:1px solid #5A3A80;color:#eee;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:.9rem;width:240px}
+#login button{background:#1A1030;border:1px solid #9C27B0;color:#B080FF;padding:8px 24px;cursor:pointer;border-radius:4px;font-family:monospace}
+#login-err{color:#FF4444;font-size:.8rem;min-height:1em}
+#app{display:none;flex-direction:column;min-height:100vh}
+#tabs{display:flex;background:#0A0A18;border-bottom:1px solid #222;padding:0 16px}
+.tab{padding:8px 16px;cursor:pointer;color:#666;border-bottom:2px solid transparent;font-size:.78rem;letter-spacing:.05em}
+.tab.active{color:#B080FF;border-bottom-color:#9C27B0}
+.tab:hover:not(.active){color:#aaa}
+#content{padding:16px;flex:1;overflow-y:auto}
+.panel{display:none}.panel.active{display:block}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:#0D0D20;border:1px solid #1A1A35;border-radius:6px;padding:12px}
+.stat-card .val{font-size:1.4rem;color:#FFD700;font-weight:bold;margin-top:4px}
+.stat-card .lbl{color:#777;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+table{width:100%;border-collapse:collapse;margin-bottom:12px}
+th{text-align:left;padding:6px 8px;color:#888;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #1A1A35}
+td{padding:6px 8px;border-bottom:1px solid #111;vertical-align:middle}
+tr:hover td{background:#0D0D1A}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.68rem}
+.badge.online{background:#1A3A1A;color:#4CAF50;border:1px solid #2A5A2A}
+.badge.offline{background:#111;color:#444;border:1px solid #222}
+.btn{padding:3px 10px;border-radius:3px;cursor:pointer;font-family:monospace;font-size:.72rem;border:1px solid}
+.btn-red{background:#2A0A0A;border-color:#882222;color:#FF6666}
+.btn-red:hover{background:#3A1010}
+.btn-blue{background:#0A1020;border-color:#224488;color:#6699FF}
+.btn-blue:hover{background:#0D1828}
+.btn-yellow{background:#1A1500;border-color:#886600;color:#FFD700}
+.btn-yellow:hover{background:#221A00}
+.btn-purple{background:#150A20;border-color:#5A3A80;color:#B080FF}
+.btn-purple:hover{background:#1A1030}
+.config-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#0D0D20;border:1px solid #1A1A35;border-radius:5px;padding:10px}
+.config-row label{color:#aaa;min-width:180px;font-size:.78rem}
+.config-row input[type=number],.config-row input[type=text]{background:#111;border:1px solid #5A3A80;color:#eee;padding:4px 8px;border-radius:3px;font-family:monospace;font-size:.8rem;width:100px}
+textarea{background:#111;border:1px solid #5A3A80;color:#eee;padding:8px;border-radius:4px;font-family:monospace;font-size:.8rem;width:100%;resize:vertical}
+#msg-bar{position:fixed;bottom:16px;right:16px;padding:8px 16px;border-radius:5px;font-size:.8rem;display:none;z-index:100}
+.section-title{color:#B080FF;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1A1A35}
+.hof-board{display:inline-block;vertical-align:top;margin-right:16px;margin-bottom:12px;background:#0D0D20;border:1px solid #1A1A35;border-radius:6px;padding:10px;min-width:180px}
+.hof-board .hof-title{color:#FFD700;font-size:.75rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em}
+.hof-entry{padding:2px 0;font-size:.78rem}
+.hof-entry span{color:#888}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>⚔ Victory Quest Admin</h2>
+  <input type="password" id="pw" placeholder="Admin password" onkeydown="if(event.key==='Enter')doLogin()">
+  <button onclick="doLogin()">▶ LOGIN</button>
+  <div id="login-err"></div>
+</div>
+
+<div id="app">
+  <h1>⚔ VICTORY QUEST — ADMIN DASHBOARD</h1>
+  <div id="tabs">
+    <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+    <div class="tab" onclick="showTab('players')">👥 Players</div>
+    <div class="tab" onclick="showTab('accounts')">📚 Accounts</div>
+    <div class="tab" onclick="showTab('config')">⚙ Config</div>
+    <div class="tab" onclick="showTab('broadcast')">📢 Broadcast</div>
+    <div class="tab" onclick="showTab('hof')">🏆 Hall of Fame</div>
+  </div>
+  <div id="content">
+
+    <!-- DASHBOARD -->
+    <div id="panel-dashboard" class="panel active">
+      <div class="stat-grid" id="stat-grid"></div>
+      <div class="section-title">Treasury</div>
+      <div id="treasury-display" style="margin-bottom:16px;color:#4CAF50;font-size:.9rem"></div>
+      <div class="section-title">Active Config</div>
+      <div id="config-display" style="color:#aaa;line-height:1.8"></div>
+    </div>
+
+    <!-- PLAYERS -->
+    <div id="panel-players" class="panel">
+      <div class="section-title">Online Players (<span id="online-count">0</span>)</div>
+      <table>
+        <thead><tr><th>Nickname</th><th>Account</th><th>Zone</th><th>Action</th></tr></thead>
+        <tbody id="players-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- ACCOUNTS -->
+    <div id="panel-accounts" class="panel">
+      <div class="section-title">Registered Accounts (<span id="account-count">0</span>)</div>
+      <input type="text" id="acct-search" placeholder="Search…" oninput="filterAccounts()" style="background:#111;border:1px solid #333;color:#eee;padding:5px 10px;border-radius:3px;font-family:monospace;margin-bottom:10px;width:200px">
+      <table>
+        <thead><tr><th>Username</th><th>Level</th><th>Kills</th><th>Created</th><th>Updated</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="accounts-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="panel-config" class="panel">
+      <div class="section-title">Server Parameters</div>
+      <div class="config-row">
+        <label>Earmark Rate (EARMARK_RATE_LIVE)</label>
+        <input type="number" id="cfg-earmark" min="0.1" max="5" step="0.1" value="0.5">
+        <span style="color:#888;font-size:.72rem">% (0.1–5.0)</span>
+        <button class="btn btn-purple" onclick="setEarmark()">Set</button>
+      </div>
+      <div class="config-row">
+        <label>Loot TTL</label>
+        <input type="number" id="cfg-loot-ttl" min="1" max="60" step="1" value="10">
+        <span style="color:#888;font-size:.72rem">minutes (1–60)</span>
+        <button class="btn btn-purple" onclick="setLootTtl()">Set</button>
+      </div>
+      <div class="config-row">
+        <label>Snowball Spawn Chance</label>
+        <input type="number" id="cfg-snowball" min="0" max="100" step="5" value="40">
+        <span style="color:#888;font-size:.72rem">% (on player death)</span>
+        <button class="btn btn-purple" onclick="setSnowball()">Set</button>
+      </div>
+      <div class="config-row">
+        <label>Whale Arrival Chance</label>
+        <input type="number" id="cfg-whale" min="0" max="100" step="5" value="35">
+        <span style="color:#888;font-size:.72rem">% (per 5–10 min cycle)</span>
+        <button class="btn btn-purple" onclick="setWhale()">Set</button>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-yellow" onclick="triggerWhale()">🐋 Trigger Whale Now</button>
+        <button class="btn btn-red" onclick="clearLoot()">🗑 Clear All World Loot</button>
+      </div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div id="panel-broadcast" class="panel">
+      <div class="section-title">Broadcast to All Players</div>
+      <textarea id="broadcast-msg" rows="3" placeholder="Message to all online players…" style="margin-bottom:8px"></textarea>
+      <button class="btn btn-yellow" onclick="sendBroadcast()">📢 Send Broadcast</button>
+    </div>
+
+    <!-- HALL OF FAME -->
+    <div id="panel-hof" class="panel">
+      <div class="section-title">Top Players</div>
+      <div id="hof-display"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="msg-bar"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+let socket, state = {};
+let allAccounts = [];
+
+function doLogin(){
+  const pw = document.getElementById('pw').value;
+  document.getElementById('login-err').textContent = '';
+  socket = io('/admin', {auth:{password:pw}});
+  socket.on('connect', ()=>{
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('app').style.flexDirection = 'column';
+  });
+  socket.on('connect_error', err=>{
+    document.getElementById('login-err').textContent = 'Invalid password.';
+  });
+  socket.on('admin_state', s=>{ state=s; allAccounts=s.accounts||[]; render(); });
+  socket.on('admin_msg', d=>showMsg(d.msg, d.ok?'#1A3A1A':'#3A1A1A', d.ok?'#4CAF50':'#FF4444'));
+}
+
+function showTab(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showMsg(msg, bg='#1A3A1A', col='#4CAF50'){
+  const el = document.getElementById('msg-bar');
+  el.textContent = msg; el.style.background=bg; el.style.color=col;
+  el.style.border=`1px solid ${col}`; el.style.display='block';
+  clearTimeout(el._t); el._t=setTimeout(()=>el.style.display='none', 3000);
+}
+
+function render(){
+  renderDashboard(); renderPlayers(); renderAccounts(); renderHof();
+  syncConfigInputs();
+}
+
+function renderDashboard(){
+  const s = state;
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="lbl">Online Players</div><div class="val" style="color:#4CAF50">${s.onlineCount||0}</div></div>
+    <div class="stat-card"><div class="lbl">Registered Accounts</div><div class="val">${s.accountCount||0}</div></div>
+    <div class="stat-card"><div class="lbl">Earmark Rate</div><div class="val" style="color:#B080FF">${((s.earmarkRate||0.005)*100).toFixed(2)}%</div></div>
+    <div class="stat-card"><div class="lbl">Loot TTL</div><div class="val" style="color:#FFD700">${s.lootTtlMin||10} min</div></div>
+    <div class="stat-card"><div class="lbl">Snowball Chance</div><div class="val" style="color:#FF6030">${Math.round((s.snowballChance||0.4)*100)}%</div></div>
+    <div class="stat-card"><div class="lbl">Whale Chance</div><div class="val" style="color:#60AAFF">${Math.round((s.whaleChance||0.35)*100)}%</div></div>
+  `;
+  const t = s.treasury||{};
+  document.getElementById('treasury-display').innerHTML =
+    `alUSD collected: <b>$${(t.alUSD||0).toFixed(2)}</b> &nbsp;|&nbsp; alETH collected: <b>⟠${(t.alETH||0).toFixed(4)}</b>`;
+  document.getElementById('config-display').innerHTML =
+    `Earmark Rate: ${((s.earmarkRate||0.005)*100).toFixed(2)}% &nbsp;·&nbsp; Loot TTL: ${s.lootTtlMin||10}m &nbsp;·&nbsp; Snowball: ${Math.round((s.snowballChance||0.4)*100)}% &nbsp;·&nbsp; Whale: ${Math.round((s.whaleChance||0.35)*100)}%`;
+}
+
+function renderPlayers(){
+  const players = state.players||[];
+  document.getElementById('online-count').textContent = players.length;
+  document.getElementById('players-tbody').innerHTML = players.length
+    ? players.map(p=>`<tr>
+        <td style="color:#FFD700">${esc(p.nickname)}</td>
+        <td style="color:#aaa">${esc(p.accountId||'guest')}</td>
+        <td style="color:#888">${esc(p.zone)}</td>
+        <td><button class="btn btn-red" onclick="kickPlayer('${p.id}')">Kick</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="color:#444;text-align:center">No players online</td></tr>';
+}
+
+let _filteredAccounts = null;
+function filterAccounts(){
+  const q = document.getElementById('acct-search').value.toLowerCase();
+  _filteredAccounts = q ? allAccounts.filter(a=>a.username.toLowerCase().includes(q)) : null;
+  renderAccounts();
+}
+
+function renderAccounts(){
+  const list = _filteredAccounts || allAccounts;
+  document.getElementById('account-count').textContent = allAccounts.length;
+  document.getElementById('accounts-tbody').innerHTML = list.length
+    ? list.map(a=>`<tr>
+        <td style="color:${a.online?'#FFD700':'#aaa'}">${esc(a.username)}</td>
+        <td>${a.level||1}</td>
+        <td>${a.kills||0}</td>
+        <td style="color:#555">${a.created||'—'}</td>
+        <td style="color:#555">${a.updated||'—'}</td>
+        <td><span class="badge ${a.online?'online':'offline'}">${a.online?'online':'offline'}</span></td>
+        <td><button class="btn btn-red" onclick="deleteUser('${esc(a.username)}')">Delete</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" style="color:#444;text-align:center">No accounts</td></tr>';
+}
+
+function renderHof(){
+  const hof = state.hallOfFame||{};
+  function board(title, arr, unit){
+    if(!arr||!arr.length) return `<div class="hof-board"><div class="hof-title">${title}</div><div style="color:#444">—</div></div>`;
+    return `<div class="hof-board"><div class="hof-title">${title}</div>${arr.map((e,i)=>`<div class="hof-entry">#${i+1} ${esc(e.name)} <span>${e.value}${unit}</span></div>`).join('')}</div>`;
+  }
+  document.getElementById('hof-display').innerHTML =
+    board('⚔ Top XP', hof.topXP, ' xp') +
+    board('💀 Top Killers', hof.topKills, ' kills') +
+    board('🪙 Wealthiest', hof.topGold, ' 🪙');
+}
+
+function syncConfigInputs(){
+  const s = state;
+  const v = (id, val) => { const el=document.getElementById(id); if(el&&document.activeElement!==el) el.value=val; };
+  v('cfg-earmark', ((s.earmarkRate||0.005)*100).toFixed(2));
+  v('cfg-loot-ttl', s.lootTtlMin||10);
+  v('cfg-snowball', Math.round((s.snowballChance||0.4)*100));
+  v('cfg-whale', Math.round((s.whaleChance||0.35)*100));
+}
+
+function kickPlayer(id){ if(confirm('Kick this player?')) socket.emit('admin_kick',{socketId:id}); }
+function deleteUser(username){ if(confirm(`Delete account "${username}"? This is permanent.`)) socket.emit('admin_delete_user',{username}); }
+function setEarmark(){ socket.emit('admin_set_earmark',{rate:parseFloat(document.getElementById('cfg-earmark').value)/100}); }
+function setLootTtl(){ socket.emit('admin_set_loot_ttl',{minutes:parseInt(document.getElementById('cfg-loot-ttl').value)}); }
+function setSnowball(){ socket.emit('admin_set_snowball',{chance:parseFloat(document.getElementById('cfg-snowball').value)/100}); }
+function setWhale(){ socket.emit('admin_set_whale',{chance:parseFloat(document.getElementById('cfg-whale').value)/100}); }
+function triggerWhale(){ socket.emit('admin_trigger_whale'); }
+function clearLoot(){ if(confirm('Clear all world loot piles?')) socket.emit('admin_clear_loot'); }
+function sendBroadcast(){ const msg=document.getElementById('broadcast-msg').value.trim(); if(msg){socket.emit('admin_broadcast',{msg});document.getElementById('broadcast-msg').value='';} }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
