@@ -390,6 +390,25 @@ body.touch #mobile-act{display:flex}
   </div>
 </div>
 
+<!-- TRANSMUTER UI -->
+<div id="transmuter-ui" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:200;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee">
+  <div style="background:#0d1117;border:2px solid #4FC3F7;border-radius:10px;padding:22px;max-width:480px;width:92%">
+    <h2 style="color:#4FC3F7;margin:0 0 4px">⚗ The Transmuter</h2>
+    <p style="color:#888;font-size:.78rem;margin:0 0 10px">Deposit alUSD or alETH · Receive underlying collateral as borrowers' earmarked debt redeems · 1:1 · Pro-rata</p>
+    <div style="font-size:.82rem;margin-bottom:12px;color:#aaa">
+      $ <b id="tr-alusd-bal">0</b> alUSD &nbsp;·&nbsp; ⟠ <b id="tr-aleth-bal">0</b> alETH
+    </div>
+    <div style="margin-bottom:12px">
+      <input id="tr-deposit-amt" type="number" min="0.01" step="0.01" placeholder="Amount" style="width:90px;background:#111;color:#eee;border:1px solid #444;padding:5px 8px;border-radius:4px;margin:4px 4px 4px 0">
+      <button onclick="depositTransmuter('alUSD')" style="background:#1565C0;color:#fff;border:none;padding:7px 12px;border-radius:4px;cursor:pointer;margin:3px;font-size:.82rem">$ alUSD → 🪙</button>
+      <button onclick="depositTransmuter('alETH')" style="background:#6A1B9A;color:#fff;border:none;padding:7px 12px;border-radius:4px;cursor:pointer;margin:3px;font-size:.82rem">⟠ alETH → 💀</button>
+    </div>
+    <div id="transmuter-positions" style="max-height:220px;overflow-y:auto"></div>
+    <p style="font-size:.7rem;color:#555;margin:10px 0 4px">Redemption events fire periodically · Rate governed by ALCX vote</p>
+    <button onclick="closeTransmuter()" style="background:#1a1a1a;color:#aaa;border:1px solid #444;padding:8px 28px;border-radius:4px;cursor:pointer;margin-top:4px">Close  [Esc]</button>
+  </div>
+</div>
+
 <!-- EXCHANGE UI -->
 <div id="exchange-ui" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:200;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;color:#eee">
   <div style="background:#0d1117;border:2px solid #FF9800;border-radius:10px;padding:22px;max-width:460px;width:92%">
@@ -1622,6 +1641,9 @@ const NPCS = {
     {type:'clerk', face:1, name:'Banker Alyx', x:6, y:6,
      dialog:['Welcome to the Alchemix Bank.','Deposit Spacebucks to borrow alUSD, or Schmeckles to borrow alETH.','Self-repaying loans. No interest. No liquidation risk. Ever.'],
      bank:true},
+    {type:'merchant', face:3, name:'Transmuter Mira', x:14, y:6,
+     dialog:['Welcome to the Transmuter.','Deposit alUSD or alETH here.','As borrowers repay their earmarked debt, you receive the underlying collateral at 1:1.','Arbitrage opportunity: buy cheap alUSD at the exchange, deposit here, earn the spread.'],
+     transmuter:true},
   ],
 };
 
@@ -2815,6 +2837,7 @@ const G = {
   alETH: 0,
   alcx: CFG.START_ALCX,
   bankPositions: [],
+  transmuterDeposits: [], // [{type:'alUSD'|'alETH', amount, available}]
   _queueAlcxDripTick: 0,
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
@@ -2894,6 +2917,7 @@ window.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'){
     if(document.getElementById('bank-ui').style.display!=='none'){ closeBank(); return; }
+    if(document.getElementById('transmuter-ui').style.display!=='none'){ closeTransmuter(); return; }
     if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
     if(G.shop){ closeShop(); e.preventDefault(); }
     else if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
@@ -3033,6 +3057,7 @@ function tryInteract(){
   if(!nearest)return;
   if(nearest.shop){openShop(nearest.shop);return;}
   if(nearest.bank){ openBank(); return; }
+  if(nearest.transmuter){ openTransmuter(); return; }
   if(nearest.exchange){ openExchange(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
@@ -3893,7 +3918,7 @@ function depositBank(collateral){
   const borrow=Math.floor(amt*0.9*100)/100;
   if(collateral==='spacebucks'){G.spacebucks-=amt;G.alUSD=Math.round((G.alUSD+borrow)*100)/100;}
   else{G.schmeckles-=amt;G.alETH=Math.round((G.alETH+borrow)*10000)/10000;}
-  G.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,claimed:false});
+  G.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
   chatLog(`🏦 Deposited ${amt} ${collateral==='spacebucks'?'Spacebucks':'Schmeckles'} → borrowed ${borrow} ${collateral==='spacebucks'?'alUSD':'alETH'} (90% LTV)`,'#4CAF50');
   SFX.buy();
   renderBankUI();
@@ -3907,6 +3932,79 @@ function claimBankPosition(idx){
   chatLog(`✅ Claimed ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles'} from fully repaid position!`,'#FFD700');
   SFX.coin();
   renderBankUI();
+}
+
+// ── TRANSMUTER ────────────────────────────────────────────────────────────────
+function openTransmuter(){
+  G.paused=true;
+  renderTransmuterUI();
+  document.getElementById('transmuter-ui').style.display='flex';
+}
+function closeTransmuter(){
+  G.paused=false;
+  document.getElementById('transmuter-ui').style.display='none';
+}
+function renderTransmuterUI(){
+  document.getElementById('tr-alusd-bal').textContent=G.alUSD.toFixed(2);
+  document.getElementById('tr-aleth-bal').textContent=G.alETH.toFixed(4);
+  let html='';
+  G.transmuterDeposits.forEach((dep,i)=>{
+    if(dep.amount<=0.001&&dep.available<=0.001)return;
+    const syn=dep.type==='alUSD'?'$ alUSD':'⟠ alETH';
+    const col=dep.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles';
+    const pct=dep.amount+dep.available>0?Math.min(100,Math.round(dep.available/(dep.amount+dep.available)*100)):100;
+    const canClaim=dep.available>0.001;
+    html+=`<div class="bank-pos">
+      <b>${syn}</b> deposited: ${(dep.amount+dep.available).toFixed(2)} → ${col}<br>
+      <div class="bank-bar"><div class="bank-bar-fill" style="width:${pct}%;background:#4FC3F7"></div></div>
+      <span style="font-size:.75rem;color:#4FC3F7">${dep.available.toFixed(2)} ready to claim</span>
+      ${canClaim?`<button onclick="claimTransmuter(${i})" style="background:#4FC3F7;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${dep.available.toFixed(2)} ${dep.type==='alUSD'?'🪙':'💀'}</button>`:''}
+    </div>`;
+  });
+  if(!html)html='<p style="color:#aaa;font-size:.85rem">No active deposits. Deposit alUSD or alETH above to participate in redemptions.</p>';
+  document.getElementById('transmuter-positions').innerHTML=html;
+}
+function depositTransmuter(type){
+  const amt=parseFloat(document.getElementById('tr-deposit-amt').value)||0;
+  if(amt<=0){chatLog('Enter a deposit amount.','#FF8800');return;}
+  if(type==='alUSD'&&G.alUSD<amt){chatLog('Not enough alUSD!','#FF4444');return;}
+  if(type==='alETH'&&G.alETH<amt){chatLog('Not enough alETH!','#FF4444');return;}
+  if(type==='alUSD')G.alUSD=Math.round((G.alUSD-amt)*100)/100;
+  else G.alETH=Math.round((G.alETH-amt)*10000)/10000;
+  // Merge with existing deposit of same type or create new
+  const existing=G.transmuterDeposits.find(d=>d.type===type&&d.amount>0.001);
+  if(existing)existing.amount+=amt;
+  else G.transmuterDeposits.push({type,amount:amt,available:0});
+  chatLog(`⚗ Transmuter: deposited ${amt.toFixed(2)} ${type}. Waiting for next redemption event.`,'#4FC3F7');
+  SFX.buy();
+  renderTransmuterUI();
+}
+function claimTransmuter(idx){
+  const dep=G.transmuterDeposits[idx];
+  if(!dep||dep.available<=0.001)return;
+  const amt=dep.available;
+  dep.available=0;
+  if(dep.type==='alUSD')G.spacebucks+=Math.floor(amt);
+  else G.schmeckles+=Math.floor(amt);
+  chatLog(`✅ Transmuter: claimed ${Math.floor(amt)} ${dep.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles'}!`,'#FFD700');
+  SFX.coin();
+  renderTransmuterUI();
+}
+function distributeTransmuterPool(sbAmount,ethAmount){
+  // alUSD depositors get Spacebucks, alETH depositors get Schmeckles
+  ['alUSD','alETH'].forEach(type=>{
+    const poolAmt=type==='alUSD'?sbAmount:ethAmount;
+    if(poolAmt<=0)return;
+    const deps=G.transmuterDeposits.filter(d=>d.type===type&&d.amount>0.001);
+    const total=deps.reduce((s,d)=>s+d.amount,0);
+    if(total<=0)return;
+    deps.forEach(d=>{
+      const share=d.amount/total;
+      const recv=Math.min(d.amount,poolAmt*share);
+      d.available=(d.available||0)+recv;
+      d.amount=Math.max(0,d.amount-recv);
+    });
+  });
 }
 
 // ── EXCHANGE ──────────────────────────────────────────────────────────────────
@@ -4579,19 +4677,44 @@ function gameLoop(ts){
       G.alcx+=1;
       chatLog('⚗ Queue: +1 ALCX earned','#9C27B0');
     }
-    // Bank loan auto-repayment
+    // Bank: yield-based auto-repayment + earmarking for Transmuter
     if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
+      const totalDebt=G.bankPositions.reduce((s,p)=>s+(!p.claimed&&p.debt>0?p.debt:0),0);
       G.bankPositions.forEach(pos=>{
-        if(pos.debt>0.001){
-          const payment=Math.min(pos.debt,pos.borrowed*0.005);
-          pos.debt=Math.max(0,pos.debt-payment);
-          if(pos.debt<=0.001&&!pos.claimed){
-            pos.debt=0;
-            chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
-            SFX.coin();
-          }
+        if(pos.claimed||pos.debt<=0.001)return;
+        // Yield repayment (0.5%/cycle, represents yield minus 15% protocol fee)
+        const payment=Math.min(pos.debt,pos.borrowed*0.005);
+        pos.debt=Math.max(0,pos.debt-payment);
+        // Earmarking: proportional to this position's share of total debt (0.5%/cycle)
+        if(totalDebt>0){
+          const share=pos.debt/totalDebt;
+          const earmarkAmt=Math.min(pos.debt-(pos.earmarked||0), totalDebt*0.005*share);
+          pos.earmarked=Math.min(pos.debt,(pos.earmarked||0)+Math.max(0,earmarkAmt));
+        }
+        if(pos.debt<=0.001&&!pos.claimed){
+          pos.debt=0;pos.earmarked=0;
+          chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
+          SFX.coin();
         }
       });
+    }
+    // Transmuter redemption event (every 900 ticks ~15s): fire earmarked → debt paid → pool fills
+    if(G.bankPositions&&G.tick%900===0&&G.tick>0){
+      let sbRedeemed=0,ethRedeemed=0;
+      G.bankPositions.forEach(pos=>{
+        if(pos.claimed||!(pos.earmarked>0.001))return;
+        const redeem=pos.earmarked;
+        pos.debt=Math.max(0,pos.debt-redeem);
+        pos.earmarked=0;
+        const net=redeem*(1-0.005); // 0.5% borrower redemption fee
+        if(pos.collateral==='spacebucks')sbRedeemed+=net;
+        else ethRedeemed+=net;
+        if(pos.debt<=0.001&&!pos.claimed){pos.debt=0;chatLog(`✨ Bank position fully repaid!`,'#FFD700');SFX.coin();}
+      });
+      if(sbRedeemed>0||ethRedeemed>0){
+        distributeTransmuterPool(sbRedeemed,ethRedeemed);
+        if(G.transmuterDeposits.some(d=>d.available>0.001))chatLog('⚗ Transmuter: redemption arrived — visit Transmuter Mira to claim!','#4FC3F7');
+      }
     }
     // persist
     if(G.tick%90===0&&G.mp<G.maxMp){G.mp=Math.min(G.maxMp,G.mp+1);}
@@ -4671,6 +4794,7 @@ function loadState(){
     if(s.maxHp)G.maxHp=s.maxHp;
     if(s.maxMp)G.maxMp=s.maxMp;
     if(s.mp!=null)G.mp=Math.min(s.mp,G.maxMp);
+    if(s.transmuterDeposits)G.transmuterDeposits=s.transmuterDeposits;
     if(s.quests)G.quests=s.quests;
     if(s.dungeonBossDefeated)G.dungeonBossDefeated=s.dungeonBossDefeated;
   }catch(e){}
@@ -4794,6 +4918,7 @@ function saveToServer(){
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
     stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
+    transmuterDeposits:G.transmuterDeposits,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
