@@ -33,6 +33,9 @@ const G = {
   _prevX:0,_prevY:0,_camVx:0,_camVy:0,  // camera lead tracking
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedAlcx:0,         // ALCX locked while in entry queue
+  zoneSeniority:0,      // 5-min intervals spent in marketplace/treasury without leaving
+  govProposals:[],      // active governance proposals
+  earmarkRate:0.005,    // current earmark rate (from server)
   battle:null,          // active battle state or null
   showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
@@ -106,6 +109,7 @@ window.addEventListener('keydown',e=>{
     if(document.getElementById('transmuter-ui').style.display!=='none'){ closeTransmuter(); return; }
     if(document.getElementById('market-ui').style.display!=='none'){ closeMarket(); return; }
     if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
+    if(document.getElementById('governance-ui')?.style.display!=='none'){closeGovernance();return;}
     if(G.shop){ closeShop(); e.preventDefault(); }
     else if(G.npcDialog){
       // Pending inv upgrade? Esc = decline
@@ -313,6 +317,7 @@ function tryInteract(){
   if(nearest.bank){ openBank(); return; }
   if(nearest.transmuter){ openTransmuter(); return; }
   if(nearest.market){ openMarket(); return; }
+  if(nearest.govBoard){openGovernance();return;}
   if(nearest.invUpgrade){ openInvUpgrade(); return; }
   if(nearest.exchange){ openExchange(); return; }
   if(nearest.hallOfFame){ showHallOfFame(); return; }
@@ -447,6 +452,20 @@ function updateQueuePanel(){
   } else {
     lockEl.style.display='none';
   }
+  // Seniority badge
+  let senEl=document.getElementById('queue-seniority');
+  if(!senEl){senEl=document.createElement('div');senEl.id='queue-seniority';senEl.style.cssText='font-size:.7rem;color:#9C27B0;margin-top:2px';panel.insertBefore(senEl,document.getElementById('queue-enter-btn'));}
+  senEl.textContent=G.zoneSeniority>0?`⭐ Seniority: ${G.zoneSeniority} (drip ×${1+Math.floor(G.zoneSeniority/3)})`:'';
+  // Auction / Donation bid row
+  let aucEl=document.getElementById('queue-auction-row');
+  if(!aucEl){
+    aucEl=document.createElement('div');aucEl.id='queue-auction-row';
+    aucEl.style.cssText='display:flex;gap:4px;align-items:center;margin-top:6px;font-size:.72rem';
+    aucEl.innerHTML=`<span style="color:#FFD700">⚡</span><input id="queue-bid-amt" type="number" min="1" step="1" value="5" style="width:50px;background:#111;border:1px solid #5A3A80;color:#eee;padding:2px 4px;font-family:monospace;border-radius:3px"><button onclick="doAuctionBid()" style="padding:2px 8px;background:#1A1A00;border:1px solid #FFD700;color:#FFD700;cursor:pointer;border-radius:3px;font-family:monospace;font-size:.7rem">Bid ALCX to Skip</button>`;
+    panel.insertBefore(aucEl,document.getElementById('queue-enter-btn'));
+  }
+  // Only show if waiting (not yet served)
+  aucEl.style.display=(!served)?'flex':'none';
   const enterBtn=document.getElementById('queue-enter-btn');
   enterBtn.style.display=served?'block':'none';
   enterBtn.textContent=type==='entry'?'▶ ENTER NOW':'▶ LEAVE NOW';
@@ -455,6 +474,8 @@ function updateQueuePanel(){
 function changeZone(zone,sx,sy){
   SFX.door();
   G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;G.camX=0;G.camY=0;
+  // Reset seniority when leaving economic zones
+  if(G.zone!=='marketplace'&&G.zone!=='treasury')G.zoneSeniority=0;
   musPlay(zone);
   _mmCanvas=null;G.showMinimap=false;
   {
@@ -1212,6 +1233,59 @@ function endBattle(){
 let _marketTab='browse';
 function openMarket(){G.paused=true;_marketTab='browse';renderMarketUI();document.getElementById('market-ui').style.display='block';}
 function closeMarket(){G.paused=false;document.getElementById('market-ui').style.display='none';}
+function openGovernance(){G.paused=true;renderGovernanceUI();document.getElementById('governance-ui').style.display='flex';}
+function closeGovernance(){G.paused=false;document.getElementById('governance-ui').style.display='none';}
+function renderGovernanceUI(){
+  const el=document.getElementById('gov-content');if(!el)return;
+  const rate=(G.earmarkRate||0.005)*100;
+  const prop=G.govProposals.find(p=>p.passed===null);
+  let html=`<div style="color:#FFD700;margin-bottom:8px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
+  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:12px">Higher rate = faster loan repayment & more transmuter activity</div>`;
+  if(prop){
+    const msLeft=Math.max(0,prop.endsAt-Date.now());
+    const mLeft=Math.ceil(msLeft/60000);
+    const total=prop.yesWeight+prop.noWeight||1;
+    const yesPct=Math.round(prop.yesWeight/total*100);
+    html+=`<div style="border:1px solid #5A3A80;border-radius:6px;padding:10px;margin-bottom:10px">`;
+    html+=`<div style="color:#B080FF;font-weight:bold">📜 Active Proposal #${prop.id}</div>`;
+    html+=`<div style="margin:4px 0">Proposer: ${prop.proposerName}</div>`;
+    html+=`<div>New rate: <b>${(prop.value*100).toFixed(2)}%</b></div>`;
+    html+=`<div style="color:#aaa;font-size:.72rem">${mLeft}m remaining</div>`;
+    html+=`<div style="margin:6px 0;font-size:.75rem">`;
+    html+=`<span style="color:#4CAF50">✅ YES ${prop.yesWeight.toFixed(1)} ALCX (${yesPct}%)</span> `;
+    html+=`<span style="color:#FF4444">❌ NO ${prop.noWeight.toFixed(1)} ALCX (${100-yesPct}%)</span>`;
+    html+=`</div>`;
+    html+=`<div style="display:flex;gap:6px;margin-top:8px">`;
+    html+=`<button onclick="govVote(${prop.id},'yes')" style="flex:1;padding:5px;background:#1A3A1A;border:1px solid #4CAF50;color:#4CAF50;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">✅ Vote YES</button>`;
+    html+=`<button onclick="govVote(${prop.id},'no')" style="flex:1;padding:5px;background:#3A1A1A;border:1px solid #FF4444;color:#FF4444;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">❌ Vote NO</button>`;
+    html+=`</div></div>`;
+  }else{
+    html+=`<div style="color:#888;margin-bottom:8px">No active proposal. Propose a new earmark rate:</div>`;
+    html+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">`;
+    html+=`<span style="color:#aaa;font-size:.8rem">Rate (%):</span>`;
+    html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${rate.toFixed(2)}" style="width:70px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
+    html+=`<button onclick="govPropose()" style="padding:4px 10px;background:#1A1030;border:1px solid #9C27B0;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">📜 Propose</button>`;
+    html+=`</div>`;
+    html+=`<div style="color:#666;font-size:.7rem">Requires ≥10 ALCX · You auto-vote YES · 5-minute voting window</div>`;
+  }
+  el.innerHTML=html;
+}
+function govPropose(){
+  const v=parseFloat(document.getElementById('gov-rate-inp')?.value);
+  if(isNaN(v)||v<0.1||v>2.0){chatLog('Rate must be 0.1–2.0%.','#FF4444');return;}
+  socket.emit('governance_propose',{rate:v/100});
+}
+function govVote(id,choice){socket.emit('governance_vote',{proposalId:id,choice});}
+function doAuctionBid(){
+  if(!G.queueState||G.queueState.served)return;
+  const amt=parseFloat(document.getElementById('queue-bid-amt')?.value||0);
+  if(isNaN(amt)||amt<1){chatLog('Enter a valid ALCX bid (min 1).','#FF4444');return;}
+  if(G.alcx<amt){chatLog(`Not enough ALCX! (have ${G.alcx})`, '#FF4444');SFX.error();return;}
+  G.alcx=parseFloat((G.alcx-amt).toFixed(4));
+  renderHUD();
+  socket.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
+  chatLog(`⚡ Bid ${amt} ALCX to jump the queue!`,'#FFD700');
+}
 
 function showHallOfFame(){
   const hof=G.hallOfFame||{};
@@ -2314,8 +2388,13 @@ function gameLoop(ts){
     if(G.zone==='governance')renderGovernancePanel(ctxUI);
     // ALCX queue drip
     if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%300===0){
-      G.alcx+=1;
-      chatLog('⚗ Queue: +1 ALCX earned','#9C27B0');
+      // Seniority accumulates while actively in the queue (not yet served)
+      if(!G.queueState.served)(G.zoneSeniority=(G.zoneSeniority||0)+1);
+      // ALCX drip scales with seniority (1 base + 1 per 3 seniority points)
+      const drip=1+Math.floor((G.zoneSeniority||0)/3);
+      G.alcx+=drip;
+      const bonusStr=drip>1?` (seniority bonus ×${drip})`:'';
+      chatLog(`⚗ Queue: +${drip} ALCX earned${bonusStr}`,'#9C27B0');
     }
     // Bank: local yield repayment (server handles earmarking/transmuter globally every 60s)
     if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
@@ -2615,6 +2694,34 @@ function initSocket(){
     // ── Hall of Fame ──────────────────────────────────────────────────────────
     socket.on('hall_of_fame',data=>{
       G.hallOfFame=data||{topXP:[],topKills:[],topGold:[]};
+    });
+
+    // ── Governance ────────────────────────────────────────────────────────────
+    socket.on('gov_state',data=>{
+      G.govProposals=data.proposals||[];
+      G.earmarkRate=data.earmarkRate||0.005;
+      if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
+    });
+    socket.on('gov_result',data=>{
+      if(data.ok){
+        if(data.choice)chatLog(`✅ Vote cast: ${data.choice.toUpperCase()} (${data.weight?.toFixed(1)} ALCX weight, ${data.timeLeft}m left)`,'#9C27B0');
+        else chatLog('📜 Governance proposal submitted!','#9C27B0');
+      }else chatLog('Gov: '+data.error,'#FF4444');
+      if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
+    });
+
+    // ── Auction ───────────────────────────────────────────────────────────────
+    socket.on('auction_result',data=>{
+      if(data.ok){
+        chatLog(`⚡ Queue skip confirmed! Bid ${data.alcx} ALCX. ${data.others} others each earned ${data.share} ALCX.`,'#FFD700');
+        SFX.buy();
+        updateQueuePanel();
+      }else{chatLog('Auction: '+data.error,'#FF4444');SFX.error();}
+    });
+    socket.on('auction_payout',data=>{
+      G.alcx=parseFloat((G.alcx+(data.amount||0)).toFixed(4));
+      chatLog(`⚡ ${data.bidderName} skipped the queue — you earned +${data.amount} ALCX!`,'#9C27B0');
+      renderHUD();
     });
 }
 

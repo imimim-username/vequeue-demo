@@ -435,6 +435,9 @@ const NPCS = {
         "It sounds simple, but you'd be amazed how revolutionary that idea actually is.",
       ]
     },
+    {type:'wizard',face:2,name:'Governance Board',x:14,y:6,
+     dialog:['Cast your ALCX-weighted vote on protocol parameters.','Current vote: earmark rate controls how fast bank loans repay.'],
+     govBoard:true},
   ],
   marketplace:[
     { id:'vendor', x:5, y:5, type:'merchant', face:1, name:'Vendor Zelda', shop:'zelda',

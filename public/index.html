@@ -270,6 +270,14 @@
   <div id="market-content"></div>
 </div>
 
+<div id="governance-ui" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;background:#050A1A;border:2px solid #5A3A80;border-radius:8px;padding:16px;min-width:320px;max-width:400px;color:#DDD;font-family:monospace;font-size:.8rem;box-shadow:0 0 30px rgba(90,60,180,0.5);flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <b style="color:#B080FF">⚗ GOVERNANCE HALL — EARMARK VOTE</b>
+    <button onclick="closeGovernance()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.1rem;padding:0">✕</button>
+  </div>
+  <div id="gov-content"></div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/data.js"></script>
 <script src="/js/maps.js"></script>

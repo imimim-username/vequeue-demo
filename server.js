@@ -91,6 +91,59 @@ function updateHallOfFame(accountId,data){
   io.emit('hall_of_fame',hallOfFame);
 }
 
+// ── Governance Votes ──────────────────────────────────────────────────────────
+const GOV_FILE=path.join(__dirname,'governance.json');
+let govProposals=[];
+try{govProposals=JSON.parse(fs.readFileSync(GOV_FILE,'utf8'));}catch(e){govProposals=[];}
+// Remove already-settled proposals from loaded state
+govProposals=govProposals.filter(p=>p.passed===null);
+function saveGov(){try{fs.writeFileSync(GOV_FILE,JSON.stringify(govProposals),'utf8');}catch(e){}}
+let _govIdSeq=1;
+let EARMARK_RATE_LIVE=0.005; // governance-controlled, default 0.5%
+function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE});}
+// Check vote outcomes every 30s
+setInterval(()=>{
+  const now=Date.now();let changed=false;
+  govProposals.forEach(p=>{
+    if(p.passed!==null||now<p.endsAt)return;
+    if(p.yesWeight>p.noWeight){
+      p.passed=true;EARMARK_RATE_LIVE=p.value;
+      io.emit('chat',{nickname:'⚗ Governance',text:`✅ Proposal #${p.id} PASSED! Earmark rate → ${(p.value*100).toFixed(2)}% (proposed by ${p.proposerName})`});
+    }else{
+      p.passed=false;
+      io.emit('chat',{nickname:'⚗ Governance',text:`❌ Proposal #${p.id} FAILED. Earmark rate stays at ${(EARMARK_RATE_LIVE*100).toFixed(2)}%.`});
+    }
+    changed=true;
+  });
+  govProposals=govProposals.filter(p=>p.passed===null||now-p.endsAt<5*60*1000);
+  if(changed){saveGov();broadcastGovState();}
+},30000);
+
+// ── Whale Arrival Events ───────────────────────────────────────────────────────
+function triggerWhaleArrival(){
+  const zone=QUEUE_ZONES[Math.floor(Math.random()*QUEUE_ZONES.length)];
+  const alcxStake=Math.floor(500+Math.random()*4500);
+  const side=queues[zone]['entry'];
+  const whaleId='_whale_'+Date.now();
+  const whaleTicket=side.nextTicket++;
+  side.entries.push({id:whaleId,nickname:`🐋 VeQueue Whale`,ticket:whaleTicket,locked:alcxStake});
+  broadcastQueueState(zone);
+  const estWait=Math.ceil(side.entries.length*QUEUE_TICK_MS/60000);
+  io.emit('price_event',{type:'whale',msg:`🐋 A whale with ${alcxStake.toLocaleString()} ALCX is entering the ${zone} queue! Projected wait time: +${estWait}min. Queue rewards will be diluted temporarily.`});
+  io.emit('chat',{nickname:'🐋 System',text:`VeQueue Whale joined ${zone} entry queue with ${alcxStake.toLocaleString()} ALCX locked!`});
+  // Remove after 2 queue ticks
+  setTimeout(()=>{
+    side.entries=side.entries.filter(e=>e.id!==whaleId);
+    broadcastQueueState(zone);
+    io.emit('chat',{nickname:'🐋 System',text:`The VeQueue Whale has cleared the ${zone} queue. Normal wait times resumed.`});
+  },QUEUE_TICK_MS*2);
+}
+function scheduleWhale(){
+  const delay=(5+Math.random()*5)*60*1000; // 5-10 min
+  setTimeout(()=>{if(Math.random()<0.35)triggerWhaleArrival();scheduleWhale();},delay);
+}
+scheduleWhale();
+
 // ── World Loot ────────────────────────────────────────────────────────────────
 let worldLoot=[];
 const LOOT_TTL_MS=10*60*1000;
@@ -351,6 +404,7 @@ io.on('connection',socket=>{
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
+    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE});
   });
 
   socket.on('move',data=>{
@@ -588,6 +642,71 @@ io.on('connection',socket=>{
     socket.emit('market_cancel_ok',{item:listing.item});
   });
 
+  socket.on('governance_propose',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    if(govProposals.some(p=>p.passed===null))
+      return socket.emit('gov_result',{ok:false,error:'A vote is already in progress.'});
+    const rate=parseFloat(data.rate);
+    if(isNaN(rate)||rate<0.001||rate>0.02)
+      return socket.emit('gov_result',{ok:false,error:'Rate must be 0.1%–2.0%.'});
+    const alcxBal=parseFloat(pdb[socket.accountId].data?.alcx||0);
+    if(alcxBal<10)return socket.emit('gov_result',{ok:false,error:'Need ≥10 ALCX to propose.'});
+    const p={
+      id:_govIdSeq++,type:'earmark_rate',value:rate,
+      proposerName:pdb[socket.accountId].username||socket.accountId,
+      yesWeight:alcxBal,noWeight:0,
+      votes:{[socket.accountId]:{weight:alcxBal,choice:'yes'}},
+      endsAt:Date.now()+5*60*1000,passed:null,
+    };
+    govProposals.push(p);saveGov();broadcastGovState();
+    io.emit('chat',{nickname:'⚗ Governance',text:`📜 ${p.proposerName} proposes earmark rate → ${(rate*100).toFixed(2)}%. Vote in the Governance Hall! (5 min)`});
+    socket.emit('gov_result',{ok:true});
+  });
+
+  socket.on('governance_vote',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const{proposalId,choice}=data;
+    if(!['yes','no'].includes(choice))return;
+    const prop=govProposals.find(p=>p.id===proposalId&&p.passed===null);
+    if(!prop)return socket.emit('gov_result',{ok:false,error:'No active proposal found.'});
+    if(prop.votes[socket.accountId])return socket.emit('gov_result',{ok:false,error:'Already voted.'});
+    const alcxBal=parseFloat(pdb[socket.accountId].data?.alcx||0);
+    if(alcxBal<=0)return socket.emit('gov_result',{ok:false,error:'No ALCX to vote with.'});
+    prop.votes[socket.accountId]={weight:alcxBal,choice};
+    if(choice==='yes')prop.yesWeight+=alcxBal;else prop.noWeight+=alcxBal;
+    saveGov();broadcastGovState();
+    const timeLeft=Math.ceil((prop.endsAt-Date.now())/60000);
+    socket.emit('gov_result',{ok:true,choice,weight:alcxBal,timeLeft});
+    io.emit('chat',{nickname:'⚗ Governance',text:`${pdb[socket.accountId].username} voted ${choice==='yes'?'✅ YES':'❌ NO'} (${alcxBal.toFixed(1)} ALCX weight)`});
+  });
+
+  socket.on('queue_auction_bid',data=>{
+    const p=players[socket.id];if(!p)return;
+    const{zone,queueType,alcx}=data;
+    if(!QUEUE_ZONES.includes(zone)||!['entry','exit'].includes(queueType))return;
+    const bidAmt=parseFloat(alcx);
+    if(isNaN(bidAmt)||bidAmt<1)return socket.emit('auction_result',{ok:false,error:'Minimum bid is 1 ALCX.'});
+    const side=queues[zone][queueType];
+    const myEntry=side.entries.find(e=>e.id===socket.id);
+    if(!myEntry)return socket.emit('auction_result',{ok:false,error:'You are not in this queue.'});
+    // Move to front: give ticket value just below current serving+1
+    side.entries=side.entries.filter(e=>e.id!==socket.id);
+    const frontTicket=side.serving+0.5; // sorts before next integer ticket
+    myEntry.ticket=frontTicket;
+    side.entries.unshift(myEntry);
+    // Immediately serve this player
+    side.serving=frontTicket;
+    socket.emit('queue_served',{zone,queueType,ticket:frontTicket});
+    // Distribute bid to other waiting players
+    const waiting=side.entries.filter(e=>e.id!==socket.id&&!e.id.startsWith('_whale_'));
+    const share=waiting.length>0?parseFloat((bidAmt/waiting.length).toFixed(4)):0;
+    waiting.forEach(e=>{io.to(e.id).emit('auction_payout',{zone,queueType,amount:share,bidderName:p.nickname,bidAmt});});
+    socket.emit('auction_result',{ok:true,alcx:bidAmt,share,others:waiting.length});
+    broadcastQueueState(zone);
+    const label=queueType==='entry'?'entry':'exit';
+    io.emit('chat',{nickname:'⚡ Auction',text:`${p.nickname} bid ${bidAmt} ALCX to jump the ${zone} ${label} queue! ${waiting.length} members each earn ${share} ALCX.`});
+  });
+
   socket.on('disconnect',()=>{
     if(socket.accountId&&socketsByAccount[socket.accountId]===socket.id)
       delete socketsByAccount[socket.accountId];
@@ -613,7 +732,6 @@ io.on('connection',socket=>{
 });
 
 // ── Global Transmuter Redemption (every 60s) ──────────────────────────────────
-const EARMARK_RATE=0.005; // 0.5% of each position's debt earmarked+redeemed per cycle
 setInterval(()=>{
   // 1. Compute total system debt across all accounts
   let totalDebt=0;
@@ -628,7 +746,7 @@ setInterval(()=>{
     if(!acct.data?.bankPositions)return;
     acct.data.bankPositions.forEach(pos=>{
       if(pos.claimed||pos.debt<=0.001)return;
-      const redeem=EARMARK_RATE*pos.debt; // proportional to own debt (=debt/totalDebt * totalDebt * rate)
+      const redeem=EARMARK_RATE_LIVE*pos.debt; // proportional to own debt (=debt/totalDebt * totalDebt * rate)
       pos.debt=Math.max(0,pos.debt-redeem);
       pos.earmarked=0;
       const net=redeem*(1-0.005); // 0.5% borrower redemption fee
