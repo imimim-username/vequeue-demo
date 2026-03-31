@@ -735,6 +735,7 @@ const BATTLE_BTNS={};
 // ── TILE CACHE ───────────────────────────────────────────────────────────────
 // Pre-render every tile type into an offscreen canvas for fast stamping
 const TILE_CACHE = {};
+let WATER_FRAMES = [];  // 3 pre-rendered animation frames for water tiles
 
 function makeTile(fn){
   const c=document.createElement('canvas');c.width=TS;c.height=TS;
@@ -891,6 +892,24 @@ function drawWater(c){
   c.fillRect(2,6,10,2);c.fillRect(18,12,10,2);c.fillRect(6,20,14,2);c.fillRect(16,26,10,2);
   c.fillStyle='#42A5F5';
   c.fillRect(3,6,4,1);c.fillRect(19,12,4,1);c.fillRect(7,20,5,1);
+}
+
+function drawWaterAnimated(c,phase){
+  // base gradient
+  const g=c.createLinearGradient(0,0,0,TS);
+  g.addColorStop(0,'#1565C0');g.addColorStop(1,'#0D47A1');
+  c.fillStyle=g;c.fillRect(0,0,TS,TS);
+  // animated ripple rows — offset shifts by 4px each phase
+  const offset=phase*4;
+  c.fillStyle='#1976D2';
+  for(let y=2+offset%8;y<TS;y+=8){c.fillRect(0,y,TS,2);}
+  // crest highlights
+  c.fillStyle='#4A8ADB';
+  for(let y=4+offset%8;y<TS;y+=8){c.fillRect(2,y,TS-4,1);}
+  // surface glints
+  c.fillStyle='#AACCFF44';
+  c.fillRect(4+phase*3,4,8,2);
+  c.fillRect(18+phase*2,14,6,2);
 }
 
 function drawPlank(c){
@@ -3877,9 +3896,11 @@ function renderTileLayer(){
     for(let col=startC;col<=startC+TW+1;col++){
       if(row<0||row>=z.h||col<0||col>=z.w)continue;
       const tile=m[row][col];
-      const cached=TILE_CACHE[tile];
-      if(cached){
-        ctxTiles.drawImage(cached,col*TS-G.camX,row*TS-G.camY);
+      if(tile===T.WATER&&WATER_FRAMES.length){
+        ctxTiles.drawImage(WATER_FRAMES[Math.floor(G.tick/20)%3],col*TS-G.camX,row*TS-G.camY);
+      }else{
+        const cached=TILE_CACHE[tile];
+        if(cached){ctxTiles.drawImage(cached,col*TS-G.camX,row*TS-G.camY);}
       }
     }
   }
@@ -4611,6 +4632,8 @@ function startGame(){
   showScreen('screen-game');
   setupCanvases();
   buildTileCache();
+  // Build 3 animated water frames (phase 0,1,2 shift ripples by 0,4,8 px)
+  WATER_FRAMES=[0,1,2].map(phase=>{const c=document.createElement('canvas');c.width=c.height=TS;drawWaterAnimated(c.getContext('2d'),phase);return c;});
   renderTileLayer();
   {
     let zoneName=ZONES[G.zone]?.name||G.zone;
