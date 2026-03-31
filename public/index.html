@@ -304,6 +304,7 @@ body.touch #mobile-act{display:flex}
     <span id="hud-level">Lv.1</span>
     <span id="hud-gold">0 ₴</span>
     <span id="hud-players">1 online</span>
+    <button id="hud-mute" title="Toggle sound" onclick="toggleMute()" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 2px;opacity:.8">🔊</button>
   </div>
   <div id="hud-xp-bar"><div id="hud-xp-fill"></div></div>
   <div id="chat-panel">
@@ -2011,6 +2012,138 @@ function drawNPCSprite(ctx,ox,oy,type,face=2){
   }
 }
 
+// ── AUDIO SYSTEM ──────────────────────────────────────────────────────────────
+let _actx = null;
+let _sfxMuted = false;
+function getAudioCtx(){
+  if(!_actx) _actx = new (window.AudioContext||window.webkitAudioContext)();
+  if(_actx.state==='suspended') _actx.resume();
+  return _actx;
+}
+function _tone(freq, type, dur, vol, atk=0.005){
+  if(_sfxMuted) return;
+  const ctx=getAudioCtx(), o=ctx.createOscillator(), g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type=type; o.frequency.value=freq;
+  const t=ctx.currentTime;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+atk);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t); o.stop(t+dur+0.05);
+  return {o,g,t};
+}
+function _sweep(f0,f1,type,dur,vol){
+  if(_sfxMuted) return;
+  const ctx=getAudioCtx(), o=ctx.createOscillator(), g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type=type;
+  const t=ctx.currentTime;
+  o.frequency.setValueAtTime(f0,t);
+  o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t); o.stop(t+dur+0.05);
+}
+function _noise(dur,vol,cutoff=3000){
+  if(_sfxMuted) return;
+  const ctx=getAudioCtx();
+  const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const src=ctx.createBufferSource(), flt=ctx.createBiquadFilter(), g=ctx.createGain();
+  src.buffer=buf; flt.type='lowpass'; flt.frequency.value=cutoff;
+  src.connect(flt); flt.connect(g); g.connect(ctx.destination);
+  const t=ctx.currentTime;
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.start(t); src.stop(t+dur+0.05);
+}
+function toggleMute(){
+  _sfxMuted=!_sfxMuted;
+  const btn=document.getElementById('hud-mute');
+  if(btn) btn.textContent=_sfxMuted?'🔇':'🔊';
+  if(!_sfxMuted) SFX.select(); // confirmation beep on unmute
+}
+const SFX = {
+  step(){
+    // Soft low thump
+    _sweep(80,40,'sine',0.08,0.12);
+  },
+  swing(){
+    // Sword whoosh: noise burst + high sweep
+    _noise(0.12,0.25,5000);
+    _sweep(900,300,'sawtooth',0.1,0.12);
+  },
+  hitEnemy(){
+    _noise(0.07,0.35,2500);
+    _sweep(320,180,'square',0.08,0.18);
+  },
+  hitPlayer(){
+    _noise(0.15,0.45,1000);
+    _sweep(160,80,'sawtooth',0.15,0.25);
+  },
+  enemyDeath(){
+    _sweep(440,55,'square',0.45,0.28);
+    setTimeout(()=>_noise(0.2,0.2,600),100);
+  },
+  coin(){
+    _tone(880,'sine',0.18,0.2);
+    setTimeout(()=>_tone(1320,'sine',0.18,0.18),90);
+  },
+  ticket(){
+    _noise(0.04,0.35,4000);
+    setTimeout(()=>{ _noise(0.03,0.25,6000); _tone(700,'square',0.07,0.12); },55);
+  },
+  door(){
+    _sweep(220,110,'sawtooth',0.35,0.09);
+    _noise(0.12,0.1,400);
+  },
+  levelUp(){
+    const notes=[523,659,784,1047]; // C5 E5 G5 C6
+    notes.forEach((f,i)=>setTimeout(()=>_tone(f,'square',0.28,0.22,0.01),i*90));
+    setTimeout(()=>_tone(1568,'sine',0.4,0.25,0.01),notes.length*90);
+  },
+  potion(){
+    for(let i=0;i<3;i++){
+      setTimeout(()=>{
+        const ctx=getAudioCtx();
+        if(_sfxMuted) return;
+        const f=380+Math.random()*180;
+        _sweep(f,f*0.55,'sine',0.11,0.13);
+      },i*110);
+    }
+  },
+  battleStart(){
+    // Dramatic minor chord stab
+    [220,262,330,392].forEach(f=>{ _tone(f,'sawtooth',0.5,0.18,0.01); });
+    setTimeout(()=>_noise(0.3,0.15,800),50);
+  },
+  victory(){
+    const melody=[523,659,784,659,1047,1047];
+    const times=[0,100,200,300,420,500];
+    melody.forEach((f,i)=>setTimeout(()=>_tone(f,'square',0.28,0.22,0.01),times[i]));
+  },
+  gameOver(){
+    const notes=[392,330,277,220];
+    notes.forEach((f,i)=>setTimeout(()=>_tone(f,'sawtooth',0.45,0.2,0.02),i*220));
+  },
+  select(){
+    _tone(660,'square',0.07,0.14);
+  },
+  buy(){
+    _tone(523,'sine',0.1,0.18);
+    setTimeout(()=>_tone(784,'sine',0.15,0.2),85);
+  },
+  error(){
+    _tone(180,'square',0.18,0.28);
+    setTimeout(()=>_tone(150,'square',0.18,0.28),130);
+  },
+  questComplete(){
+    const notes=[523,784,1047,1568];
+    notes.forEach((f,i)=>setTimeout(()=>_tone(f,'square',0.3,0.2,0.01),i*80));
+  }
+};
+
 // ── GAME STATE ────────────────────────────────────────────────────────────────
 const G = {
   zone:'world',
@@ -2102,6 +2235,7 @@ window.addEventListener('keydown',e=>{
   }
   if(e.key==='p'||e.key==='P') togglePause();
   if(e.key==='m'||e.key==='M'){G.showMinimap=!G.showMinimap;_mmCanvas=null;}
+  if(e.key==='`'||e.key==='~') toggleMute();
 });
 window.addEventListener('keyup',e=>{delete KEYS[e.key];delete KEYS[e.keyCode];});
 
@@ -2141,7 +2275,12 @@ function tryMove(dx,dy){
   });
   if(okX)G.x=nx;
   if(okY)G.y=ny;
-  G.moving=okX||okY;
+  const moved=okX||okY;
+  G.moving=moved;
+  if(moved){
+    G._stepTick=(G._stepTick||0)+1;
+    if(G._stepTick%16===0) SFX.step();
+  }
   // direction
   if(Math.abs(dx)>Math.abs(dy)){G.dir=dx>0?1:3;}
   else if(dy!==0){G.dir=dy>0?2:0;}
@@ -2186,6 +2325,8 @@ function handleQuestDialogClose(npc){
     G.xp+=qdef.reward.xp;
     checkLevelUp();
     qs.status='completed';
+    SFX.questComplete();
+    SFX.coin();
     chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.gold} ₴`,'#4CAF50');
     if(G.paused)renderInventoryScreen();
   }
@@ -2230,6 +2371,7 @@ function advanceDialog(){
   if(!G.npcDialog)return;
   const nd=G.npcDialog;
   nd.lineIdx++;
+  SFX.select();
   if(nd.lineIdx>=nd.dialog.length){
     const npc=nd.npc;
     G.npcDialog=null;
@@ -2354,6 +2496,7 @@ function updateQueuePanel(){
 }
 
 function changeZone(zone,sx,sy){
+  SFX.door();
   G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;G.camX=0;G.camY=0;
   _mmCanvas=null;G.showMinimap=false;
   {
@@ -2412,6 +2555,7 @@ function checkLevelUp(){
     G.statPoints+=3;
     G.maxHp++;
     G.hp=Math.min(G.maxHp,G.hp+2); // partial HP restore on level-up
+    SFX.levelUp();
     chatLog(`★ LEVEL UP! You are now level ${G.level}! +3 stat points, +1 max HP`,'#FFD700');
     if(G.paused)renderInventoryScreen(); // refresh stat panel if open
   }
@@ -2479,6 +2623,7 @@ function triggerBattle(key,depth=0){
   };
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
+  SFX.battleStart();
   runPixelTransition('in',()=>{G.battle.phase='player_turn';});
 }
 
@@ -2870,7 +3015,7 @@ function doBattleAction(action){
 
   if(action==='potion'){
     const slot=G.inventory.findIndex((s,i)=>i>=2&&s&&s.type==='potion');
-    if(slot===-1){bt.log.push('No potions in inventory!');bt.phase='player_turn';return;}
+    if(slot===-1){bt.log.push('No potions in inventory!');bt.phase='player_turn';SFX.error();return;}
     const pot=G.inventory[slot];
     const before=G.hp;
     if(pot.healFull)G.hp=G.maxHp;
@@ -2878,6 +3023,7 @@ function doBattleAction(action){
     const gained=G.hp-before;
     G.inventory[slot]=null;
     bt.log.push(`Used ${pot.name}! +${gained} HP.`);
+    SFX.potion();
     bt.phase='enemy_turn';bt.animTimer=75;
     return;
   }
@@ -2899,6 +3045,8 @@ function doBattleAction(action){
     const crit=Math.random()<G.stats.lck*0.045;
     const dmg=Math.max(1,Math.floor((baseDmg-bt.enemy.def*0.55)*(crit?1.6:1)+(Math.random()*2-1)));
     bt.enemy.currentHp-=dmg;bt.hitShake=10;
+    SFX.swing();
+    setTimeout(()=>SFX.hitEnemy(),120);
     bt.log.push(crit?`Critical hit! ${dmg} damage!`:`You attack for ${dmg} damage.`);
   }
 
@@ -2908,19 +3056,23 @@ function doBattleAction(action){
     if(cls==='mage'){
       dmg=Math.max(2,Math.floor(G.stats.lck*1.6+G.stats.agi*0.5+Math.random()*4));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       bt.log.push(`Arcane Bolt! ${dmg} magic damage!`);
     } else if(cls==='paladin'){
       healAmt=Math.max(1,Math.floor(G.stats.vit*0.6)+2);
       G.hp=Math.min(G.maxHp,G.hp+healAmt);
+      SFX.potion();
       bt.log.push(`Holy Light! Restored ${healAmt} HP.`);
     } else if(cls==='rogue'){
       dmg=Math.max(1,Math.floor(G.stats.agi*1.3)-Math.floor(bt.enemy.def*0.3));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       bt.log.push(`Twin Daggers! ${dmg} piercing damage!`);
     } else { // warrior
       const weapon=G.inventory[0];
       dmg=Math.max(1,Math.floor((weapon?.dmg||2)*1.9+G.stats.str*1.1-bt.enemy.def));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       bt.log.push(`Power Strike! ${dmg} massive damage!`);
     }
   }
@@ -2929,6 +3081,8 @@ function doBattleAction(action){
   if(bt.enemy.currentHp<=0){
     bt.enemy.currentHp=0;
     bt.log.push(`${bt.enemy.name} is defeated!`);
+    SFX.enemyDeath();
+    setTimeout(()=>SFX.victory(),500);
     bt.result='win';
     bt.xpGained=bt.enemy.xp;
     bt.goldGained=bt.enemy.gold;
@@ -2940,6 +3094,7 @@ function doBattleAction(action){
       chatLog('★ THE LICH IS DEFEATED! Ancient evil vanquished!','#AA00FF');
     }
     updateQuestProgress(bt.enemy.type);
+    SFX.coin();
     chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
     saveToServer();
     // Wait for player input — do NOT auto-advance
@@ -2959,10 +3114,12 @@ function doEnemyTurn(){
     const endArmor=Math.floor(G.stats.end*0.5);
     const dmg=Math.max(1,e.atk-endArmor+(((Math.random()*3)|0)-1));
     G.hp=Math.max(0,G.hp-dmg);
+    SFX.hitPlayer();
     bt.log.push(`${e.name} hits you for ${dmg}!`);
     if(G.hp<=0){
       G.hp=0;
       bt.log.push('You have been defeated...');
+      SFX.gameOver();
       bt.result='lose';
       // Wait for player input — do NOT auto-advance
       return;
@@ -3053,19 +3210,22 @@ function renderShop(){
 function buyItem(vendorId,idx){
   const item=SHOP_CATALOG[vendorId]?.[idx];
   if(!item)return;
-  if(G.schmeckles<item.cost){chatLog('Not enough Schmeckles!','#FF4444');return;}
-  if(G.level<item.lvl){chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
+  if(G.schmeckles<item.cost){SFX.error();chatLog('Not enough Schmeckles!','#FF4444');return;}
+  if(G.level<item.lvl){SFX.error();chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
   G.schmeckles-=item.cost;
   if(item.type==='weapon'){
     G.inventory[0]={...item};
+    SFX.buy();
     chatLog(`Equipped ${item.name}! (+${item.dmg} DMG)`,'#4CAF50');
   } else if(item.type==='shield'){
     G.inventory[1]={...item};
+    SFX.buy();
     chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
   } else if(item.type==='potion'){
     const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
-    if(slot===-1){G.schmeckles+=item.cost;chatLog('Inventory full! No room for potions.','#FF4444');return;}
+    if(slot===-1){G.schmeckles+=item.cost;SFX.error();chatLog('Inventory full! No room for potions.','#FF4444');return;}
     G.inventory[slot]={...item};
+    SFX.buy();
     chatLog(`Bought ${item.name}!`,'#4CAF50');
   }
   renderShop();
@@ -3693,6 +3853,7 @@ function initSocket(){
     if(G.queueState){
       G.queueState.ticket=data.ticket;
       // Do NOT copy data.serving into served — served is only set by queue_served event
+      SFX.ticket();
       updateQueuePanel();
     }
   });
