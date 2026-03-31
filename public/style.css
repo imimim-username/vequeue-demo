@@ -1,0 +1,203 @@
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#fff;user-select:none}
+.screen{display:none;position:fixed;inset:0;align-items:center;justify-content:center}
+.screen.active{display:flex}
+
+/* ── LOGIN SCREEN ── */
+#screen-login{background:#000;flex-direction:column;align-items:center;justify-content:center}
+#login-box{background:#080818;border:3px solid #FFD700;padding:2rem 2.2rem;
+  min-width:300px;max-width:88vw;font-family:'Courier New',monospace;text-align:center}
+#login-box h1{color:#FFD700;letter-spacing:.25em;font-size:1.3rem;margin:0 0 .3rem}
+#login-box p{color:#555;font-size:.68rem;margin:0 0 1.2rem}
+#login-error{color:#FF4444;font-size:.73rem;min-height:1.1em;margin-bottom:.6rem}
+#login-username,#login-pin{display:block;width:100%;box-sizing:border-box;
+  margin-bottom:.65rem;padding:.5rem .7rem;background:#0d0d2a;
+  border:1px solid #333;color:#eee;font-family:inherit;font-size:.85rem}
+#login-username:focus,#login-pin:focus{border-color:#FFD700;outline:none}
+#login-main-btns{display:flex;gap:.5rem;margin-bottom:.5rem}
+#btn-login,#btn-register{flex:1;padding:.55rem;background:#111130;
+  border:2px solid #FFD700;color:#FFD700;font-family:inherit;
+  font-size:.72rem;cursor:pointer;letter-spacing:.1em}
+#btn-login:hover,#btn-register:hover{background:#1a1a50}
+#btn-guest{width:100%;padding:.35rem;background:transparent;
+  border:1px solid #222;color:#333;font-family:inherit;
+  font-size:.63rem;cursor:pointer;letter-spacing:.05em}
+#btn-guest:hover{color:#555;border-color:#444}
+#login-connecting{color:#555;font-size:.65rem;margin-top:.8rem}
+
+/* ── TITLE ── */
+#screen-title{background:#000;flex-direction:column}
+#title-canvas{position:absolute;inset:0;width:100%;height:100%}
+#title-ui{position:relative;text-align:center;z-index:2}
+.game-title{font-size:clamp(2rem,8vw,5rem);letter-spacing:.2em;color:#FFD700;
+  text-shadow:0 0 20px #FFD700,0 0 40px #FF8C00,4px 4px 0 #8B4500;
+  animation:pulse 2s ease-in-out infinite alternate}
+.game-subtitle{font-size:clamp(.7rem,2vw,1.1rem);letter-spacing:.3em;color:#87CEEB;margin:.5rem 0 2rem}
+@keyframes pulse{from{text-shadow:0 0 20px #FFD700,0 0 40px #FF8C00,4px 4px 0 #8B4500}
+  to{text-shadow:0 0 40px #FFD700,0 0 80px #FF8C00,4px 4px 0 #8B4500}}
+#btn-start{background:none;border:3px solid #FFD700;color:#FFD700;font-family:inherit;
+  font-size:1.2rem;letter-spacing:.2em;padding:.6rem 2rem;cursor:pointer;
+  animation:blink 1s step-end infinite}
+#btn-start:hover{background:#FFD70022}
+@keyframes blink{50%{opacity:0}}
+
+/* ── CREATE ── */
+#screen-create{background:#0a0a1a;flex-direction:row;padding:1.5rem;overflow-y:auto;align-items:flex-start;justify-content:center}
+#screen-create h2{color:#FFD700;letter-spacing:.2em;font-size:1.3rem}
+.species-btn,.class-btn{background:#111;border:2px solid #333;color:#aaa;
+  font-family:inherit;font-size:.72rem;padding:.3rem .5rem;cursor:pointer;
+  border-radius:3px;white-space:nowrap;letter-spacing:.05em}
+.species-btn:hover,.class-btn:hover{border-color:#888}
+.species-btn.selected,.class-btn.selected{border-color:#FFD700;color:#FFD700;background:#1a1600}
+.create-row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;justify-content:center}
+.create-label{color:#87CEEB;min-width:120px;font-size:.85rem;letter-spacing:.1em}
+input[type=text]{background:#111;border:2px solid #333;color:#fff;font-family:inherit;
+  padding:.4rem .8rem;font-size:.9rem;width:180px}
+input[type=text]:focus{outline:none;border-color:#FFD700}
+.color-btn{width:36px;height:36px;border:3px solid #333;cursor:pointer;border-radius:3px}
+.color-btn.selected{border-color:#FFD700;transform:scale(1.15)}
+.stat-row{display:flex;gap:.5rem;align-items:center}
+.stat-name{color:#ccc;font-size:.8rem;width:80px}
+.stat-bar{display:flex;gap:2px}
+.stat-pip{width:8px;height:14px;border:1px solid #444;cursor:pointer;border-radius:1px}
+.stat-pip.filled{background:#FFD700;border-color:#CC9900}
+.stat-pip.capped{background:#252535;border-color:#404060;cursor:default}
+.stat-pip.filled.capped{background:#3A3000;border-color:#555000}
+.stat-pip.class-lock{background:#CC6600;border-color:#FF8C00;cursor:default}
+.stat-pip.class-lock.capped{background:#6A3300;border-color:#8B4400;cursor:default}
+.stat-pts{color:#FFD700;font-size:.8rem;min-width:60px;text-align:right}
+#btn-create{background:#FFD700;border:none;color:#000;font-family:inherit;font-weight:bold;
+  font-size:1.1rem;letter-spacing:.15em;padding:.6rem 2.5rem;cursor:pointer;margin-top:1rem}
+#btn-create:hover{background:#FFA500}
+.persist-row{display:flex;gap:.5rem;align-items:center;font-size:.8rem;color:#888}
+.persist-row input{cursor:pointer}
+
+/* ── GAME ── */
+#screen-game{background:#000;flex-direction:column}
+#game-wrap{position:relative;image-rendering:pixelated}
+#game-wrap canvas{position:absolute;top:0;left:0;image-rendering:pixelated}
+#cv-bg{z-index:1}#cv-tiles{z-index:2}#cv-sprites{z-index:3}#cv-fg{z-index:4;pointer-events:none}#cv-ceiling{z-index:5;pointer-events:none}
+#cv-ui{z-index:6;pointer-events:none}
+#cv-ui[style*="pointer-events: auto"]{cursor:pointer}
+
+/* ── HUD ── */
+#hud{position:fixed;top:0;left:0;right:0;height:36px;background:linear-gradient(#000a,#0006);
+  display:flex;align-items:center;padding:0 12px;gap:16px;z-index:10;font-size:.75rem}
+#hud-zone{color:#87CEEB;letter-spacing:.1em;flex:1}
+#hud-hearts,#hud-mp{display:flex;gap:2px}
+#hud-spacebucks,#hud-alusd,#hud-alcx{font-size:.75rem}
+#hud-players{color:#888;font-size:.7rem}
+#hud-level{color:#8BC34A;font-weight:bold;font-size:.75rem;min-width:36px;text-align:center}
+#hud-xp-bar{position:fixed;top:36px;left:0;right:0;height:5px;background:#111;z-index:10}
+#hud-xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#4CAF50,#CDDC39);transition:width .4s}
+
+/* ── CHAT ── */
+#chat-panel{position:fixed;bottom:0;left:0;width:min(320px,100vw);z-index:10;
+  background:#0008;padding:6px}
+#chat-log{height:80px;overflow-y:auto;font-size:.72rem;line-height:1.4;margin-bottom:4px}
+#chat-log .msg{padding:1px 0}
+#chat-log .msg .who{color:#FFD700}
+#chat-input{width:100%;background:#111;border:1px solid #444;color:#fff;
+  font-family:inherit;font-size:.75rem;padding:3px 6px;display:none}
+
+/* ── MOBILE ── */
+body.touch #mobile-pad{display:flex}
+#mobile-pad{display:none;position:fixed;bottom:10px;right:10px;z-index:10;
+  flex-direction:column;align-items:center;gap:2px}
+.pad-row{display:flex;gap:2px}
+.pad-btn{width:44px;height:44px;background:#ffffff22;border:2px solid #ffffff44;
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pad-btn:active{background:#ffffff55}
+#mobile-act{position:fixed;bottom:10px;left:10px;z-index:10;display:none;flex-direction:column;gap:6px}
+body.touch #mobile-act{display:flex}
+.act-btn{width:52px;height:52px;background:#FFD70033;border:2px solid #FFD70088;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;letter-spacing:.05em;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.act-btn:active{background:#FFD70066}
+
+/* ── PAUSE ── */
+#pause-overlay{display:none;position:fixed;inset:0;background:#000c;z-index:20;
+  align-items:center;justify-content:center}
+#pause-overlay.open{display:flex}
+#pause-box{background:#0d0d1f;border:3px solid #FFD700;padding:1.5rem;min-width:320px;max-width:90vw}
+#pause-box h2{color:#FFD700;letter-spacing:.2em;margin-bottom:1rem;font-size:1.1rem}
+#inv-grid{display:grid;grid-template-columns:repeat(8,36px);gap:4px;margin-bottom:1rem}
+.inv-slot{width:36px;height:36px;border:2px solid #333;background:#111;
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;cursor:pointer}
+.inv-slot.has-item{border-color:#FFD700}
+#stats-box{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:#ccc}
+.stat-line{display:flex;justify-content:space-between}
+.stat-line span:last-child{color:#FFD700}
+
+/* ── GOD MODE ── */
+#godmode-badge{display:none;position:fixed;top:40px;right:8px;background:#FFD700;
+  color:#000;font-size:.65rem;padding:2px 8px;z-index:15;letter-spacing:.1em}
+#godmode-badge.on{display:block}
+
+/* ── QUEUE PANEL ── */
+#queue-panel{display:none;position:fixed;bottom:90px;right:10px;z-index:15;
+  background:#050510;border:2px solid #FFD700;min-width:185px;max-width:210px;
+  font-family:'Courier New',monospace;box-shadow:0 0 24px #FFD70044}
+#queue-header{background:#FFD700;color:#000;font-size:.63rem;letter-spacing:.15em;
+  padding:4px 8px;font-weight:bold}
+#queue-ticket-num{font-size:2.2rem;color:#FFD700;text-align:center;
+  padding:8px 0 2px;line-height:1;letter-spacing:.05em}
+#queue-serving-line{color:#aaa;font-size:.67rem;text-align:center;padding:1px 0}
+#queue-ahead-line{color:#888;font-size:.65rem;text-align:center;padding-bottom:5px}
+#queue-locked-line{color:#FF8C00;font-size:.65rem;text-align:center;
+  padding:3px 8px;border-top:1px solid #1a1a30}
+#queue-list{max-height:80px;overflow-y:auto;padding:4px 8px;
+  border-top:1px solid #1a1a30;font-size:.61rem}
+#queue-list div{padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#queue-enter-btn{display:none;margin:6px 8px 2px;padding:6px;background:#002A14;
+  border:2px solid #00DD77;color:#00DD77;font-family:inherit;font-size:.7rem;
+  letter-spacing:.1em;cursor:pointer;width:calc(100% - 16px);
+  animation:blink .7s step-end infinite}
+#queue-leave-btn{margin:4px 8px 8px;padding:3px;background:#1a0000;
+  border:1px solid #440000;color:#664444;font-family:inherit;font-size:.6rem;
+  cursor:pointer;width:calc(100% - 16px);letter-spacing:.05em}
+
+/* ── NPC DIALOG ── */
+#npc-dialog{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  width:88%;max-width:540px;background:#07071a;border:3px solid #4a90d9;
+  border-radius:3px;z-index:20;font-family:'Courier New',monospace;
+  box-shadow:0 0 28px #4a90d944}
+#npc-dialog-inner{display:flex;align-items:flex-start;gap:10px;padding:10px 12px 6px}
+#npc-portrait-cv{border:2px solid #4a90d9;background:#0a0a1a;flex-shrink:0;
+  image-rendering:pixelated}
+#npc-dialog-body{flex:1;min-width:0}
+#npc-dialog-name{color:#FFD700;font-size:.72rem;font-weight:bold;
+  letter-spacing:.08em;margin-bottom:4px}
+#npc-dialog-text{color:#d8d8ee;font-size:.75rem;line-height:1.55;min-height:36px}
+#npc-dialog-hint{text-align:right;color:#445;font-size:.6rem;
+  padding:3px 12px 6px;border-top:1px solid #1a1a3a;margin-top:3px}
+
+/* ── SHOP ── */
+#shop-overlay{display:none;position:fixed;inset:0;background:#000d;z-index:25;
+  align-items:center;justify-content:center}
+#shop-overlay.open{display:flex}
+#shop-box{background:#080818;border:3px solid #FFD700;padding:1.2rem;
+  min-width:360px;max-width:94vw;max-height:82vh;overflow-y:auto;
+  font-family:'Courier New',monospace}
+#shop-header-row{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:.8rem;border-bottom:1px solid #333;padding-bottom:.5rem}
+#shop-title{color:#FFD700;font-size:.9rem;font-weight:bold;letter-spacing:.15em}
+#shop-gold-display{color:#FFD700;font-size:.8rem}
+.shop-row{display:flex;align-items:center;gap:10px;padding:7px 4px;
+  border-bottom:1px solid #12122a}
+.shop-row-icon{font-size:1.3rem;width:26px;text-align:center;flex-shrink:0}
+.shop-row-info{flex:1;min-width:0}
+.shop-row-name{color:#ddd;font-size:.78rem;font-weight:bold}
+.shop-row-desc{color:#666;font-size:.67rem;margin-top:1px}
+.shop-row-req{font-size:.62rem;margin-top:2px}
+.shop-row-right{text-align:right;flex-shrink:0}
+.shop-row-price{color:#FFD700;font-size:.78rem;margin-bottom:3px}
+.shop-buy-btn{background:#1a4a1a;border:1px solid #4CAF50;color:#4CAF50;
+  padding:3px 10px;font-family:inherit;font-size:.68rem;cursor:pointer;letter-spacing:.05em}
+.shop-buy-btn:hover:not(:disabled){background:#2a6a2a}
+.shop-buy-btn:disabled{background:#1a1a1a;border-color:#333;color:#444;cursor:default}
+.bank-pos{background:#111;border:1px solid #2a2a2a;border-radius:6px;padding:10px;margin:6px 0;font-size:.8rem}
+.bank-bar{background:#1a1a1a;border-radius:4px;height:7px;margin:6px 0}
+.bank-bar-fill{background:linear-gradient(90deg,#388E3C,#81C784);height:7px;border-radius:4px}
+</style>
