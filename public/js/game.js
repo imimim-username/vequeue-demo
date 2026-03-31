@@ -2580,6 +2580,7 @@ function initSocket(){
     } else {
       // New account or guest — go to character creation
       showScreen('screen-title');
+      musPlay('title');
     }
   });
 
@@ -2904,6 +2905,7 @@ document.getElementById('btn-start').addEventListener('click',()=>{
   loadState(); // pre-populate G from saved state before building create screen
   showScreen('screen-create');
   buildCreateScreen();
+  musPlay('title'); // keep heroic music going through character creation
 });
 
 // ── Queue panel buttons ───────────────────────────────────────────────────────
@@ -2981,6 +2983,7 @@ document.getElementById('login-pin').addEventListener('keydown',e=>{if(e.key==='
 document.getElementById('login-username').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-pin').focus();});
 document.getElementById('btn-guest').addEventListener('click',()=>{
   showScreen('screen-title');
+  musPlay('title');
 });
 
 // Init socket and show login screen on page load

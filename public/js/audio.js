@@ -140,7 +140,27 @@ const N={_:0,
 
 // Zone music tracks: {bpm, mel:[[freq,beats],...], bass:[[freq,beats],...]}
 // beats = quarter-note count; freq=0 is a rest
+// Optional: melType/bassType override oscillator ('square'|'sawtooth'|'triangle'|'sine')
+//           melVol/bassVol override volume
 const MUS_TRACKS={
+  // ── Title / character-creation screen — heroic fanfare in C major ──
+  title:{bpm:108, melType:'sawtooth', melVol:0.10, bassType:'triangle', bassVol:0.16,
+    mel:[
+      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,2],[N._,1],    // fanfare arpeggio
+      [N.B5,1],[N.A5,1],[N.G5,2],[N._,2],              // descending answer
+      [N.A5,1],[N.C6,1],[N.B5,1],[N.A5,1],[N.G5,2],   // flowing phrase
+      [N.F5,1],[N.G5,1],[N.A5,2],                      // transition lift
+      [N.G5,1],[N.E5,1],[N.D5,1],[N.C5,1],[N.E5,2],   // second phrase
+      [N.G5,1],[N.A5,1],[N.C6,2],[N.B5,1],[N.A5,1],   // climb to peak
+      [N.G5,2],[N.F5,2],[N.E5,2],[N._,2],              // breath before finale
+      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,1],[N.E6,2],   // triumphant ascent
+      [N.D6,2],[N.C6,4]],                              // grand resolution
+    bass:[
+      [N.C3,2],[N.G3,2],[N.A3,2],[N.E3,2],
+      [N.F3,2],[N.C3,2],[N.G3,4],
+      [N.F3,2],[N.C3,2],[N.G3,2],[N.E3,2],
+      [N.A3,2],[N.F3,2],[N.G3,2],[N.C3,2],
+      [N.G3,4],[N.C3,4]]},
   world:{bpm:126,
     mel:[[N.E5,1],[N.G5,1],[N.A5,2],[N.G5,1],[N.E5,1],[N.D5,2],
          [N.C5,1],[N.E5,1],[N.G5,2],[N.A5,1],[N.G5,1],[N.E5,2],
@@ -211,14 +231,16 @@ function _musSched(){
   const track=MUS_TRACKS[_musZone]; if(!track)return;
   const c=getAudioCtx();
   const now=c.currentTime,LA=0.15,spb=60/track.bpm;
+  const mType=track.melType||'square', mVol=track.melVol||0.09;
+  const bType=track.bassType||'triangle', bVol=track.bassVol||0.13;
   while(_musMel.next<now+LA){
     const[f,b]=track.mel[_musMel.idx%track.mel.length];
-    _musNote(f,_musMel.next,spb*b*0.88,'square',0.09);
+    _musNote(f,_musMel.next,spb*b*0.88,mType,mVol);
     _musMel.next+=spb*b; _musMel.idx++;
   }
   while(_musBass.next<now+LA){
     const[f,b]=track.bass[_musBass.idx%track.bass.length];
-    _musNote(f,_musBass.next,spb*b*0.72,'triangle',0.13);
+    _musNote(f,_musBass.next,spb*b*0.72,bType,bVol);
     _musBass.next+=spb*b; _musBass.idx++;
   }
 }
