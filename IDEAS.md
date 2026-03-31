@@ -1,6 +1,6 @@
 # veQueue Game — Ideas & Design Notes
 
-_Last updated: 2026-03-31_
+_Last updated: 2026-03-31 (admin dashboard added)_
 
 ---
 
@@ -540,6 +540,63 @@ Specialized sub-zones inside the economic zone, each requiring you to commit you
 - Other players see the queue jump happening in real time
 - **Balance:** auction price scales with queue depth — crowded queue = expensive bypass; patient players benefit from accumulating queue seniority while spenders burn ALCX; neither strategy is strictly dominant
 - **Teaches:** entry queue premium capture — the mechanism earns from demand volatility; queue members are enriched by jumpers
+
+---
+
+## Admin Dashboard
+
+A password-protected operator panel served at `/admin` on the same Node.js server. Designed for live demos and real-time governance demonstrations — an admin can adjust parameters mid-session and all connected players feel the effects immediately.
+
+### Access & Auth
+- Served at `/admin` route by the existing Express/Node server
+- Protected by `ADMIN_PASSWORD` env var — simple POST login, session cookie
+- Separate page from the game canvas; no in-game UI
+
+### Live Stats Panel (read-only, real-time via Socket.io)
+- Connected player count + each player's current zone
+- Queue depth for marketplace and treasury (separate counters)
+- Protocol treasury balance (accumulated from all fees)
+- Total token supply in circulation: Spacebucks / Schmeckles / alUSD / alETH / ALCX
+- Active bank positions count + total outstanding debt
+
+### Tunable Parameters (push to all clients instantly via Socket.io `config_update` event)
+
+| Parameter | Default | Control |
+|-----------|---------|---------|
+| Bank LTV % | 90% | Slider 0–100 |
+| Bank yield fee % | 15% | Slider 0–50 |
+| Loan auto-repayment speed | 0.5%/tick | Slider (slow / medium / fast / instant) |
+| Exchange fee % | 0.30% | Slider 0–5% |
+| ALCX queue drip rate | 1 per 5s | Slider |
+| ALCX queue lock % | 20% | Slider 0–100% |
+| Queue jump ALCX cost multiplier | 1× | Slider 0.5–10× |
+| Enemy difficulty multiplier | 1× | Slider 0.5–5× |
+| XP multiplier | 1× | Slider 0.5–5× |
+| Shop prices multiplier | 1× | Slider 0.25–3× |
+| Starting wallet (new players) | 100 SB / 50 alUSD / 20 ALCX | Number inputs |
+
+**Broadcast mechanic:** when admin changes a parameter, server emits `config_update` → all connected clients update their local `CFG` object → takes effect next game tick → players see a brief toast notification: *"⚙ Governor adjusted: Bank LTV → 75%"*
+
+### Admin Actions
+- **Kick player** — disconnect by username
+- **Teleport player** — move a specific player to any zone
+- **Airdrop currencies** — grant Spacebucks / alUSD / ALCX to all players simultaneously
+- **Trigger whale arrival** — fire the NPC whale event (flow-rate dilution demo)
+- **Broadcast message** — send a message to all players' in-game chat
+- **Reset treasury** — zero the treasury balance counter
+- **Toggle god mode** — enable/disable for a specific player by username
+- **Force queue serve** — immediately serve the next player in a queue (useful for pacing demos)
+
+### Why This Is High-Value for Demos
+During a live presentation, the admin can say: *"Watch what happens when I lower the Bank LTV from 90% to 50%"* — and everyone in the game feels it immediately. Makes governance mechanics tangible rather than theoretical. The whale arrival trigger is especially useful: trigger it on command, let players react, then discuss the flow-rate dilution resistance concept while they're experiencing it.
+
+### Implementation Notes
+- Server: add `/admin` GET route (serve dashboard HTML) and `/admin/login` POST route
+- New socket event: `config_update {key, value}` — server broadcasts to all game clients
+- New socket event: `admin_action {type, payload}` — server executes and may emit follow-up events
+- Client: listen for `config_update`, update matching `CFG` field, show toast
+- All tunable parameters must reference `CFG` fields (not hardcoded literals) in game code
+- `ADMIN_PASSWORD` env var required; no dashboard access without it
 
 ---
 
