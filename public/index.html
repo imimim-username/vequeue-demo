@@ -3921,6 +3921,7 @@ function depositBank(collateral){
   G.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
   chatLog(`🏦 Deposited ${amt} ${collateral==='spacebucks'?'Spacebucks':'Schmeckles'} → borrowed ${borrow} ${collateral==='spacebucks'?'alUSD':'alETH'} (90% LTV)`,'#4CAF50');
   SFX.buy();
+  socket?.emit('bank_sync',{bankPositions:G.bankPositions});
   renderBankUI();
 }
 function claimBankPosition(idx){
@@ -3931,6 +3932,7 @@ function claimBankPosition(idx){
   else G.schmeckles+=pos.deposited;
   chatLog(`✅ Claimed ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles'} from fully repaid position!`,'#FFD700');
   SFX.coin();
+  socket?.emit('bank_sync',{bankPositions:G.bankPositions});
   renderBankUI();
 }
 
@@ -3975,8 +3977,9 @@ function depositTransmuter(type){
   const existing=G.transmuterDeposits.find(d=>d.type===type&&d.amount>0.001);
   if(existing)existing.amount+=amt;
   else G.transmuterDeposits.push({type,amount:amt,available:0});
-  chatLog(`⚗ Transmuter: deposited ${amt.toFixed(2)} ${type}. Waiting for next redemption event.`,'#4FC3F7');
+  chatLog(`⚗ Transmuter: deposited ${amt.toFixed(2)} ${type}. Waiting for next global redemption event.`,'#4FC3F7');
   SFX.buy();
+  socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
   renderTransmuterUI();
 }
 function claimTransmuter(idx){
@@ -3988,6 +3991,7 @@ function claimTransmuter(idx){
   else G.schmeckles+=Math.floor(amt);
   chatLog(`✅ Transmuter: claimed ${Math.floor(amt)} ${dep.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles'}!`,'#FFD700');
   SFX.coin();
+  socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
   renderTransmuterUI();
 }
 function distributeTransmuterPool(sbAmount,ethAmount){
@@ -4677,44 +4681,21 @@ function gameLoop(ts){
       G.alcx+=1;
       chatLog('⚗ Queue: +1 ALCX earned','#9C27B0');
     }
-    // Bank: yield-based auto-repayment + earmarking for Transmuter
+    // Bank: local yield repayment (server handles earmarking/transmuter globally every 60s)
     if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
-      const totalDebt=G.bankPositions.reduce((s,p)=>s+(!p.claimed&&p.debt>0?p.debt:0),0);
+      let anyRepaid=false;
       G.bankPositions.forEach(pos=>{
         if(pos.claimed||pos.debt<=0.001)return;
-        // Yield repayment (0.5%/cycle, represents yield minus 15% protocol fee)
         const payment=Math.min(pos.debt,pos.borrowed*0.005);
         pos.debt=Math.max(0,pos.debt-payment);
-        // Earmarking: proportional to this position's share of total debt (0.5%/cycle)
-        if(totalDebt>0){
-          const share=pos.debt/totalDebt;
-          const earmarkAmt=Math.min(pos.debt-(pos.earmarked||0), totalDebt*0.005*share);
-          pos.earmarked=Math.min(pos.debt,(pos.earmarked||0)+Math.max(0,earmarkAmt));
-        }
         if(pos.debt<=0.001&&!pos.claimed){
-          pos.debt=0;pos.earmarked=0;
+          pos.debt=0;
           chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
           SFX.coin();
         }
+        anyRepaid=true;
       });
-    }
-    // Transmuter redemption event (every 900 ticks ~15s): fire earmarked → debt paid → pool fills
-    if(G.bankPositions&&G.tick%900===0&&G.tick>0){
-      let sbRedeemed=0,ethRedeemed=0;
-      G.bankPositions.forEach(pos=>{
-        if(pos.claimed||!(pos.earmarked>0.001))return;
-        const redeem=pos.earmarked;
-        pos.debt=Math.max(0,pos.debt-redeem);
-        pos.earmarked=0;
-        const net=redeem*(1-0.005); // 0.5% borrower redemption fee
-        if(pos.collateral==='spacebucks')sbRedeemed+=net;
-        else ethRedeemed+=net;
-        if(pos.debt<=0.001&&!pos.claimed){pos.debt=0;chatLog(`✨ Bank position fully repaid!`,'#FFD700');SFX.coin();}
-      });
-      if(sbRedeemed>0||ethRedeemed>0){
-        distributeTransmuterPool(sbRedeemed,ethRedeemed);
-        if(G.transmuterDeposits.some(d=>d.available>0.001))chatLog('⚗ Transmuter: redemption arrived — visit Transmuter Mira to claim!','#4FC3F7');
-      }
+      if(anyRepaid)socket?.emit('bank_sync',{bankPositions:G.bankPositions});
     }
     // persist
     if(G.tick%90===0&&G.mp<G.maxMp){G.mp=Math.min(G.maxMp,G.mp+1);}
@@ -4870,6 +4851,29 @@ function initSocket(){
       SFX.ticket();
       updateQueuePanel();
     }
+  });
+
+  // Global bank redemption: server updated our positions
+  socket.on('bank_positions_updated',data=>{
+    G.bankPositions=data.bankPositions;
+    G.bankPositions.forEach(pos=>{
+      if(pos.debt<=0.001&&!pos.claimed){
+        chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
+        SFX.coin();
+      }
+    });
+    if(document.getElementById('bank-ui').style.display!=='none')renderBankUI();
+  });
+
+  // Global transmuter payout: server distributed redeemed collateral
+  socket.on('transmuter_payout',data=>{
+    G.transmuterDeposits=data.transmuterDeposits;
+    if(data.sbPayout>0||data.schmPayout>0){
+      chatLog(`⚗ Transmuter: global redemption — ${data.sbPayout>0?data.sbPayout.toFixed(2)+' 🪙 ':''}`+
+              `${data.schmPayout>0?data.schmPayout.toFixed(4)+' 💀 ':''}ready to claim!`,'#4FC3F7');
+      SFX.coin();
+    }
+    if(document.getElementById('transmuter-ui').style.display!=='none')renderTransmuterUI();
   });
 }
 

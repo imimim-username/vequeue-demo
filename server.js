@@ -19,6 +19,7 @@ const io=new Server(srv,{cors:{origin:'*'}});
 app.use(express.static(path.join(__dirname,'public')));
 
 const players={};
+const socketsByAccount={}; // accountId -> socket.id (for targeted emits)
 
 // ── Queue state ───────────────────────────────────────────────────────────────
 // Each economic zone has an entry queue and an exit queue.
@@ -102,6 +103,7 @@ io.on('connection',socket=>{
     pdb[key]={username,pin_hash:hashPin(String(pin)),data:null,created:Date.now()};
     saveDb();
     socket.accountId=key;
+    socketsByAccount[key]=socket.id;
     socket.emit('auth_result',{ok:true,isNew:true,username});
   });
 
@@ -111,7 +113,24 @@ io.on('connection',socket=>{
     if(!row||row.pin_hash!==hashPin(String(pin)))
       return socket.emit('auth_result',{ok:false,error:'Invalid username or PIN.'});
     socket.accountId=key;
+    socketsByAccount[key]=socket.id;
     socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:row.data||null});
+  });
+
+  // Sync bank positions after any bank transaction (deposit/claim)
+  socket.on('bank_sync',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    pdb[socket.accountId].data=pdb[socket.accountId].data||{};
+    pdb[socket.accountId].data.bankPositions=data.bankPositions;
+    saveDb();
+  });
+
+  // Sync transmuter deposits after any transmuter transaction
+  socket.on('transmuter_sync',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    pdb[socket.accountId].data=pdb[socket.accountId].data||{};
+    pdb[socket.accountId].data.transmuterDeposits=data.transmuterDeposits;
+    saveDb();
   });
 
   socket.on('save_character',data=>{
@@ -202,6 +221,8 @@ io.on('connection',socket=>{
   });
 
   socket.on('disconnect',()=>{
+    if(socket.accountId&&socketsByAccount[socket.accountId]===socket.id)
+      delete socketsByAccount[socket.accountId];
     const p=players[socket.id];
     if(p){
       socket.to(p.zone).emit('player_left',socket.id);
@@ -222,6 +243,68 @@ io.on('connection',socket=>{
     console.log('disconnect',socket.id);
   });
 });
+
+// ── Global Transmuter Redemption (every 60s) ──────────────────────────────────
+const EARMARK_RATE=0.005; // 0.5% of each position's debt earmarked+redeemed per cycle
+setInterval(()=>{
+  // 1. Compute total system debt across all accounts
+  let totalDebt=0;
+  Object.values(pdb).forEach(acct=>{
+    (acct.data?.bankPositions||[]).forEach(p=>{if(!p.claimed&&p.debt>0.001)totalDebt+=p.debt;});
+  });
+  if(totalDebt<=0)return;
+
+  // 2. Earmark + redeem per position, collect collateral
+  let sbRedeemed=0,ethRedeemed=0;
+  Object.entries(pdb).forEach(([id,acct])=>{
+    if(!acct.data?.bankPositions)return;
+    acct.data.bankPositions.forEach(pos=>{
+      if(pos.claimed||pos.debt<=0.001)return;
+      const redeem=EARMARK_RATE*pos.debt; // proportional to own debt (=debt/totalDebt * totalDebt * rate)
+      pos.debt=Math.max(0,pos.debt-redeem);
+      pos.earmarked=0;
+      const net=redeem*(1-0.005); // 0.5% borrower redemption fee
+      if(pos.collateral==='spacebucks')sbRedeemed+=net;
+      else ethRedeemed+=net;
+      if(pos.debt<=0.001)pos.debt=0;
+    });
+    // Push updated positions to connected player
+    const sid=socketsByAccount[id];
+    if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
+  });
+
+  if(sbRedeemed<=0&&ethRedeemed<=0){saveDb();return;}
+
+  // 3. Distribute pro-rata to transmuter depositors
+  let totalTrAlUSD=0,totalTrAlETH=0;
+  Object.values(pdb).forEach(acct=>{
+    (acct.data?.transmuterDeposits||[]).forEach(d=>{
+      if(d.type==='alUSD'&&d.amount>0.001)totalTrAlUSD+=d.amount;
+      if(d.type==='alETH'&&d.amount>0.001)totalTrAlETH+=d.amount;
+    });
+  });
+  Object.entries(pdb).forEach(([id,acct])=>{
+    if(!acct.data?.transmuterDeposits)return;
+    let sbPayout=0,schmPayout=0;
+    acct.data.transmuterDeposits.forEach(dep=>{
+      if(dep.type==='alUSD'&&dep.amount>0.001&&totalTrAlUSD>0){
+        const recv=Math.min(dep.amount,sbRedeemed*(dep.amount/totalTrAlUSD));
+        dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); sbPayout+=recv;
+      }
+      if(dep.type==='alETH'&&dep.amount>0.001&&totalTrAlETH>0){
+        const recv=Math.min(dep.amount,ethRedeemed*(dep.amount/totalTrAlETH));
+        dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); schmPayout+=recv;
+      }
+    });
+    if(sbPayout>0||schmPayout>0){
+      const sid=socketsByAccount[id];
+      if(sid)io.to(sid).emit('transmuter_payout',{transmuterDeposits:acct.data.transmuterDeposits,sbPayout,schmPayout});
+    }
+  });
+
+  saveDb();
+  console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
+},60000);
 
 const PORT=3001;
 srv.listen(PORT,'127.0.0.1',()=>console.log(`Victory Quest running on 127.0.0.1:${PORT}`));
