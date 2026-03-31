@@ -1383,9 +1383,9 @@ function makeMarketplace(){
   fill(7,1,9,4,T.STALL);fill(7,7,9,10,T.STALL);fill(7,13,9,16,T.STALL);
   // aisles (walkable)
   fill(5,1,6,18,T.STONE);fill(2,5,9,6,T.STONE);fill(2,11,9,12,T.STONE);
-  // queue entry
-  m[0][9]=T.QUEUE_IN;m[0][10]=T.QUEUE_IN;
-  m[12][9]=T.QUEUE_OUT;m[12][10]=T.QUEUE_OUT;
+  // doors: north entry and south exit (both DOOR_O so players can see them clearly)
+  m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
+  m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;
   // columns
   m[2][18]=T.COLUMN;m[10][18]=T.COLUMN;
   return m;
@@ -1402,7 +1402,7 @@ function makeTreasury(){
   fill(1,9,11,10,T.STONE);fill(5,1,6,18,T.STONE);
   // entry door (north) and exit queue (south)
   m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
-  m[12][9]=T.QUEUE_OUT;m[12][10]=T.QUEUE_OUT;
+  m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;
   // corner columns (decorative)
   m[2][1]=T.COLUMN;m[2][18]=T.COLUMN;m[9][1]=T.COLUMN;m[9][18]=T.COLUMN;
   // centrepiece fountain (walkable)
@@ -1539,12 +1539,17 @@ const ZONE_DOORS = {
   world_marketplace:{from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'marketplace',sx:10,sy:1, queue:true},
   world_treasury:   {from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'treasury',  sx:10,sy:1, queue:true},
   // From building interiors → world
-  tavern_exit:     {from:'tavern',    tileRows:[12],tileCols:[9,10,11],   to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
-  governance_exit: {from:'governance',tileRows:[12],tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
-  marketplace_exit:{from:'marketplace',tileRows:[12],tileCols:[8,9,10,11],to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+14},
-  treasury_exit:   {from:'treasury',  tileRows:[12],tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+29, sy:TOWN_OY+14},
+  tavern_exit:           {from:'tavern',      tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
+  governance_exit:       {from:'governance',  tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
+  // Marketplace: south exit (far from entry) + north exit (back through entry door)
+  marketplace_exit:      {from:'marketplace', tileRows:[12],  tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
+  marketplace_north_exit:{from:'marketplace', tileRows:[0],   tileCols:[9,10],      to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+14},
+  // Treasury: south exit (far from entry) + north exit (back through entry door)
+  treasury_exit:         {from:'treasury',    tileRows:[12],  tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
+  treasury_north_exit:   {from:'treasury',    tileRows:[0],   tileCols:[9,10],      to:'world', sx:TOWN_OX+29, sy:TOWN_OY+14},
   world_dungeon:   {from:'world', tileRows:[139,140,141,142,143,144], tileCols:[108,109,110,111], to:'dungeon', sx:8, sy:6},
-  dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:148},
+  // Dungeon exit: spawn NORTH of the grating (row 134) so player doesn't immediately re-trigger dungeon entry when walking back to town
+  dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:134},
 };
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
