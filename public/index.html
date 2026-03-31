@@ -2920,7 +2920,12 @@ window.addEventListener('keydown',e=>{
     if(document.getElementById('transmuter-ui').style.display!=='none'){ closeTransmuter(); return; }
     if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
     if(G.shop){ closeShop(); e.preventDefault(); }
-    else if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
+    else if(G.npcDialog){
+      // Esc on a quest offer or active quest → decline / abandon
+      const _qid=G.npcDialog.npc?.questId;
+      if(_qid){const _qs=G.quests[_qid];if(!_qs||_qs.status==='active'){declineOrAbandonQuest();e.preventDefault();return;}}
+      advanceDialog(); e.preventDefault();
+    }
     else {
       const ci=document.getElementById('chat-input');
       if(document.activeElement===ci){ci.blur();ci.style.display='none';}
@@ -2982,6 +2987,8 @@ function tryMove(dx,dy){
 
 // ── QUEST SYSTEM ──────────────────────────────────────────────────────────────
 // Returns the appropriate dialog lines for an NPC, resolving quest state.
+const QUEST_ABANDON_PENALTY=50; // alUSD penalty for abandoning an active quest
+
 function getQuestDialog(npc){
   const qid=npc.questId;
   if(!qid)return npc.dialog;
@@ -2990,10 +2997,13 @@ function getQuestDialog(npc){
   const qs=G.quests[qid];
   if(!qs){
     // Quest not yet accepted — offer it
-    return[...qdef.offerLines,'[ Accept quest: E / Space ]'];
+    return[...qdef.offerLines,'[ Accept: Space/E  |  Decline: Esc ]'];
   }
   if(qs.status==='active'){
-    return[`${qdef.inProgressLine} (${qs.progress}/${qdef.required})`];
+    return[
+      `${qdef.inProgressLine} (${qs.progress}/${qdef.required})`,
+      `[ Continue: Space/E  |  Abandon: Esc (costs ${QUEST_ABANDON_PENALTY} alUSD) ]`,
+    ];
   }
   if(qs.status==='ready'){
     return[...qdef.readyLines,`[ Claim reward: +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD ]`];
@@ -3024,6 +3034,43 @@ function handleQuestDialogClose(npc){
     chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.alUSD} alUSD`,'#4CAF50');
     if(G.paused)renderInventoryScreen();
   }
+}
+
+// Called when the player presses Esc during a quest dialog — declines offer or abandons active quest.
+function declineOrAbandonQuest(){
+  if(!G.npcDialog)return;
+  const npc=G.npcDialog.npc;
+  const qid=npc?.questId;
+  // Close dialog
+  G.npcDialog=null;
+  G.paused=false;
+  document.getElementById('npc-dialog').style.display='none';
+  SFX.select();
+  if(!qid)return;
+  const qdef=QUEST_DEFS[qid];
+  if(!qdef)return;
+  const qs=G.quests[qid];
+  if(!qs){
+    // Declining the quest offer
+    chatLog(`Declined quest: "${qdef.title}".`,'#888888');
+  } else if(qs.status==='active'){
+    // Abandoning an active quest — charge penalty
+    if(G.alUSD<QUEST_ABANDON_PENALTY){
+      chatLog(`Can't abandon: need ${QUEST_ABANDON_PENALTY} alUSD (have ${G.alUSD.toFixed(2)}).`,'#FF4444');
+      SFX.error();
+      // Re-open the dialog so they know they're stuck with it
+      G.npcDialog={npc,lineIdx:0,dialog:getQuestDialog(npc)};
+      G.paused=true;
+      showNpcDialog();
+      return;
+    }
+    G.alUSD=Math.max(0,G.alUSD-QUEST_ABANDON_PENALTY);
+    delete G.quests[qid];
+    chatLog(`Quest abandoned: "${qdef.title}" (−${QUEST_ABANDON_PENALTY} alUSD penalty).`,'#FF8800');
+    SFX.error();
+    saveToServer();
+  }
+  // If status is 'ready' or 'completed', Esc just closes — no special action needed.
 }
 
 // Called after winning a battle — increments kill-type quest progress.
@@ -3767,27 +3814,34 @@ function doBattleAction(action){
   if(action==='special'){
     let dmg=0,healAmt=0;
     const cls=G.class_||'warrior';
+    const mpCost=(cls==='rogue'||cls==='warrior')?1:2;
+    if(!spendMp(mpCost)){
+      bt.log.push(`Not enough MP! (need ${mpCost} ◆)`);
+      SFX.error();
+      bt.phase='player_turn';
+      return;
+    }
     if(cls==='mage'){
       dmg=Math.max(2,Math.floor(G.stats.lck*1.6+G.stats.agi*0.5+Math.random()*4));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
-      bt.log.push(`Arcane Bolt! ${dmg} magic damage!`);
+      bt.log.push(`Arcane Bolt! ${dmg} magic damage! (−${mpCost} MP)`);
     } else if(cls==='paladin'){
       healAmt=Math.max(1,Math.floor(G.stats.vit*0.6)+2);
       G.hp=Math.min(G.maxHp,G.hp+healAmt);
       SFX.potion();
-      bt.log.push(`Holy Light! Restored ${healAmt} HP.`);
+      bt.log.push(`Holy Light! Restored ${healAmt} HP. (−${mpCost} MP)`);
     } else if(cls==='rogue'){
       dmg=Math.max(1,Math.floor(G.stats.agi*1.3)-Math.floor(bt.enemy.def*0.3));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
-      bt.log.push(`Twin Daggers! ${dmg} piercing damage!`);
+      bt.log.push(`Twin Daggers! ${dmg} piercing damage! (−${mpCost} MP)`);
     } else { // warrior
       const weapon=G.inventory[0];
       dmg=Math.max(1,Math.floor((weapon?.dmg||2)*1.9+G.stats.str*1.1-bt.enemy.def));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
-      bt.log.push(`Power Strike! ${dmg} massive damage!`);
+      bt.log.push(`Power Strike! ${dmg} massive damage! (−${mpCost} MP)`);
     }
   }
 
