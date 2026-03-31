@@ -447,6 +447,9 @@ const NPCS = {
         "A dead hero can't spend their gold. Just saying.",
       ]
     },
+    {type:'merchant',face:5,name:'Market Board',x:8,y:6,
+     dialog:['Browse listings or sell your items here.','Consignment fee: 5% of sale price. Listings expire after 24h.'],
+     market:true},
   ],
   dungeon:[
     { id:'dungeon_ghost', x:33, y:7, type:'guard', face:2, name:'Restless Spirit',

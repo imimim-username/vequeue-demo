@@ -38,6 +38,8 @@ const G = {
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
   shop:null,            // {vendorId} — active shop or null
   dungeonBossDefeated:false,
+  worldLoot:[],
+  marketListings:[],
   quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
 };
 
@@ -94,6 +96,7 @@ window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if(document.getElementById('bank-ui').style.display!=='none'){ closeBank(); return; }
     if(document.getElementById('transmuter-ui').style.display!=='none'){ closeTransmuter(); return; }
+    if(document.getElementById('market-ui').style.display!=='none'){ closeMarket(); return; }
     if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
     if(G.shop){ closeShop(); e.preventDefault(); }
     else if(G.npcDialog){
@@ -269,6 +272,10 @@ function updateQuestProgress(enemyType){
 // ── NPC INTERACTION ────────────────────────────────────────────────────────────
 function tryInteract(){
   if(G.battle||G.npcDialog)return;
+  // Check for nearby loot piles
+  {const px_=Math.floor(G.x/TS),py_=Math.floor(G.y/TS);
+  const nearLoot=G.worldLoot.find(l=>l.zone===G.zone&&Math.abs(l.x-px_)<=1&&Math.abs(l.y-py_)<=1);
+  if(nearLoot){socket.emit('loot_pickup',{lootId:nearLoot.id});return;}}
   const npcs=NPCS[G.zone];if(!npcs)return;
   const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
   // Find the nearest NPC within 1.5 tiles
@@ -281,6 +288,7 @@ function tryInteract(){
   if(nearest.shop){openShop(nearest.shop);return;}
   if(nearest.bank){ openBank(); return; }
   if(nearest.transmuter){ openTransmuter(); return; }
+  if(nearest.market){ openMarket(); return; }
   if(nearest.exchange){ openExchange(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
@@ -1084,13 +1092,28 @@ function endBattle(){
   _snapCtx.fillStyle='#000';_snapCtx.fillRect(0,0,W,H);
   bt.phase='transition_out';
   if(bt.result==='lose'){
-    const pen=Math.floor(G.alUSD*0.10);
-    G.alUSD=Math.max(0,G.alUSD-pen);
+    const droppedItems=G.inventory.slice(2).filter(Boolean);
+    G.inventory=[G.inventory[0],G.inventory[1],...new Array(6).fill(null)];
+    const sbDrop=Math.floor(G.spacebucks*0.30);
+    const smDrop=Math.floor(G.schmeckles*0.30);
+    const auDrop=parseFloat((G.alUSD*0.20).toFixed(2));
+    G.spacebucks=Math.max(0,G.spacebucks-sbDrop);
+    G.schmeckles=Math.max(0,G.schmeckles-smDrop);
+    G.alUSD=Math.max(0,parseFloat((G.alUSD-auDrop).toFixed(2)));
+    if(socket&&(droppedItems.length||sbDrop||smDrop||auDrop)){
+      socket.emit('loot_drop',{
+        zone:G.zone,x:Math.round(G.x/TS),y:Math.round(G.y/TS),
+        items:droppedItems,
+        currencies:{spacebucks:sbDrop,schmeckles:smDrop,alUSD:auDrop},
+        killerType:bt.enemy.type,
+      });
+    }
     G.hp=Math.max(1,Math.floor(G.maxHp*0.3));
     runPixelTransition('out',()=>{
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
       changeZone('world',TOWN_OX+20,TOWN_OY+14);
-      chatLog(`Defeated! Lost ${pen} alUSD. Respawned in town.`,'#FF4040');
+      const lostStr=[sbDrop&&`${sbDrop}🪙`,smDrop&&`${smDrop}💀`,auDrop&&`${auDrop}$`].filter(Boolean).join(' ');
+      chatLog(`Defeated! Dropped: ${lostStr||'nothing'}. Respawned in town.`,'#FF4040');
     });
   } else {
     runPixelTransition('out',()=>{
@@ -1106,6 +1129,71 @@ function endBattle(){
     });
   }
 }
+
+// ── Market ─────────────────────────────────────────────────────────────────────
+let _marketTab='browse';
+function openMarket(){G.paused=true;_marketTab='browse';renderMarketUI();document.getElementById('market-ui').style.display='block';}
+function closeMarket(){G.paused=false;document.getElementById('market-ui').style.display='none';}
+function marketTab(tab){
+  _marketTab=tab;
+  ['browse','list'].forEach(t=>{
+    const btn=document.getElementById('market-tab-'+t);
+    if(btn){btn.style.background=tab===t?'#1A1030':'#0A0A14';btn.style.color=tab===t?'#B080FF':'#888';}
+  });
+  renderMarketUI();
+}
+function renderMarketUI(){
+  const el=document.getElementById('market-content');if(!el)return;
+  if(_marketTab==='browse'){
+    const listings=G.marketListings||[];
+    if(!listings.length){el.innerHTML='<div style="color:#555;text-align:center;padding:16px">No listings yet. Be the first to sell something!</div>';return;}
+    el.innerHTML=listings.map(l=>{
+      const statStr=l.item.dmg?`+${l.item.dmg} DMG`:l.item.def?`+${l.item.def} DEF`:l.item.healFull?'Full HP':l.item.heal?`+${l.item.heal} HP`:'';
+      const priceCol=l.currency==='alETH'?'#7B68EE':'#4CAF50';
+      const canAfford=l.currency==='alETH'?G.alETH>=l.price:G.alUSD>=l.price;
+      const isOwn=l.sellerId===G_accountId;
+      const btn=isOwn
+        ?`<button onclick="cancelListing(${l.id})" style="font-size:.65rem;padding:2px 6px;background:#3A1020;border:1px solid #7A2040;color:#FF8080;cursor:pointer;border-radius:3px;font-family:monospace">CANCEL</button>`
+        :canAfford
+          ?`<button onclick="buyListing(${l.id})" style="font-size:.65rem;padding:2px 6px;background:#1A3020;border:1px solid #2A7040;color:#80FF80;cursor:pointer;border-radius:3px;font-family:monospace">BUY</button>`
+          :`<button disabled style="font-size:.65rem;padding:2px 6px;background:#1A1A1A;border:1px solid #333;color:#444;border-radius:3px;font-family:monospace">BUY</button>`;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #1A1030">
+        <span style="font-size:1.2rem">${l.item.icon||'?'}</span>
+        <div style="flex:1"><div style="color:#EEE">${l.item.name}<span style="color:#666;font-size:.7rem;margin-left:4px">${statStr}</span></div>
+        <div style="color:#555;font-size:.7rem">by ${l.sellerName}</div></div>
+        <div style="text-align:right"><div style="color:${priceCol}">${l.currency==='alETH'?'⟠':'$'}${l.price}</div>${btn}</div>
+      </div>`;
+    }).join('');
+  }else{
+    const listable=G.inventory.map((item,i)=>({item,i})).filter(({item,i})=>i>=2&&item!==null);
+    if(!listable.length){el.innerHTML='<div style="color:#555;text-align:center;padding:16px">No consumables in inventory to list.</div>';return;}
+    const opts=listable.map(({item,i})=>`<option value="${i}">${item.icon||'?'} ${item.name}</option>`).join('');
+    el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">
+      <div><label style="color:#888;font-size:.75rem">Item</label><br>
+        <select id="mkt-item-sel" style="width:100%;background:#0D0D1A;border:1px solid #3A2050;color:#DDD;padding:4px;font-family:monospace;font-size:.75rem;border-radius:3px">${opts}</select></div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:2"><label style="color:#888;font-size:.75rem">Price</label><br>
+          <input id="mkt-price" type="number" min="0.01" step="0.01" placeholder="0.00"
+            style="width:100%;background:#0D0D1A;border:1px solid #3A2050;color:#DDD;padding:4px;font-family:monospace;font-size:.75rem;border-radius:3px;box-sizing:border-box"></div>
+        <div style="flex:1"><label style="color:#888;font-size:.75rem">Currency</label><br>
+          <select id="mkt-currency" style="width:100%;background:#0D0D1A;border:1px solid #3A2050;color:#DDD;padding:4px;font-family:monospace;font-size:.75rem;border-radius:3px">
+            <option value="alUSD">$ alUSD</option><option value="alETH">⟠ alETH</option>
+          </select></div>
+      </div>
+      <div style="color:#555;font-size:.7rem">5% consignment fee deducted from sale. Listings expire in 24h.</div>
+      <button onclick="submitListItem()" style="padding:6px;background:#2A1040;border:1px solid #5A3A80;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.8rem">📋 LIST ITEM</button>
+    </div>`;
+  }
+}
+function submitListItem(){
+  const slot=parseInt(document.getElementById('mkt-item-sel')?.value);
+  const price=parseFloat(document.getElementById('mkt-price')?.value);
+  const currency=document.getElementById('mkt-currency')?.value;
+  if(isNaN(slot)||isNaN(price)||price<=0){chatLog('Enter a valid price.','#FF8800');return;}
+  socket.emit('market_list',{inventorySlot:slot,price,currency});
+}
+function buyListing(id){socket.emit('market_buy',{listingId:id});}
+function cancelListing(id){socket.emit('market_cancel',{listingId:id});}
 
 // ── BANK ──────────────────────────────────────────────────────────────────────
 function openBank(){
@@ -1312,6 +1400,11 @@ function renderShop(){
     const itemCurrency=item.currency||'alUSD';
     const balance=itemCurrency==='alETH'?G.alETH:G.alUSD;
     const canAfford=balance>=item.cost;
+    const altCurrency2=itemCurrency==='alETH'?'alUSD':'alETH';
+    const altRate2=(EXCHANGE_RATES[itemCurrency]||1)/(EXCHANGE_RATES[altCurrency2]||1);
+    const altCost2=altCurrency2==='alETH'?parseFloat((item.cost*altRate2*1.003).toFixed(4)):parseFloat((item.cost*altRate2*1.003).toFixed(2));
+    const altBalance2=altCurrency2==='alETH'?G.alETH:G.alUSD;
+    const canAffordAlt=!canAfford&&altBalance2>=altCost2;
     const meetsLvl=G.level>=item.lvl;
     const canBuy=canAfford&&meetsLvl;
     let statStr='';
@@ -1332,7 +1425,9 @@ function renderShop(){
       </div>
       <div class="shop-row-right">
         <div class="shop-row-price">${currencySymbol}${priceStr}</div>
-        <button class="shop-buy-btn" onclick="buyItem('${v}',${i})" ${canBuy?'':'disabled'}>BUY</button>
+        <button class="shop-buy-btn" onclick="buyItem('${v}',${i})" ${canBuy||canAffordAlt?'':'disabled'} style="${canAffordAlt?'background:#1A2A50;color:#8090FF;border-color:#4060C0':''}">
+          ${canBuy?'BUY':canAffordAlt?`~${altCost2} ${altCurrency2}`:'BUY'}
+        </button>
       </div>
     `;
     list.appendChild(row);
@@ -1341,12 +1436,24 @@ function renderShop(){
 function buyItem(vendorId,idx){
   const item=SHOP_CATALOG[vendorId]?.[idx];
   if(!item)return;
-  const currency=item.currency||'alUSD';
+  let currency=item.currency||'alUSD';
   const balance=currency==='alETH'?G.alETH:G.alUSD;
-  if(balance<item.cost){SFX.error();chatLog(`Not enough ${currency}!`,'#FF4444');return;}
+  if(balance<item.cost){
+    const altCur=currency==='alETH'?'alUSD':'alETH';
+    const altRate=(EXCHANGE_RATES[currency]||1)/(EXCHANGE_RATES[altCur]||1);
+    const altCost=altCur==='alETH'?parseFloat((item.cost*altRate*1.003).toFixed(4)):parseFloat((item.cost*altRate*1.003).toFixed(2));
+    const altBal=altCur==='alETH'?G.alETH:G.alUSD;
+    if(altBal>=altCost){
+      if(altCur==='alETH')G.alETH=parseFloat((G.alETH-altCost).toFixed(4));
+      else G.alUSD=parseFloat((G.alUSD-altCost).toFixed(2));
+      chatLog(`Paid ${altCost} ${altCur} for ${item.name} (auto-converted, 0.3% fee)`,'#8090FF');
+      currency='_converted';
+    }else{SFX.error();chatLog(`Not enough ${currency} (or ${altCur} to convert).`,'#FF4444');return;}
+  }
   if(G.level<item.lvl){SFX.error();chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
-  if(currency==='alETH')G.alETH-=item.cost;
-  else G.alUSD-=item.cost;
+  if(currency==='alETH')G.alETH=parseFloat((G.alETH-item.cost).toFixed(4));
+  else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-item.cost).toFixed(2));
+  // if currency==='_converted', already deducted above
   if(item.type==='weapon'){
     G.inventory[0]={...item};
     SFX.buy();
@@ -1522,6 +1629,19 @@ function renderSpriteLayer(ctx){
   // ── Local player ──
   const sx=G.x-G.camX-12,sy=G.y-G.camY-20;
   drawPlayerSprite(ctx,sx,sy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor);
+
+  // Draw world loot piles
+  if(G.worldLoot){
+    G.worldLoot.filter(l=>l.zone===G.zone).forEach(l=>{
+      const sx=l.x*TS-G.camX+TS/2,sy=l.y*TS-G.camY+TS/2;
+      const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,14);
+      grd.addColorStop(0,'rgba(255,200,0,0.35)');grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,14,0,Math.PI*2);ctx.fill();
+      ctx.save();ctx.font='14px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('💰',sx,sy);
+      ctx.restore();
+    });
+  }
 }
 
 // ── HUD ───────────────────────────────────────────────────────────────────────
@@ -2105,6 +2225,58 @@ function initSocket(){
     }
     if(document.getElementById('transmuter-ui').style.display!=='none')renderTransmuterUI();
   });
+    socket.on('world_loot_init',data=>{G.worldLoot=data.piles||[];});
+    socket.on('world_loot_added',data=>{if(!G.worldLoot.find(l=>l.id===data.pile.id))G.worldLoot.push(data.pile);});
+    socket.on('world_loot_removed',data=>{G.worldLoot=G.worldLoot.filter(l=>l.id!==data.id);});
+    socket.on('loot_claimed',data=>{
+      if(!data.ok){chatLog(data.error||'Loot gone.','#FF4444');return;}
+      G.spacebucks+=data.currencies.spacebucks;
+      G.schmeckles+=data.currencies.schmeckles;
+      G.alUSD=parseFloat((G.alUSD+data.currencies.alUSD).toFixed(2));
+      data.items.forEach(item=>{const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);if(slot!==-1)G.inventory[slot]=item;});
+      G.worldLoot=G.worldLoot.filter(l=>l.id!==data.lootId);
+      const c=data.currencies;
+      const got=[c.spacebucks&&`+${c.spacebucks}🪙`,c.schmeckles&&`+${c.schmeckles}💀`,c.alUSD&&`+${c.alUSD}$`].filter(Boolean).join(' ');
+      chatLog(`💰 Found ${data.fromPlayer}'s loot! ${got||'items only'} + ${data.items.length} item(s) (${Math.round(data.decayPct*100)}% decayed)`,'#FFD700');
+      SFX.coin();saveToServer();
+    });
+    socket.on('market_state',data=>{
+      G.marketListings=data.listings||[];
+      if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
+    });
+    socket.on('market_buy_result',data=>{
+      if(data.ok){
+        if(data.currency==='alETH')G.alETH=parseFloat((G.alETH-data.price).toFixed(4));
+        else G.alUSD=parseFloat((G.alUSD-data.price).toFixed(2));
+        const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+        if(slot!==-1)G.inventory[slot]=data.item;
+        chatLog(`Bought ${data.item.name} from ${data.sellerName}!`,'#4CAF50');
+        SFX.buy();saveToServer();
+        if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
+      }else{chatLog('Purchase failed: '+data.error,'#FF4444');SFX.error();}
+    });
+    socket.on('market_sale_notify',data=>{
+      if(data.currency==='alETH')G.alETH=parseFloat((G.alETH+data.payout).toFixed(4));
+      else G.alUSD=parseFloat((G.alUSD+data.payout).toFixed(2));
+      chatLog(`★ Your ${data.item.name} sold for ${data.payout.toFixed(2)} ${data.currency}! (5% fee taken)`,'#FFD700');
+      saveToServer();
+    });
+    socket.on('market_list_ok',data=>{
+      // Remove from local inventory by matching name (server already removed from pdb)
+      const sl=G.inventory.findIndex((item,i)=>i>=2&&item&&item.name===data.listing.item.name);
+      if(sl!==-1)G.inventory[sl]=null;
+      chatLog(`Listed ${data.listing.item.name} for ${data.listing.price} ${data.listing.currency}.`,'#B080FF');
+      SFX.buy();saveToServer();
+      if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
+    });
+    socket.on('market_cancel_ok',data=>{
+      const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+      if(slot!==-1)G.inventory[slot]=data.item;
+      chatLog(`Listing cancelled. ${data.item.name} returned to inventory.`,'#888888');
+      saveToServer();
+      if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
+    });
+    socket.on('market_error',data=>{chatLog(data.error,'#FF4444');SFX.error();});
 }
 
 function joinGameServer(){

@@ -21,6 +21,33 @@ app.use(express.static(path.join(__dirname,'public')));
 const players={};
 const socketsByAccount={}; // accountId -> socket.id (for targeted emits)
 
+// ── World Loot ────────────────────────────────────────────────────────────────
+let worldLoot=[];
+const LOOT_TTL_MS=10*60*1000;
+let _lootIdSeq=1;
+setInterval(()=>{
+  const now=Date.now();
+  const expired=worldLoot.filter(l=>now-l.spawnedAt>LOOT_TTL_MS);
+  expired.forEach(l=>{
+    worldLoot=worldLoot.filter(x=>x.id!==l.id);
+    io.to(l.zone).emit('world_loot_removed',{id:l.id});
+    io.to('world').emit('world_loot_removed',{id:l.id});
+  });
+},60000);
+
+// ── Marketplace ────────────────────────────────────────────────────────────────
+const MARKET_FILE=path.join(__dirname,'marketplace.json');
+let marketplace=[];
+try{marketplace=JSON.parse(fs.readFileSync(MARKET_FILE,'utf8'));}catch(e){marketplace=[];}
+function saveMarket(){try{fs.writeFileSync(MARKET_FILE,JSON.stringify(marketplace),'utf8');}catch(e){console.error('Market save error',e);}}
+let _marketIdSeq=marketplace.reduce((m,l)=>Math.max(m,l.id||0),0)+1;
+setInterval(()=>{
+  const now=Date.now();
+  const before=marketplace.length;
+  marketplace=marketplace.filter(l=>now-l.listedAt<24*60*60*1000);
+  if(marketplace.length!==before){saveMarket();io.emit('market_state',{listings:marketplace});}
+},5*60*1000);
+
 // ── Queue state ───────────────────────────────────────────────────────────────
 // Each economic zone has an entry queue and an exit queue.
 // entries: [{id, nickname, ticket, locked}]
@@ -160,6 +187,8 @@ io.on('connection',socket=>{
     socket.to(p.zone).emit('player_joined',publicP(socket.id));
     // Send current queue state for all economic zones
     QUEUE_ZONES.forEach(z=>socket.emit('queue_state',queueStateFor(z)));
+    socket.emit('world_loot_init',{piles:worldLoot.filter(l=>l.zone===p.zone)});
+    socket.emit('market_state',{listings:marketplace});
   });
 
   socket.on('move',data=>{
@@ -182,6 +211,7 @@ io.on('connection',socket=>{
     socket.join(p.zone);
     socket.emit('zone_players',zonePlayers(p.zone,socket.id));
     socket.to(p.zone).emit('player_joined',publicP(socket.id));
+    socket.emit('world_loot_init',{piles:worldLoot.filter(l=>l.zone===p.zone)});
   });
 
   socket.on('chat',data=>{
@@ -218,6 +248,112 @@ io.on('connection',socket=>{
     // Immediately serve the next person
     serveNext(zone,queueType);
     broadcastQueueState(zone);
+  });
+
+  socket.on('loot_drop',data=>{
+    const p=players[socket.id];if(!p)return;
+    const{zone,x,y,items,currencies,killerType}=data;
+    const pile={
+      id:_lootIdSeq++,zone,x,y,
+      items:(items||[]).slice(0,6),
+      currencies:{
+        spacebucks:Math.max(0,Math.floor(currencies?.spacebucks||0)),
+        schmeckles:Math.max(0,Math.floor(currencies?.schmeckles||0)),
+        alUSD:Math.max(0,parseFloat((currencies?.alUSD||0).toFixed(2))),
+      },
+      ownerName:p.nickname,killerType:killerType||'unknown',spawnedAt:Date.now(),
+    };
+    worldLoot.push(pile);
+    io.to(zone).emit('world_loot_added',{pile});
+    io.to('world').emit('world_loot_added',{pile});
+  });
+
+  socket.on('loot_pickup',data=>{
+    const{lootId}=data;
+    const idx=worldLoot.findIndex(l=>l.id===lootId);
+    if(idx<0)return socket.emit('loot_claimed',{ok:false,error:'Already taken.'});
+    const pile=worldLoot.splice(idx,1)[0];
+    const DECAY=0.20;
+    const decayedItems=pile.items.map(item=>{
+      const d={...item};
+      if(d.dmg)d.dmg=Math.max(1,Math.floor(d.dmg*(1-DECAY)));
+      if(d.def)d.def=Math.max(0,Math.floor(d.def*(1-DECAY)));
+      if(d.heal)d.heal=Math.max(1,Math.floor(d.heal*(1-DECAY)));
+      return d;
+    });
+    socket.emit('loot_claimed',{ok:true,lootId,items:decayedItems,currencies:pile.currencies,decayPct:DECAY,fromPlayer:pile.ownerName});
+    io.to(pile.zone).emit('world_loot_removed',{id:pile.id});
+    io.to('world').emit('world_loot_removed',{id:pile.id});
+  });
+
+  socket.on('market_list',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const{inventorySlot,price,currency}=data;
+    if(typeof inventorySlot!=='number'||inventorySlot<2||inventorySlot>7)return;
+    if(!['alUSD','alETH'].includes(currency))return;
+    const p=parseFloat(price);
+    if(!p||p<=0||p>999999)return;
+    const inv=pdb[socket.accountId].data?.inventory;
+    if(!inv||!inv[inventorySlot])return socket.emit('market_error',{error:'No item in that slot.'});
+    const item={...inv[inventorySlot]};
+    inv[inventorySlot]=null;
+    saveDb();
+    const listing={id:_marketIdSeq++,sellerId:socket.accountId,sellerName:pdb[socket.accountId].username||socket.accountId,item,price:p,currency,listedAt:Date.now()};
+    marketplace.push(listing);
+    saveMarket();
+    io.emit('market_state',{listings:marketplace});
+    socket.emit('market_list_ok',{listing});
+  });
+
+  socket.on('market_buy',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const{listingId}=data;
+    const idx=marketplace.findIndex(l=>l.id===listingId);
+    if(idx<0)return socket.emit('market_buy_result',{ok:false,error:'Listing not found.'});
+    const listing=marketplace[idx];
+    if(listing.sellerId===socket.accountId)return socket.emit('market_buy_result',{ok:false,error:"Can't buy your own listing."});
+    const buyerData=pdb[socket.accountId].data;
+    if(!buyerData)return socket.emit('market_buy_result',{ok:false,error:'No character data.'});
+    const bal=listing.currency==='alETH'?(buyerData.alETH||0):(buyerData.alUSD||0);
+    if(bal<listing.price)return socket.emit('market_buy_result',{ok:false,error:`Not enough ${listing.currency}.`});
+    if(listing.currency==='alETH')buyerData.alETH=parseFloat(((buyerData.alETH||0)-listing.price).toFixed(4));
+    else buyerData.alUSD=parseFloat(((buyerData.alUSD||0)-listing.price).toFixed(2));
+    const buyerInv=buyerData.inventory=buyerData.inventory||new Array(8).fill(null);
+    const freeSlot=buyerInv.findIndex((s,i)=>i>=2&&s===null);
+    if(freeSlot!==-1)buyerInv[freeSlot]=listing.item;
+    saveDb();
+    const fee=parseFloat((listing.price*0.05).toFixed(listing.currency==='alETH'?4:2));
+    const payout=parseFloat((listing.price-fee).toFixed(listing.currency==='alETH'?4:2));
+    const sellerData=pdb[listing.sellerId]?.data;
+    if(sellerData){
+      if(listing.currency==='alETH')sellerData.alETH=parseFloat(((sellerData.alETH||0)+payout).toFixed(4));
+      else sellerData.alUSD=parseFloat(((sellerData.alUSD||0)+payout).toFixed(2));
+      saveDb();
+    }
+    const sellerSid=socketsByAccount[listing.sellerId];
+    if(sellerSid)io.to(sellerSid).emit('market_sale_notify',{item:listing.item,price:listing.price,payout,currency:listing.currency});
+    marketplace.splice(idx,1);
+    saveMarket();
+    io.emit('market_state',{listings:marketplace});
+    socket.emit('market_buy_result',{ok:true,item:listing.item,price:listing.price,currency:listing.currency,sellerName:listing.sellerName});
+  });
+
+  socket.on('market_cancel',data=>{
+    if(!socket.accountId)return;
+    const{listingId}=data;
+    const idx=marketplace.findIndex(l=>l.id===listingId&&l.sellerId===socket.accountId);
+    if(idx<0)return;
+    const listing=marketplace.splice(idx,1)[0];
+    const sellerData=pdb[socket.accountId].data;
+    if(sellerData){
+      const inv=sellerData.inventory=sellerData.inventory||new Array(8).fill(null);
+      const slot=inv.findIndex((s,i)=>i>=2&&s===null);
+      if(slot!==-1)inv[slot]=listing.item;
+      saveDb();
+    }
+    saveMarket();
+    io.emit('market_state',{listings:marketplace});
+    socket.emit('market_cancel_ok',{item:listing.item});
   });
 
   socket.on('disconnect',()=>{

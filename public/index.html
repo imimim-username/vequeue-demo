@@ -251,6 +251,19 @@
   <button id="queue-leave-btn">✕ Leave Queue</button>
 </div>
 
+<!-- ═══════════════ MARKET UI ═══════════════ -->
+<div id="market-ui" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;background:#0A0A14;border:2px solid #5A3A80;border-radius:8px;padding:16px;min-width:340px;max-width:440px;width:90vw;max-height:80vh;overflow-y:auto;color:#DDD;font-family:monospace;font-size:.8rem;box-shadow:0 0 30px rgba(90,60,128,0.5)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <b style="color:#B080FF;font-size:.9rem">📋 CONSIGNMENT MARKET</b>
+    <button onclick="closeMarket()" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.1rem;padding:0">✕</button>
+  </div>
+  <div id="market-tabs" style="display:flex;gap:6px;margin-bottom:10px">
+    <button id="market-tab-browse" onclick="marketTab('browse')" style="flex:1;padding:4px;background:#1A1030;border:1px solid #5A3A80;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">Browse Listings</button>
+    <button id="market-tab-list" onclick="marketTab('list')" style="flex:1;padding:4px;background:#0A0A14;border:1px solid #3A2050;color:#888;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">List an Item</button>
+  </div>
+  <div id="market-content"></div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/data.js"></script>
 <script src="/js/maps.js"></script>
