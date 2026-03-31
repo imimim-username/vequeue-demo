@@ -2279,7 +2279,7 @@ function drawDungeonBG(ctx,W,H,tick){
 function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor){
   // ── Mega Man X–style armored hero sprite ─────────────────────────────────
   const sp=species||'human';
-  const f=moving?(Math.floor(frame/4)%8):0;
+  const f=moving?(Math.floor(frame/4)%6):0;
   const c=color||'#2255DD';
 
   // 5-shade armor palette
@@ -2317,8 +2317,11 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
   const {hx,hy,hw,hh,bx,by,bw,bh,lw,sw,legGap}=SD;
   const cx2=12; // sprite horizontal center
 
-  // walk-cycle offsets (leg/arm swing)
-  const swing=[0,3,5,3,0,-3,-5,-3][f]||0;
+  // 6-frame walk-cycle: Y swing for legs/arms + body bob for upper torso
+  const WALK_SWING=[0,-4,-6, 0, 4, 6]; // left-leg Y offset per frame (right is mirrored)
+  const WALK_BOB  =[0, 0, 1, 0, 0, 1]; // body dips 1px on foot-plant frames
+  const swing  =moving?WALK_SWING[f]:0;
+  const bob    =moving?WALK_BOB[f]:0;
   const lLegOff=moving? swing:0;
   const rLegOff=moving?-swing:0;
   const lArmOff=moving?-swing:0;
@@ -2364,7 +2367,8 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
   OR(lr,legY+4+rLegOff,lw,4,aBrt);
   ctx.fillStyle=aHi;ctx.fillRect(ox+lr,oy+legY+4+rLegOff,lw,2);
 
-  // ─ Body / Chest plate ─
+  // ─ Body / Chest plate ─ (upper body shifts with bob — save canvas state)
+  ctx.save(); ctx.translate(0, bob);
   ctx.fillStyle=aOut;ctx.fillRect(ox+bx-1,oy+by-1,bw+2,bh+2);
   ctx.fillStyle=aSh; ctx.fillRect(ox+bx,  oy+by,  bw,  bh);
   ctx.fillStyle=aMid;ctx.fillRect(ox+bx,  oy+by,  bw-3,bh);
@@ -2501,6 +2505,7 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
     ctx.strokeStyle='#FFD70055';ctx.lineWidth=5;
     ctx.beginPath();ctx.arc(ox+cx2,oy+hy-3,14,0,Math.PI*2);ctx.stroke();
   }
+  ctx.restore(); // end upper-body bob translate
 }
 
 // ── NPC SPRITE ────────────────────────────────────────────────────────────────
