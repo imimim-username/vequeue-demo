@@ -168,6 +168,7 @@ const publicP=id=>{
     id:p.id,nickname:p.nickname,color:p.color,
     hairColor:p.hairColor,species:p.species,class_:p.class_,
     zone:p.zone,x:p.x,y:p.y,dir:p.dir,frame:p.frame,moving:p.moving,
+    accessory:p.accessory||null,
   };
 };
 const zonePlayers=(zone,excl)=>
@@ -247,6 +248,7 @@ io.on('connection',socket=>{
       x:data.x||660, y:data.y||460,
       dir:2,frame:0,moving:false,
       schmeckles:data.schmeckles||100,
+      accessory:data.accessory||null,
     };
     const p=players[socket.id];
     socket.join(p.zone);

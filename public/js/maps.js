@@ -452,6 +452,9 @@ const NPCS = {
     {type:'merchant',face:5,name:'Market Board',x:8,y:6,
      dialog:['Browse listings or sell your items here.','Consignment fee: 5% of sale price. Listings expire after 24h.'],
      market:true},
+    {type:'wizard',face:1,name:'Expansion Vendor',x:12,y:4,
+     dialog:['Need more bag space? I can help — for a price.','Inventory can be expanded up to 12 slots total.'],
+     invUpgrade:true},
   ],
   dungeon:[
     { id:'dungeon_ghost', x:33, y:7, type:'guard', face:2, name:'Restless Spirit',

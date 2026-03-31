@@ -42,6 +42,8 @@ const G = {
   marketListings:[],
   livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
   treasury:{alUSD:0,alETH:0},
+  accessory:null,       // 'cape' | 'hat' | 'glasses' | null
+  maxInvSlots:8,        // 8–12; upgradeable at Expansion Vendor in marketplace
   quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
 };
 
@@ -102,6 +104,8 @@ window.addEventListener('keydown',e=>{
     if(document.getElementById('exchange-ui').style.display!=='none'){ closeExchange(); return; }
     if(G.shop){ closeShop(); e.preventDefault(); }
     else if(G.npcDialog){
+      // Pending inv upgrade? Esc = decline
+      if(G._pendingInvUpgrade){G._pendingInvUpgrade=null;G.npcDialog=null;G.paused=false;document.getElementById('npc-dialog').style.display='none';chatLog('Upgrade declined.','#888');e.preventDefault();return;}
       // Esc on a quest offer or active quest → decline / abandon
       const _qid=G.npcDialog.npc?.questId;
       if(_qid){const _qs=G.quests[_qid];if(!_qs||_qs.status==='active'){declineOrAbandonQuest();e.preventDefault();return;}}
@@ -291,6 +295,7 @@ function tryInteract(){
   if(nearest.bank){ openBank(); return; }
   if(nearest.transmuter){ openTransmuter(); return; }
   if(nearest.market){ openMarket(); return; }
+  if(nearest.invUpgrade){ openInvUpgrade(); return; }
   if(nearest.exchange){ openExchange(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
@@ -307,6 +312,8 @@ function advanceDialog(){
     G.npcDialog=null;
     G.paused=false;
     document.getElementById('npc-dialog').style.display='none';
+    // Inventory upgrade confirmation on last line accept
+    if(G._pendingInvUpgrade){doInvUpgrade();return;}
     handleQuestDialogClose(npc);
   } else {
     showNpcDialog();
@@ -1198,6 +1205,40 @@ function buyListing(id){socket.emit('market_buy',{listingId:id});}
 function cancelListing(id){socket.emit('market_cancel',{listingId:id});}
 
 // ── BANK ──────────────────────────────────────────────────────────────────────
+// ── Inventory Expansion ───────────────────────────────────────────────────────
+const INV_UPGRADE_COSTS=[0,0,0,0,0,0,0,0,20,40,80,200]; // cost to upgrade to slots[i+1]
+function openInvUpgrade(){
+  G.paused=true;
+  const cur=G.maxInvSlots;
+  const maxPossible=12;
+  if(cur>=maxPossible){
+    chatLog('Your inventory is already at maximum capacity (12 slots)!','#FFD700');
+    G.paused=false;return;
+  }
+  const cost=INV_UPGRADE_COSTS[cur]||999;
+  const nd={npc:{name:'Expansion Vendor'},lineIdx:0,dialog:[
+    `Current capacity: ${cur} slots.`,
+    `Upgrade to ${cur+1} slots for ${cost} alUSD?`,
+    `[ Accept: E/Space — costs ${cost} alUSD ]  [ Decline: Esc ]`,
+  ]};
+  // hijack NPC dialog for the upgrade prompt, but handle it ourselves
+  G._pendingInvUpgrade={cost};
+  G.npcDialog=nd;
+  showNpcDialog();
+}
+function doInvUpgrade(){
+  const upg=G._pendingInvUpgrade;
+  if(!upg)return;
+  const cost=upg.cost;
+  if(G.alUSD<cost){chatLog(`Need ${cost} alUSD to upgrade inventory.`,'#FF4444');SFX.error();return;}
+  G.alUSD=parseFloat((G.alUSD-cost).toFixed(2));
+  G.maxInvSlots=Math.min(12,G.maxInvSlots+1);
+  while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
+  G._pendingInvUpgrade=null;
+  chatLog(`✅ Inventory expanded to ${G.maxInvSlots} slots! (−${cost} alUSD)`,'#B080FF');
+  SFX.buy();saveToServer();
+}
+
 function openBank(){
   G.paused=true;
   renderBankUI();
@@ -1636,7 +1677,7 @@ function renderSpriteLayer(ctx){
   // ── Other players ──
   for(const[id,p] of Object.entries(others)){
     const sx=p.x-G.camX-12,sy=p.y-G.camY-20;
-    drawPlayerSprite(ctx,sx,sy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1]);
+    drawPlayerSprite(ctx,sx,sy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null);
     // name label
     ctx.fillStyle='#00000088';ctx.fillRect(sx+2,sy-14,p.nickname?.length*6||40,12);
     ctx.fillStyle='#fff';ctx.font='9px monospace';ctx.fillText(p.nickname||'',sx+4,sy-5);
@@ -1644,7 +1685,7 @@ function renderSpriteLayer(ctx){
 
   // ── Local player ──
   const sx=G.x-G.camX-12,sy=G.y-G.camY-20;
-  drawPlayerSprite(ctx,sx,sy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor);
+  drawPlayerSprite(ctx,sx,sy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory);
 
   // Draw world loot piles
   if(G.worldLoot){
@@ -1760,18 +1801,28 @@ function togglePause(){
 function renderInventoryScreen(){
   const grid=document.getElementById('inv-grid');
   grid.innerHTML='';
-  G.inventory.forEach((item,i)=>{
+  // Show only up to maxInvSlots; grow array if needed
+  while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
+  for(let i=0;i<G.maxInvSlots;i++){
+    const item=G.inventory[i];
     const slot=document.createElement('div');
     slot.className='inv-slot'+(item?' has-item':'');
-    slot.textContent=item?item.icon||'?':'';
-    slot.title=item?item.name:'Empty';
+    slot.textContent=item?item.icon||'?':(i===0?'⚔':(i===1?'🛡':''));
+    slot.title=i===0?`Weapon: ${item?.name||'—'}`:i===1?`Shield: ${item?.name||'—'}`:item?item.name:'Empty';
     if(item&&item.type==='potion'&&!G.battle){
       slot.title=`${item.name} — Click to use`;
       slot.style.cursor='pointer';
       slot.addEventListener('click',()=>usePotion(i));
     }
     grid.appendChild(slot);
-  });
+  }
+  // Capacity line
+  const capEl=document.getElementById('inv-capacity');
+  if(capEl){
+    const maxPossible=12;
+    capEl.innerHTML=`Slots: ${G.maxInvSlots}/${maxPossible}`
+      +(G.maxInvSlots<maxPossible?' — <span style="color:#B080FF">upgrade at Expansion Vendor in Marketplace</span>':'');
+  }
   const stats=document.getElementById('stats-box');
   const s=G.stats;
   const xpNeeded=xpForLevel(G.level);
@@ -1890,7 +1941,7 @@ function buildCreateScreen(){
     const scale=2.5;
     previewCtx.save();
     previewCtx.scale(scale,scale);
-    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor);
+    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor,G.accessory);
     previewCtx.restore();
     const sp2=SPECIES[G.species||'human'];const cl=CLASSES[G.class_||'warrior'];
     const finalHp=sp2.baseHp+Math.floor((alloc.vit-2)*0.5);
@@ -1970,6 +2021,27 @@ function buildCreateScreen(){
       b.style.border='2px solid #FFD700';G.hairColor=c;updatePreview();
     });
     hp.appendChild(b);
+  });
+
+  // ── Accessory picker ──
+  const ACCESSORIES=[
+    {key:null,   label:'None',    icon:'👤'},
+    {key:'cape', label:'Cape',    icon:'🧣'},
+    {key:'hat',  label:'Wiz Hat', icon:'🎩'},
+    {key:'glasses',label:'Glasses',icon:'🕶️'},
+  ];
+  const ap=document.getElementById('accessory-picker');
+  ap.innerHTML='';
+  ACCESSORIES.forEach(({key,label,icon})=>{
+    const b=document.createElement('button');
+    b.className='species-btn'+(G.accessory===key?' selected':'');
+    b.style.fontSize='.75rem';b.style.padding='3px 8px';
+    b.textContent=`${icon} ${label}`;
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#accessory-picker button').forEach(x=>x.classList.remove('selected'));
+      b.classList.add('selected');G.accessory=key;updatePreview();
+    });
+    ap.appendChild(b);
   });
 
   // ── Stat allocation ──
@@ -2366,6 +2438,7 @@ function joinGameServer(){
     socket.emit('join',{
       nickname:G.nickname,color:G.color,hairColor:G.hairColor,
       species:G.species,class_:G.class_,zone:G.zone,x:G.x,y:G.y,
+      accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     });
   };
   if(socket.connected)doJoin();
@@ -2393,6 +2466,9 @@ function applyServerState(s){
   G.level=s.level??1;
   G.statPoints=s.statPoints??0;
   if(Array.isArray(s.inventory))G.inventory=s.inventory;
+  if(s.accessory!==undefined)G.accessory=s.accessory;
+  if(s.maxInvSlots!=null)G.maxInvSlots=s.maxInvSlots;
+  while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   G.quests=s.quests||{};
   G.dungeonBossDefeated=s.dungeonBossDefeated||false;
 }
@@ -2407,7 +2483,7 @@ function saveToServer(){
     stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
     transmuterDeposits:G.transmuterDeposits,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
-    inventory:G.inventory,
+    inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
   });
 }

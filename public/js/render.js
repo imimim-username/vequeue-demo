@@ -1045,7 +1045,7 @@ function drawDungeonBG(ctx,W,H,tick){
 
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware
-function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor){
+function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory){
   // ── Mega Man X–style armored hero sprite ─────────────────────────────────
   const sp=species||'human';
   const f=moving?(Math.floor(frame/4)%6):0;
@@ -1106,6 +1106,23 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
     ctx.fillStyle=out||aOut;ctx.fillRect(ox+x-1,oy+y-1,w+2,h+2);
     ctx.fillStyle=fill;ctx.fillRect(ox+x,oy+y,w,h);
   };
+
+  // ─ Cape (drawn behind body/legs) ─
+  if(accessory==='cape'){
+    const capeColor=darken(color,70); const capeHi=darken(color,45);
+    // left flap
+    ctx.fillStyle=darken(capeColor,20);
+    ctx.beginPath();ctx.moveTo(ox+bx,oy+by+2);ctx.lineTo(ox+bx-6,oy+44);ctx.lineTo(ox+bx+4,oy+44);ctx.lineTo(ox+bx+2,oy+by+2);ctx.fill();
+    ctx.fillStyle=capeColor;
+    ctx.beginPath();ctx.moveTo(ox+bx,oy+by+2);ctx.lineTo(ox+bx-5,oy+44);ctx.lineTo(ox+bx+3,oy+44);ctx.lineTo(ox+bx+2,oy+by+2);ctx.fill();
+    // right flap
+    ctx.fillStyle=darken(capeColor,20);
+    ctx.beginPath();ctx.moveTo(ox+bx+bw-2,oy+by+2);ctx.lineTo(ox+bx+bw+6,oy+44);ctx.lineTo(ox+bx+bw-4,oy+44);ctx.lineTo(ox+bx+bw,oy+by+2);ctx.fill();
+    ctx.fillStyle=capeColor;
+    ctx.beginPath();ctx.moveTo(ox+bx+bw-2,oy+by+2);ctx.lineTo(ox+bx+bw+5,oy+44);ctx.lineTo(ox+bx+bw-3,oy+44);ctx.lineTo(ox+bx+bw,oy+by+2);ctx.fill();
+    // collar (overtop of shoulders, drawn again after body save)
+    ctx.fillStyle=capeHi;ctx.fillRect(ox+bx,oy+by-1,bw,3);
+  }
 
   // ─ Boots ─
   const bootY=by+bh+9;
@@ -1265,6 +1282,42 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
     // human / mage / rogue etc — hair visible above visor at helmet top
     ctx.fillStyle=hair;  ctx.fillRect(ox+hx,  oy+hy,hw,2);
     ctx.fillStyle=hairHL;ctx.fillRect(ox+hx+1,oy+hy,hw-2,1);
+  }
+
+  // ─ Hat (wizard hat — above helmet) ─
+  if(accessory==='hat'){
+    const hatCol='#2A0A4A',hatHi='#4A1A7A',hatBrim='#3A1060';
+    // brim
+    ctx.fillStyle=darken(hatCol,20);ctx.fillRect(ox+hx-5,oy+hy-1,hw+10,4);
+    ctx.fillStyle=hatBrim;ctx.fillRect(ox+hx-4,oy+hy,hw+8,3);
+    ctx.fillStyle=hatHi;ctx.fillRect(ox+hx-4,oy+hy,hw+8,1);
+    // cone
+    const htop=hy-16;
+    ctx.fillStyle=darken(hatCol,20);
+    ctx.beginPath();ctx.moveTo(ox+cx2-1,oy+htop-1);ctx.lineTo(ox+hx-3,oy+hy);ctx.lineTo(ox+hx+hw+3,oy+hy);ctx.fill();
+    ctx.fillStyle=hatCol;
+    ctx.beginPath();ctx.moveTo(ox+cx2,oy+htop);ctx.lineTo(ox+hx-2,oy+hy);ctx.lineTo(ox+hx+hw+2,oy+hy);ctx.fill();
+    ctx.fillStyle=hatHi;
+    ctx.beginPath();ctx.moveTo(ox+cx2,oy+htop);ctx.lineTo(ox+cx2-1,oy+htop+4);ctx.lineTo(ox+hx+2,oy+hy);ctx.lineTo(ox+hx+4,oy+hy);ctx.fill();
+    // star on hat
+    ctx.fillStyle='#FFD700';ctx.fillRect(ox+cx2-1,oy+htop+5,2,2);
+  }
+
+  // ─ Glasses (over visor) ─
+  if(accessory==='glasses'){
+    const gf='#C0A000',gl='rgba(100,200,255,0.35)';
+    const vx2=hx+2,vy2=hy+5,vw2=hw-4; // match visor dims
+    const lensW=Math.floor(vw2/2)-1, lensH=3;
+    // left lens frame + tint
+    ctx.fillStyle=gf;ctx.fillRect(ox+vx2,oy+vy2-1,lensW,lensH+2);
+    ctx.fillStyle=gl;ctx.fillRect(ox+vx2+1,oy+vy2,lensW-2,lensH);
+    ctx.fillStyle='#80CFFF';ctx.fillRect(ox+vx2+1,oy+vy2,lensW-2,1);
+    // right lens frame + tint
+    ctx.fillStyle=gf;ctx.fillRect(ox+vx2+lensW+2,oy+vy2-1,lensW,lensH+2);
+    ctx.fillStyle=gl;ctx.fillRect(ox+vx2+lensW+3,oy+vy2,lensW-2,lensH);
+    ctx.fillStyle='#80CFFF';ctx.fillRect(ox+vx2+lensW+3,oy+vy2,lensW-2,1);
+    // bridge
+    ctx.fillStyle=gf;ctx.fillRect(ox+vx2+lensW,oy+vy2+1,2,1);
   }
 
   // ─ God mode halo ─
