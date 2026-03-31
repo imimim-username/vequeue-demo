@@ -290,6 +290,7 @@ body.touch #mobile-act{display:flex}
     <h2>⚔ CHARACTER</h2>
     <div id="inv-grid"></div>
     <div id="stats-box"></div>
+    <div id="quest-log-box" style="margin-top:.8rem;border-top:1px solid #222;padding-top:.5rem"></div>
     <div style="margin-top:1rem;font-size:.7rem;color:#555">ESC / P to close</div>
   </div>
 </div>
@@ -526,6 +527,74 @@ const DUNGEON_MAP=(()=>{
   s(27,26,T.GRATING);s(31,26,T.GRATING);
   return m;
 })();
+
+// ── QUEST DEFINITIONS ─────────────────────────────────────────────────────────
+const QUEST_DEFS = {
+  wolf_hunt:{
+    id:'wolf_hunt', title:'Wolf Culling', giver:'Town Crier',
+    type:'kill', target:'wolf', required:5,
+    reward:{xp:150,gold:80},
+    offerLines:[
+      "Traveller, a word. The Dire Wolves south of the river grow bolder.",
+      "They've attacked three merchant caravans this month alone.",
+      "Would you be willing to slay 5 of them? There's a reward in it for you.",
+    ],
+    inProgressLine:"The wolves still roam. Keep at it!",
+    readyLines:[
+      "Word reached me — you've done it! Five wolves slain.",
+      "The roads are safer because of you.",
+    ],
+    completedLines:["The roads are safer thanks to you, hero. Safe travels!"],
+  },
+  goblin_hunt:{
+    id:'goblin_hunt', title:'Goblin Problem', giver:'Grizzled Regular',
+    type:'kill', target:'goblin', required:5,
+    reward:{xp:120,gold:60},
+    offerLines:[
+      "Those damned goblins keep springing out of the wilderness at traders.",
+      "I lost three good friends to goblin ambushes. Three.",
+      "Kill five of those little monsters for me, would you?",
+    ],
+    inProgressLine:"Still need more goblin scalps. Keep going.",
+    readyLines:[
+      "Five goblins down? Ha! I knew you had it in you.",
+      "Least I can do is share some of my coin.",
+    ],
+    completedLines:["Haven't seen a goblin since you went to work. Fine job."],
+  },
+  dark_knight_hunt:{
+    id:'dark_knight_hunt', title:'Knight Slayer', giver:'Barkeep Moe',
+    type:'kill', target:'darkKnight', required:1,
+    reward:{xp:300,gold:150},
+    offerLines:[
+      "Word is a Dark Knight prowls the deep south — past the second river.",
+      "It's terrorized every poor soul who wandered that far.",
+      "I'll make it worth your while if you put it down.",
+    ],
+    inProgressLine:"That Dark Knight still walks? Be careful out there.",
+    readyLines:[
+      "You killed it?! By the gods, I heard thunder from here.",
+      "You've earned this — and a legend to go with it.",
+    ],
+    completedLines:["A hero walks among us. Drinks on the house. ...Eventually."],
+  },
+  lich_quest:{
+    id:'lich_quest', title:'The Ancient Evil', giver:'Senior Clerk Praxis',
+    type:'kill', target:'lich', required:1,
+    reward:{xp:800,gold:500},
+    offerLines:[
+      "The records speak of an Ancient Lich entombed beneath the dungeon entrance.",
+      "It predates this town, the rivers, perhaps civilization itself.",
+      "This is an official matter of state. We need a champion willing to end it.",
+    ],
+    inProgressLine:"The Lich still draws breath. The realm counts on you.",
+    readyLines:[
+      "It is done. I can feel the darkness lifting even here in this hall.",
+      "The realm owes you a debt beyond measure. Take this — it is the least we can offer.",
+    ],
+    completedLines:["Peace shall reign. We'll need to update the records. Extensively."],
+  },
+};
 
 // ── SHOP CATALOG ───────────────────────────────────────────────────────────────
 const SHOP_CATALOG = {
@@ -1324,7 +1393,7 @@ const ZONES = {
 // Each NPC: {id, x, y (tile coords), type (sprite), name, face (direction 0-3), dialog[]}
 const NPCS = {
   world:[
-    { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier',
+    { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier', questId:'wolf_hunt',
       dialog:[
         "Hear ye, hear ye! Welcome to Victory Quest, brave adventurer!",
         "Our town is a safe haven — no monsters dare enter these gates.",
@@ -1357,7 +1426,7 @@ const NPCS = {
     },
   ],
   tavern:[
-    { id:'barkeep', x:10, y:2, type:'barkeep', face:2, name:'Barkeep Moe',
+    { id:'barkeep', x:10, y:2, type:'barkeep', face:2, name:'Barkeep Moe', questId:'dark_knight_hunt',
       dialog:[
         "Welcome to The Rusty Flagon! Pull up a stool, traveller.",
         "You look like you've seen some wilderness action. Eyes of a survivor.",
@@ -1367,7 +1436,7 @@ const NPCS = {
         "Another round? ...Oh, we don't actually serve drinks yet. Sorry.",
       ]
     },
-    { id:'tavern_regular', x:4, y:8, type:'merchant', face:1, name:'Grizzled Regular',
+    { id:'tavern_regular', x:4, y:8, type:'merchant', face:1, name:'Grizzled Regular', questId:'goblin_hunt',
       dialog:[
         "I've been coming here thirty years. The ale's still terrible.",
         "You're heading south? Respect. Most folks don't come back from the deep zone.",
@@ -1376,7 +1445,7 @@ const NPCS = {
     },
   ],
   governance:[
-    { id:'clerk', x:10, y:3, type:'clerk', face:2, name:'Senior Clerk Praxis',
+    { id:'clerk', x:10, y:3, type:'clerk', face:2, name:'Senior Clerk Praxis', questId:'lich_quest',
       dialog:[
         "Welcome to the Governance Hall. All records and civic matters are kept here.",
         "The veQueue protocol was established to ensure fair access to shared resources.",
@@ -1932,6 +2001,7 @@ const G = {
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
   shop:null,            // {vendorId} — active shop or null
   dungeonBossDefeated:false,
+  quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
 };
 
 // Cache of server-broadcast queue states
@@ -2035,6 +2105,67 @@ function tryMove(dx,dy){
   else if(dy!==0){G.dir=dy>0?2:0;}
 }
 
+// ── QUEST SYSTEM ──────────────────────────────────────────────────────────────
+// Returns the appropriate dialog lines for an NPC, resolving quest state.
+function getQuestDialog(npc){
+  const qid=npc.questId;
+  if(!qid)return npc.dialog;
+  const qdef=QUEST_DEFS[qid];
+  if(!qdef)return npc.dialog;
+  const qs=G.quests[qid];
+  if(!qs){
+    // Quest not yet accepted — offer it
+    return[...qdef.offerLines,'[ Accept quest: E / Space ]'];
+  }
+  if(qs.status==='active'){
+    return[`${qdef.inProgressLine} (${qs.progress}/${qdef.required})`];
+  }
+  if(qs.status==='ready'){
+    return[...qdef.readyLines,`[ Claim reward: +${qdef.reward.xp} XP, +${qdef.reward.gold} ₴ ]`];
+  }
+  // completed
+  return qdef.completedLines;
+}
+
+// Called when a quest dialog closes — handles accept and turn-in actions.
+function handleQuestDialogClose(npc){
+  const qid=npc.questId;
+  if(!qid)return;
+  const qdef=QUEST_DEFS[qid];
+  if(!qdef)return;
+  const qs=G.quests[qid];
+  if(!qs){
+    // Accept the quest
+    G.quests[qid]={progress:0,status:'active'};
+    chatLog(`★ Quest accepted: "${qdef.title}" — ${qdef.inProgressLine}`,'#FFD700');
+  } else if(qs.status==='ready'){
+    // Turn in the quest
+    G.schmeckles+=qdef.reward.gold;
+    G.xp+=qdef.reward.xp;
+    checkLevelUp();
+    qs.status='completed';
+    chatLog(`★ Quest complete: "${qdef.title}"! +${qdef.reward.xp} XP, +${qdef.reward.gold} ₴`,'#4CAF50');
+    if(G.paused)renderInventoryScreen();
+  }
+}
+
+// Called after winning a battle — increments kill-type quest progress.
+function updateQuestProgress(enemyType){
+  for(const[qid,qs] of Object.entries(G.quests)){
+    if(qs.status!=='active')continue;
+    const qdef=QUEST_DEFS[qid];
+    if(qdef.type==='kill'&&qdef.target===enemyType){
+      qs.progress=Math.min(qdef.required,qs.progress+1);
+      if(qs.progress>=qdef.required){
+        qs.status='ready';
+        chatLog(`★ Quest ready: "${qdef.title}" — return to ${qdef.giver}!`,'#FFD700');
+      } else {
+        chatLog(`Quest: "${qdef.title}" ${qs.progress}/${qdef.required}`,'#aaa');
+      }
+    }
+  }
+}
+
 // ── NPC INTERACTION ────────────────────────────────────────────────────────────
 function tryInteract(){
   if(G.battle||G.npcDialog)return;
@@ -2048,18 +2179,21 @@ function tryInteract(){
   }
   if(!nearest)return;
   if(nearest.shop){openShop(nearest.shop);return;}
-  G.npcDialog={npc:nearest,lineIdx:0};
+  G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
   showNpcDialog();
 }
 
 function advanceDialog(){
   if(!G.npcDialog)return;
-  G.npcDialog.lineIdx++;
-  if(G.npcDialog.lineIdx>=G.npcDialog.npc.dialog.length){
+  const nd=G.npcDialog;
+  nd.lineIdx++;
+  if(nd.lineIdx>=nd.dialog.length){
+    const npc=nd.npc;
     G.npcDialog=null;
     G.paused=false;
     document.getElementById('npc-dialog').style.display='none';
+    handleQuestDialogClose(npc);
   } else {
     showNpcDialog();
   }
@@ -2077,8 +2211,8 @@ function showNpcDialog(){
   pctx.restore();
   // Text
   document.getElementById('npc-dialog-name').textContent=npc.name;
-  document.getElementById('npc-dialog-text').textContent=npc.dialog[nd.lineIdx];
-  const total=npc.dialog.length;
+  document.getElementById('npc-dialog-text').textContent=nd.dialog[nd.lineIdx];
+  const total=nd.dialog.length;
   const idx=nd.lineIdx+1;
   const hint=idx<total?`[ E / Space ] Continue  (${idx}/${total})`:`[ E / Space ] Close  (${idx}/${total})`;
   document.getElementById('npc-dialog-hint').textContent=hint;
@@ -2763,6 +2897,7 @@ function doBattleAction(action){
       G.dungeonBossDefeated=true;
       chatLog('★ THE LICH IS DEFEATED! Ancient evil vanquished!','#AA00FF');
     }
+    updateQuestProgress(bt.enemy.type);
     chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
     // Wait for player input — do NOT auto-advance
     return;
@@ -3029,6 +3164,10 @@ function renderHUD(){
   document.getElementById('hud-gold').textContent=
     locked>0?`${G.schmeckles} ₴  🔒${locked}`:`${G.schmeckles} ₴`;
   document.getElementById('hud-level').textContent=`Lv.${G.level}`;
+  // Quest-ready badge
+  const hasReady=Object.values(G.quests).some(q=>q.status==='ready');
+  document.getElementById('hud-level').style.color=hasReady?'#FFD700':'#8BC34A';
+  document.getElementById('hud-level').title=hasReady?'Quest ready to turn in!':'';
   const xpPct=Math.min(1,G.xp/xpForLevel(G.level))*100;
   document.getElementById('hud-xp-fill').style.width=xpPct+'%';
   {
@@ -3084,6 +3223,24 @@ function renderInventoryScreen(){
     <div class="stat-line" style="margin-top:6px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
     <div class="stat-line"><span>Schmeckles</span><span>${G.schmeckles} ₴</span></div>
   `;
+  // Quest log
+  const qBox=document.getElementById('quest-log-box');
+  if(qBox){
+    const qids=Object.keys(G.quests);
+    let qHtml='';
+    if(qids.length===0){
+      qHtml='<div style="color:#444;font-size:.7rem;margin-top:4px">No active quests. Talk to NPCs in town!</div>';
+    } else {
+      qids.forEach(qid=>{
+        const qs=G.quests[qid];
+        const qdef=QUEST_DEFS[qid];
+        const col=qs.status==='completed'?'#444':qs.status==='ready'?'#4CAF50':'#aaa';
+        const badge=qs.status==='completed'?'✓ Done':qs.status==='ready'?'★ READY!':qs.progress+'/'+qdef.required;
+        qHtml+=`<div class="stat-line" style="color:${col}"><span>${qdef.title}</span><span>${badge}</span></div>`;
+      });
+    }
+    qBox.innerHTML=qHtml;
+  }
 }
 
 // ── CHAT ──────────────────────────────────────────────────────────────────────
@@ -3393,7 +3550,8 @@ function saveState(){
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     species:G.species,class_:G.class_,
     schmeckles:G.schmeckles,stats:G.stats,hp:G.hp,
-    xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp
+    xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp,
+    quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated
   };
   localStorage.setItem('vq_state',JSON.stringify(s));
 }
@@ -3413,6 +3571,8 @@ function loadState(){
     G.level=s.level??1;
     G.statPoints=s.statPoints??0;
     if(s.maxHp)G.maxHp=s.maxHp;
+    if(s.quests)G.quests=s.quests;
+    if(s.dungeonBossDefeated)G.dungeonBossDefeated=s.dungeonBossDefeated;
   }catch(e){}
 }
 
