@@ -2986,7 +2986,13 @@ function endBattle(){
     runPixelTransition('out',()=>{
       const sx=bt.savedX,sy=bt.savedY;
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
-      G.x=sx;G.y=sy;
+      // If the battle started inside the dungeon boss room (tile row >=24),
+      // teleport to the dungeon entry safe zone to prevent immediate re-trigger
+      if(G.zone==='dungeon'&&Math.floor(sy/TS)>=24){
+        G.x=8*TS+TS/2; G.y=6*TS+TS/2;
+      } else {
+        G.x=sx;G.y=sy;
+      }
     });
   }
 }
@@ -3546,7 +3552,7 @@ function gameLoop(ts){
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
     // persist
-    if(G.persist&&G.tick%300===0){saveState();saveToServer();}
+    if(G.tick%300===0){if(G.persist)saveState(); saveToServer();}
   }
   // Battle screen renders while paused (transition phases handled by their own rAF)
   if(G.battle&&(G.battle.phase==='player_turn'||G.battle.phase==='enemy_turn')){
@@ -3681,7 +3687,7 @@ function initSocket(){
   socket.on('queue_joined',data=>{
     if(G.queueState){
       G.queueState.ticket=data.ticket;
-      G.queueState.served=data.serving;
+      // Do NOT copy data.serving into served — served is only set by queue_served event
       updateQueuePanel();
     }
   });
@@ -3694,8 +3700,6 @@ function joinGameServer(){
       nickname:G.nickname,color:G.color,hairColor:G.hairColor,
       species:G.species,class_:G.class_,zone:G.zone,x:G.x,y:G.y,
     });
-    // Send current zone
-    QUEUE_ZONES_CLIENT.forEach(z=>{});
   };
   if(socket.connected)doJoin();
   else socket.once('connect',doJoin);
