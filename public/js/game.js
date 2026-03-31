@@ -555,6 +555,7 @@ function triggerBattle(key,depth=0){
     phase:'transition_in',
     animTimer:0,
     hitShake:0,
+    playerHitShake:0,
     log:[tmpl.msg,'What will you do?'],
     result:null,
     xpGained:0,spacebucksGained:0,schmecklesGained:0,
@@ -600,7 +601,7 @@ function runPixelTransition(dir,onComplete){
 
 function drawEnemySprite(ctx,type,x,y){
   ctx.save();ctx.translate(Math.round(x),Math.round(y));
-  const S=3;
+  const S=4;
   switch(type){
     case'wolf':      drawBattleWolf(ctx,S);      break;
     case'skeleton':  drawBattleSkeleton(ctx,S);  break;
@@ -904,6 +905,20 @@ function renderBattleScreen(){
     ctxUI.fillText(a.label,bx+8,by+19);
   });
 
+  // ── Player sprite (battle right side, facing left) ──
+  {
+    const btS=2.8; // battle sprite scale
+    const bpX=Math.floor(W*0.72), bpY=Math.floor(H*0.56);
+    // shake if player was just hit
+    const phX=bt.playerHitShake>0?(Math.random()*6-3)|0:0;
+    if(bt.playerHitShake>0)bt.playerHitShake--;
+    ctxUI.save();
+    ctxUI.translate(bpX+phX,bpY);
+    ctxUI.scale(btS,btS);
+    drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory);
+    ctxUI.restore();
+  }
+
   // ── Player info panel (bottom-right) ──
   const piX=460,piY=pY+10;
   ctxUI.fillStyle='#C0A050';ctxUI.font='bold 12px monospace';
@@ -1079,6 +1094,7 @@ function doEnemyTurn(){
     const endArmor=Math.floor(G.stats.end*0.5);
     const dmg=Math.max(1,e.atk-endArmor+(((Math.random()*3)|0)-1));
     G.hp=Math.max(0,G.hp-dmg);
+    bt.playerHitShake=8;
     SFX.hitPlayer();
     bt.log.push(`${e.name} hits you for ${dmg}!`);
     if(G.hp<=0){
@@ -1646,46 +1662,69 @@ function renderMinimap(ctx){
 }
 
 // ── SPRITE LAYER ──────────────────────────────────────────────────────────────
+const SPRITE_SCALE=1.5; // Mega Man X–style: sprites appear large relative to tiles
+// Helper: draw a sprite scaled from its foot position
+function scaledSprite(ctx,footX,footY,drawFn){
+  ctx.save();
+  ctx.translate(footX,footY);
+  ctx.scale(SPRITE_SCALE,SPRITE_SCALE);
+  drawFn(-12,-44); // sprite origin offset (center-x=12, height=44)
+  ctx.restore();
+}
+
 function renderSpriteLayer(ctx){
   ctx.clearRect(0,0,W,H);
+
+  // Sprite visual dimensions at SPRITE_SCALE
+  const SH=Math.round(44*SPRITE_SCALE); // scaled sprite height
+  const SW=Math.round(24*SPRITE_SCALE); // scaled sprite width
 
   // ── NPCs ──
   const zoneNpcs=NPCS[G.zone]||[];
   const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
   for(const npc of zoneNpcs){
-    const sx=npc.x*TS-G.camX-12, sy=npc.y*TS-G.camY-20;
+    // foot is at tile center
+    const footX=npc.x*TS-G.camX+TS/2-12;
+    const footY=npc.y*TS-G.camY+TS/2+4;
     // Skip if off-screen
-    if(sx<-40||sx>W+20||sy<-40||sy>H+20)continue;
-    drawNPCSprite(ctx,sx,sy,npc.type,npc.face??2);
-    // Name bubble — show when player is within 2 tiles
+    if(footX<-SW||footX>W+SW||footY<-SH||footY>H+40)continue;
+    scaledSprite(ctx,footX,footY,(ox,oy)=>drawNPCSprite(ctx,ox,oy,npc.type,npc.face??2));
+    // Name bubble + E hint — above scaled sprite
     const dist=Math.abs(npc.x-px)+Math.abs(npc.y-py);
     if(dist<=2){
       const label=npc.name;
       const lw=label.length*6+6;
-      ctx.fillStyle='#000000BB';ctx.fillRect(sx+12-lw/2,sy-16,lw,11);
+      const topY=footY-SH;
+      ctx.fillStyle='#000000BB';ctx.fillRect(footX-lw/2,topY-16,lw,11);
       ctx.fillStyle='#FFD700';ctx.font='8px monospace';ctx.textAlign='center';
-      ctx.fillText(label,sx+12,sy-7);
+      ctx.fillText(label,footX,topY-7);
       ctx.textAlign='left';
-      // "Press E" hint
-      ctx.fillStyle='#00000099';ctx.fillRect(sx+12-22,sy-28,44,10);
+      ctx.fillStyle='#00000099';ctx.fillRect(footX-22,topY-28,44,10);
       ctx.fillStyle='#88BBFF';ctx.font='7px monospace';ctx.textAlign='center';
-      ctx.fillText('[E] Talk',sx+12,sy-20);
+      ctx.fillText('[E] Talk',footX,topY-20);
       ctx.textAlign='left';
     }
   }
 
   // ── Other players ──
   for(const[id,p] of Object.entries(others)){
-    const sx=p.x-G.camX-12,sy=p.y-G.camY-20;
-    drawPlayerSprite(ctx,sx,sy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null);
-    // name label
-    ctx.fillStyle='#00000088';ctx.fillRect(sx+2,sy-14,p.nickname?.length*6||40,12);
-    ctx.fillStyle='#fff';ctx.font='9px monospace';ctx.fillText(p.nickname||'',sx+4,sy-5);
+    const footX=p.x-G.camX;
+    const footY=p.y-G.camY+4;
+    if(footX<-SW||footX>W+SW||footY<-SH||footY>H+40)continue;
+    scaledSprite(ctx,footX,footY,(ox,oy)=>
+      drawPlayerSprite(ctx,ox,oy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null));
+    // name label above
+    const topY=footY-SH;
+    const nl=p.nickname||'';
+    ctx.fillStyle='#00000088';ctx.fillRect(footX-nl.length*3,topY-14,nl.length*6+4,12);
+    ctx.fillStyle='#fff';ctx.font='9px monospace';ctx.textAlign='center';
+    ctx.fillText(nl,footX,topY-4);ctx.textAlign='left';
   }
 
   // ── Local player ──
-  const sx=G.x-G.camX-12,sy=G.y-G.camY-20;
-  drawPlayerSprite(ctx,sx,sy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory);
+  const footX=G.x-G.camX,footY=G.y-G.camY+4;
+  scaledSprite(ctx,footX,footY,(ox,oy)=>
+    drawPlayerSprite(ctx,ox,oy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory));
 
   // Draw world loot piles
   if(G.worldLoot){
@@ -1694,7 +1733,7 @@ function renderSpriteLayer(ctx){
       const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,14);
       grd.addColorStop(0,'rgba(255,200,0,0.35)');grd.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,14,0,Math.PI*2);ctx.fill();
-      ctx.save();ctx.font='14px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.save();ctx.font='20px serif';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText('💰',sx,sy);
       ctx.restore();
     });
