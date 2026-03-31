@@ -157,6 +157,31 @@ body.touch #mobile-act{display:flex}
 #npc-dialog-text{color:#d8d8ee;font-size:.75rem;line-height:1.55;min-height:36px}
 #npc-dialog-hint{text-align:right;color:#445;font-size:.6rem;
   padding:3px 12px 6px;border-top:1px solid #1a1a3a;margin-top:3px}
+
+/* ── SHOP ── */
+#shop-overlay{display:none;position:fixed;inset:0;background:#000d;z-index:25;
+  align-items:center;justify-content:center}
+#shop-overlay.open{display:flex}
+#shop-box{background:#080818;border:3px solid #FFD700;padding:1.2rem;
+  min-width:360px;max-width:94vw;max-height:82vh;overflow-y:auto;
+  font-family:'Courier New',monospace}
+#shop-header-row{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:.8rem;border-bottom:1px solid #333;padding-bottom:.5rem}
+#shop-title{color:#FFD700;font-size:.9rem;font-weight:bold;letter-spacing:.15em}
+#shop-gold-display{color:#FFD700;font-size:.8rem}
+.shop-row{display:flex;align-items:center;gap:10px;padding:7px 4px;
+  border-bottom:1px solid #12122a}
+.shop-row-icon{font-size:1.3rem;width:26px;text-align:center;flex-shrink:0}
+.shop-row-info{flex:1;min-width:0}
+.shop-row-name{color:#ddd;font-size:.78rem;font-weight:bold}
+.shop-row-desc{color:#666;font-size:.67rem;margin-top:1px}
+.shop-row-req{font-size:.62rem;margin-top:2px}
+.shop-row-right{text-align:right;flex-shrink:0}
+.shop-row-price{color:#FFD700;font-size:.78rem;margin-bottom:3px}
+.shop-buy-btn{background:#1a4a1a;border:1px solid #4CAF50;color:#4CAF50;
+  padding:3px 10px;font-family:inherit;font-size:.68rem;cursor:pointer;letter-spacing:.05em}
+.shop-buy-btn:hover:not(:disabled){background:#2a6a2a}
+.shop-buy-btn:disabled{background:#1a1a1a;border-color:#333;color:#444;cursor:default}
 </style>
 </head>
 <body>
@@ -280,6 +305,18 @@ body.touch #mobile-act{display:flex}
     </div>
   </div>
   <div id="npc-dialog-hint">[ E / Space ] Continue</div>
+</div>
+
+<!-- ═══════════════ SHOP PANEL ═══════════════ -->
+<div id="shop-overlay">
+  <div id="shop-box">
+    <div id="shop-header-row">
+      <span id="shop-title">SHOP</span>
+      <span id="shop-gold-display">💰 0 ₴</span>
+    </div>
+    <div id="shop-items-list"></div>
+    <div style="margin-top:.8rem;font-size:.65rem;color:#445;text-align:right">[ ESC ] Close</div>
+  </div>
 </div>
 
 <div id="queue-panel">
@@ -437,6 +474,27 @@ const ENEMIES = {
     xp:40, gold:30,
     msg:'A Dark Knight bars your path!',
   },
+};
+
+// ── SHOP CATALOG ───────────────────────────────────────────────────────────────
+const SHOP_CATALOG = {
+  zelda: [
+    // Weapons
+    {name:'Iron Sword',    icon:'⚔',  desc:'Balanced starter blade.',         type:'weapon', dmg:4,  cost:50,  lvl:1},
+    {name:'Steel Sword',   icon:'⚔',  desc:'Forged for seasoned fighters.',   type:'weapon', dmg:7,  cost:160, lvl:2},
+    {name:'War Axe',       icon:'🪓', desc:'Heavy, brutal, effective.',        type:'weapon', dmg:9,  cost:280, lvl:3},
+    {name:'Flame Blade',   icon:'🔥', desc:'Burns with ancient fire magic.',   type:'weapon', dmg:12, cost:500, lvl:5},
+    {name:'Shadow Blade',  icon:'🌑', desc:'Strikes from darkness for big crits.', type:'weapon', dmg:15, cost:900, lvl:8},
+    // Potions
+    {name:'Health Potion', icon:'🧪', desc:'Restores 5 HP.',                  type:'potion', heal:5,       cost:25, lvl:1},
+    {name:'Mega Potion',   icon:'💊', desc:'Fully restores HP.',               type:'potion', healFull:true,cost:80, lvl:3},
+  ],
+  flint: [
+    {name:'Wooden Shield', icon:'🛡', desc:'Better than nothing.',             type:'shield', def:1, cost:40,  lvl:1},
+    {name:'Iron Shield',   icon:'🛡', desc:'Solid protection.',                type:'shield', def:3, cost:150, lvl:2},
+    {name:'Steel Shield',  icon:'🛡', desc:'Heavy but tough.',                 type:'shield', def:5, cost:350, lvl:4},
+    {name:'Elven Ward',    icon:'✨', desc:'Magical barrier. Rare find.',       type:'shield', def:8, cost:700, lvl:7},
+  ],
 };
 
 // Offscreen canvases for the pixelation transition effect
@@ -1276,7 +1334,7 @@ const NPCS = {
     },
   ],
   marketplace:[
-    { id:'vendor', x:5, y:5, type:'merchant', face:1, name:'Vendor Zelda',
+    { id:'vendor', x:5, y:5, type:'merchant', face:1, name:'Vendor Zelda', shop:'zelda',
       dialog:[
         "You made it through the queue! Welcome to my stall.",
         "I stock weapons, potions, and curiosities sourced from across the realm.",
@@ -1284,7 +1342,7 @@ const NPCS = {
         "Hint: high STR means harder hits. High AGI means you dodge more often.",
       ]
     },
-    { id:'vendor2', x:15, y:8, type:'barkeep', face:3, name:'Armorer Flint',
+    { id:'vendor2', x:15, y:8, type:'barkeep', face:3, name:'Armorer Flint', shop:'flint',
       dialog:[
         "Armor's my trade. Defense is underrated by the young adventurers.",
         "Endurance stat? That's your armor stat. Don't neglect it.",
@@ -1805,6 +1863,7 @@ const G = {
   battle:null,          // active battle state or null
   showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
+  shop:null,            // {vendorId} — active shop or null
 };
 
 // Cache of server-broadcast queue states
@@ -1853,7 +1912,8 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.key==='Escape'){
-    if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
+    if(G.shop){ closeShop(); e.preventDefault(); }
+    else if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
     else {
       const ci=document.getElementById('chat-input');
       if(document.activeElement===ci){ci.blur();ci.style.display='none';}
@@ -1919,6 +1979,7 @@ function tryInteract(){
     if(d<=bestDist){bestDist=d;nearest=npc;}
   }
   if(!nearest)return;
+  if(nearest.shop){openShop(nearest.shop);return;}
   G.npcDialog={npc:nearest,lineIdx:0};
   G.paused=true;
   showNpcDialog();
@@ -2451,6 +2512,7 @@ function renderBattleScreen(){
   const actions=[
     {id:'attack', label:'⚔  ATTACK',   bg:'#6B1818',hi:'#A02020'},
     {id:'special',label:specialLabel,  bg:'#183058',hi:'#2050A0'},
+    {id:'potion', label:'🧪  POTION',  bg:'#183040',hi:'#204060'},
     {id:'flee',   label:'💨  FLEE',    bg:'#183018',hi:'#286028'},
   ];
   const active=bt.phase==='player_turn'&&!bt.result;
@@ -2514,6 +2576,19 @@ function doBattleAction(action){
   const bt=G.battle;
   if(!bt||bt.phase!=='player_turn'||bt.result)return;
 
+  if(action==='potion'){
+    const slot=G.inventory.findIndex((s,i)=>i>=2&&s&&s.type==='potion');
+    if(slot===-1){bt.log.push('No potions in inventory!');bt.phase='player_turn';return;}
+    const pot=G.inventory[slot];
+    const before=G.hp;
+    if(pot.healFull)G.hp=G.maxHp;
+    else G.hp=Math.min(G.maxHp,G.hp+(pot.heal||5));
+    const gained=G.hp-before;
+    G.inventory[slot]=null;
+    bt.log.push(`Used ${pot.name}! +${gained} HP.`);
+    bt.phase='enemy_turn';bt.animTimer=75;
+    return;
+  }
   if(action==='flee'){
     const chance=Math.min(0.88,0.4+G.stats.agi*0.06-bt.enemy.spd*0.04);
     if(Math.random()<chance){
@@ -2621,6 +2696,87 @@ function endBattle(){
       G.x=sx;G.y=sy;
     });
   }
+}
+
+// ── SHOP ──────────────────────────────────────────────────────────────────────
+function openShop(vendorId){
+  G.shop={vendorId};
+  G.paused=true;
+  renderShop();
+  document.getElementById('shop-overlay').classList.add('open');
+}
+function closeShop(){
+  if(!G.shop)return;
+  G.shop=null;
+  G.paused=false;
+  document.getElementById('shop-overlay').classList.remove('open');
+}
+function renderShop(){
+  const v=G.shop?.vendorId;
+  if(!v)return;
+  const items=SHOP_CATALOG[v]||[];
+  const title=v==='zelda'?'VENDOR ZELDA — Weapons & Potions':'ARMORER FLINT — Shields';
+  document.getElementById('shop-title').textContent=title;
+  document.getElementById('shop-gold-display').textContent=`💰 ${G.schmeckles} ₴`;
+  const list=document.getElementById('shop-items-list');
+  list.innerHTML='';
+  items.forEach((item,i)=>{
+    const canAfford=G.schmeckles>=item.cost;
+    const meetsLvl=G.level>=item.lvl;
+    const canBuy=canAfford&&meetsLvl;
+    let statStr='';
+    if(item.type==='weapon')statStr=`+${item.dmg} DMG`;
+    else if(item.type==='shield')statStr=`+${item.def} DEF`;
+    else if(item.healFull)statStr='Full HP restore';
+    else statStr=`+${item.heal} HP`;
+    const row=document.createElement('div');
+    row.className='shop-row';
+    row.innerHTML=`
+      <div class="shop-row-icon">${item.icon}</div>
+      <div class="shop-row-info">
+        <div class="shop-row-name">${item.name} <span style="color:#aaa;font-weight:normal">(${statStr})</span></div>
+        <div class="shop-row-desc">${item.desc}</div>
+        <div class="shop-row-req" style="color:${meetsLvl?'#556':'#FF6600'}">Requires Lv.${item.lvl}</div>
+      </div>
+      <div class="shop-row-right">
+        <div class="shop-row-price">${item.cost} ₴</div>
+        <button class="shop-buy-btn" onclick="buyItem('${v}',${i})" ${canBuy?'':'disabled'}>BUY</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+function buyItem(vendorId,idx){
+  const item=SHOP_CATALOG[vendorId]?.[idx];
+  if(!item)return;
+  if(G.schmeckles<item.cost){chatLog('Not enough Schmeckles!','#FF4444');return;}
+  if(G.level<item.lvl){chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
+  G.schmeckles-=item.cost;
+  if(item.type==='weapon'){
+    G.inventory[0]={...item};
+    chatLog(`Equipped ${item.name}! (+${item.dmg} DMG)`,'#4CAF50');
+  } else if(item.type==='shield'){
+    G.inventory[1]={...item};
+    chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
+  } else if(item.type==='potion'){
+    const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+    if(slot===-1){G.schmeckles+=item.cost;chatLog('Inventory full! No room for potions.','#FF4444');return;}
+    G.inventory[slot]={...item};
+    chatLog(`Bought ${item.name}!`,'#4CAF50');
+  }
+  renderShop();
+}
+function usePotion(slotIdx){
+  const item=G.inventory[slotIdx];
+  if(!item||item.type!=='potion')return;
+  if(G.hp>=G.maxHp){chatLog('HP is already full!','#888');return;}
+  const before=G.hp;
+  if(item.healFull)G.hp=G.maxHp;
+  else G.hp=Math.min(G.maxHp,G.hp+(item.heal||5));
+  const gained=G.hp-before;
+  G.inventory[slotIdx]=null;
+  chatLog(`Used ${item.name}! Restored ${gained} HP.`,'#4CAF50');
+  if(G.paused)renderInventoryScreen();
 }
 
 // ── TILE LAYER RENDERER ───────────────────────────────────────────────────────
@@ -2781,6 +2937,11 @@ function renderInventoryScreen(){
     slot.className='inv-slot'+(item?' has-item':'');
     slot.textContent=item?item.icon||'?':'';
     slot.title=item?item.name:'Empty';
+    if(item&&item.type==='potion'&&!G.battle){
+      slot.title=`${item.name} — Click to use`;
+      slot.style.cursor='pointer';
+      slot.addEventListener('click',()=>usePotion(i));
+    }
     grid.appendChild(slot);
   });
   const stats=document.getElementById('stats-box');
