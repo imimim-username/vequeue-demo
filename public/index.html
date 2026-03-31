@@ -10,6 +10,28 @@ body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#
 .screen{display:none;position:fixed;inset:0;align-items:center;justify-content:center}
 .screen.active{display:flex}
 
+/* ── LOGIN SCREEN ── */
+#screen-login{background:#000;flex-direction:column;align-items:center;justify-content:center}
+#login-box{background:#080818;border:3px solid #FFD700;padding:2rem 2.2rem;
+  min-width:300px;max-width:88vw;font-family:'Courier New',monospace;text-align:center}
+#login-box h1{color:#FFD700;letter-spacing:.25em;font-size:1.3rem;margin:0 0 .3rem}
+#login-box p{color:#555;font-size:.68rem;margin:0 0 1.2rem}
+#login-error{color:#FF4444;font-size:.73rem;min-height:1.1em;margin-bottom:.6rem}
+#login-username,#login-pin{display:block;width:100%;box-sizing:border-box;
+  margin-bottom:.65rem;padding:.5rem .7rem;background:#0d0d2a;
+  border:1px solid #333;color:#eee;font-family:inherit;font-size:.85rem}
+#login-username:focus,#login-pin:focus{border-color:#FFD700;outline:none}
+#login-main-btns{display:flex;gap:.5rem;margin-bottom:.5rem}
+#btn-login,#btn-register{flex:1;padding:.55rem;background:#111130;
+  border:2px solid #FFD700;color:#FFD700;font-family:inherit;
+  font-size:.72rem;cursor:pointer;letter-spacing:.1em}
+#btn-login:hover,#btn-register:hover{background:#1a1a50}
+#btn-guest{width:100%;padding:.35rem;background:transparent;
+  border:1px solid #222;color:#333;font-family:inherit;
+  font-size:.63rem;cursor:pointer;letter-spacing:.05em}
+#btn-guest:hover{color:#555;border-color:#444}
+#login-connecting{color:#555;font-size:.65rem;margin-top:.8rem}
+
 /* ── TITLE ── */
 #screen-title{background:#000;flex-direction:column}
 #title-canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -187,7 +209,22 @@ body.touch #mobile-act{display:flex}
 <body>
 
 <!-- ═══════════════ TITLE SCREEN ═══════════════ -->
-<div id="screen-title" class="screen active">
+<div id="screen-login" class="screen active">
+  <div id="login-box">
+    <h1>⚔ VICTORY QUEST</h1>
+    <p>Sign in to save your progress across sessions</p>
+    <div id="login-error"></div>
+    <input id="login-username" type="text" placeholder="Username" maxlength="20" autocomplete="username" spellcheck="false">
+    <input id="login-pin" type="password" placeholder="PIN (4+ digits)" maxlength="12" autocomplete="current-password">
+    <div id="login-main-btns">
+      <button id="btn-login">▶ LOGIN</button>
+      <button id="btn-register">★ REGISTER</button>
+    </div>
+    <button id="btn-guest">Play as Guest (progress not saved server-side)</button>
+    <div id="login-connecting">Connecting...</div>
+  </div>
+</div>
+<div id="screen-title" class="screen">
   <canvas id="title-canvas"></canvas>
   <div id="title-ui">
     <div class="game-title">VICTORY QUEST</div>
@@ -2899,6 +2936,7 @@ function doBattleAction(action){
     }
     updateQuestProgress(bt.enemy.type);
     chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
+    saveToServer();
     // Wait for player input — do NOT auto-advance
     return;
   }
@@ -3470,6 +3508,7 @@ function buildCreateScreen(){
     if(cl.startShield)G.inventory[1]=cl.startShield;
     if(!G.persist)chatLog('⚠ Progress will not be saved between sessions.','#FF8C00');
     startGame();
+    saveToServer();
   });
 }
 
@@ -3507,7 +3546,7 @@ function gameLoop(ts){
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
     // persist
-    if(G.persist&&G.tick%300===0)saveState();
+    if(G.persist&&G.tick%300===0){saveState();saveToServer();}
   }
   // Battle screen renders while paused (transition phases handled by their own rAF)
   if(G.battle&&(G.battle.phase==='player_turn'||G.battle.phase==='enemy_turn')){
@@ -3578,47 +3617,119 @@ function loadState(){
 
 // ── SOCKET.IO ─────────────────────────────────────────────────────────────────
 let socket,others={};
+let G_accountId=null;
+
 function initSocket(){
+  if(socket)return; // already initialized
   socket=io();
+
+  // ── Auth ──
   socket.on('connect',()=>{
-    socket.emit('join',{nickname:G.nickname,color:G.color,hairColor:G.hairColor,species:G.species,class_:G.class_,zone:G.zone,x:G.x,y:G.y});
+    document.getElementById('login-connecting').textContent='';
   });
+  socket.on('auth_result',result=>{
+    const errEl=document.getElementById('login-error');
+    if(!result.ok){errEl.textContent=result.error;return;}
+    G_accountId=result.username;
+    errEl.textContent='';
+    if(result.data){
+      // Returning player — load state and jump straight into game
+      applyServerState(result.data);
+      startGame();
+    } else {
+      // New account or guest — go to character creation
+      showScreen('screen-title');
+    }
+  });
+
+  // ── Game events ──
   socket.on('welcome',data=>{
     document.getElementById('hud-players').textContent=`${data.count} online`;
   });
-  socket.on('zone_players',players=>{
-    others={};players.forEach(p=>{if(p.id!==socket.id)others[p.id]=p;});
+  socket.on('player_joined',data=>{
+    others[data.id]=data;
+    document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
   });
-  socket.on('player_joined',p=>{others[p.id]=p;updateOnlineCount();});
-  socket.on('player_left',id=>{delete others[id];updateOnlineCount();});
-  socket.on('player_moved',p=>{if(others[p.id])Object.assign(others[p.id],p);});
-  socket.on('chat',msg=>{chatLog(`[${msg.nickname}] ${msg.text}`,'#87CEEB');});
-  socket.on('disconnect',()=>{others={};});
-
-  // ── Queue events ──
-  socket.on('queue_joined',data=>{
-    if(G.queueState)G.queueState.ticket=data.ticket;
+  socket.on('player_left',id=>{
+    delete others[id];
+    document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
+  });
+  socket.on('player_moved',data=>{if(others[data.id])others[data.id]=data;});
+  socket.on('zone_players',list=>{
+    others={};
+    list.forEach(p=>{others[p.id]=p;});
+    document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
+  });
+  socket.on('chat',data=>{
+    chatLog(`[${data.nickname}] ${data.text}`,'#aef');
+  });
+  socket.on('queue_state',state=>{
+    serverQueues[state.zone]=state;
     updateQueuePanel();
   });
   socket.on('queue_served',data=>{
-    if(G.queueState&&G.queueState.zone===data.zone&&G.queueState.type===data.queueType){
-      G.queueState.served=true;
+    const qs=G.queueState;
+    if(qs&&qs.zone===data.zone&&qs.type===data.queueType){
+      qs.served=data.ticket;
+      if(qs.ticket===data.ticket){
+        chatLog(`🎫 You're up! Enter ${data.zone} now.`,'#00FF88');
+        document.getElementById('queue-enter-btn').style.display='block';
+      }
       updateQueuePanel();
-      const zl=data.zone[0].toUpperCase()+data.zone.slice(1);
-      chatLog(`✅ ${zl} queue: it's your turn! Walk through or click ENTER NOW.`,'#00DD77');
     }
   });
-  socket.on('queue_state',data=>{
-    if(!serverQueues[data.zone])serverQueues[data.zone]={};
-    serverQueues[data.zone].entry=data.entry;
-    serverQueues[data.zone].exit=data.exit;
-    updateQueuePanel();
+  socket.on('queue_joined',data=>{
+    if(G.queueState){
+      G.queueState.ticket=data.ticket;
+      G.queueState.served=data.serving;
+      updateQueuePanel();
+    }
   });
+}
 
-  // Emit position periodically
-  setInterval(()=>{
-    socket?.emit('move',{x:G.x,y:G.y,dir:G.dir,zone:G.zone,frame:G.frame,moving:G.moving});
-  },50);
+function joinGameServer(){
+  if(!socket)return;
+  const doJoin=()=>{
+    socket.emit('join',{
+      nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+      species:G.species,class_:G.class_,zone:G.zone,x:G.x,y:G.y,
+    });
+    // Send current zone
+    QUEUE_ZONES_CLIENT.forEach(z=>{});
+  };
+  if(socket.connected)doJoin();
+  else socket.once('connect',doJoin);
+}
+
+function applyServerState(s){
+  if(!s)return;
+  G.nickname=s.nickname||G.nickname;
+  G.color=s.color||G.color;
+  G.hairColor=s.hairColor||G.hairColor;
+  G.species=s.species||G.species;
+  G.class_=s.class_||G.class_;
+  G.schmeckles=s.schmeckles??G.schmeckles;
+  G.stats=s.stats||G.stats;
+  G.maxHp=s.maxHp||G.maxHp;
+  G.hp=Math.min(s.hp||G.hp,G.maxHp);
+  G.xp=s.xp??0;
+  G.level=s.level??1;
+  G.statPoints=s.statPoints??0;
+  if(Array.isArray(s.inventory))G.inventory=s.inventory;
+  G.quests=s.quests||{};
+  G.dungeonBossDefeated=s.dungeonBossDefeated||false;
+}
+
+function saveToServer(){
+  if(!socket||!G_accountId)return;
+  socket.emit('save_character',{
+    nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+    species:G.species,class_:G.class_,
+    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp,maxHp:G.maxHp,
+    xp:G.xp,level:G.level,statPoints:G.statPoints,
+    inventory:G.inventory,
+    quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
+  });
 }
 function updateOnlineCount(){
   document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
@@ -3643,7 +3754,7 @@ function startGame(){
     }
     document.getElementById('hud-zone').textContent=zoneName;
   }
-  initSocket();
+  joinGameServer();
   requestAnimationFrame(gameLoop);
 }
 
@@ -3705,6 +3816,33 @@ window.addEventListener('keydown',e=>{
   if(e.key==='3')doBattleAction('flee');
 },{capture:false});
 
+// ── LOGIN HANDLERS ────────────────────────────────────────────────────────────
+const QUEUE_ZONES_CLIENT=['marketplace','treasury'];
+
+function doLogin(){
+  const username=document.getElementById('login-username').value.trim();
+  const pin=document.getElementById('login-pin').value;
+  document.getElementById('login-error').textContent='';
+  if(!username||!pin){document.getElementById('login-error').textContent='Enter username and PIN.';return;}
+  socket.emit('auth_login',{username,pin});
+}
+function doRegister(){
+  const username=document.getElementById('login-username').value.trim();
+  const pin=document.getElementById('login-pin').value;
+  document.getElementById('login-error').textContent='';
+  if(!username||!pin){document.getElementById('login-error').textContent='Enter username and PIN.';return;}
+  socket.emit('auth_register',{username,pin});
+}
+document.getElementById('btn-login').addEventListener('click',doLogin);
+document.getElementById('btn-register').addEventListener('click',doRegister);
+document.getElementById('login-pin').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('login-username').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-pin').focus();});
+document.getElementById('btn-guest').addEventListener('click',()=>{
+  showScreen('screen-title');
+});
+
+// Init socket and show login screen on page load
+initSocket();
 animateTitle();
 </script>
 </body>

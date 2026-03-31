@@ -3,6 +3,15 @@ const express=require('express');
 const http=require('http');
 const{Server}=require('socket.io');
 const path=require('path');
+const crypto=require('crypto');
+const fs=require('fs');
+
+// ── Player Account DB (JSON file, in-memory with sync writes) ─────────────────
+const DB_FILE=path.join(__dirname,'players.json');
+let pdb={};
+try{pdb=JSON.parse(fs.readFileSync(DB_FILE,'utf8'));}catch(e){pdb={};}
+function saveDb(){try{fs.writeFileSync(DB_FILE,JSON.stringify(pdb),'utf8');}catch(e){console.error('DB save error',e);}}
+function hashPin(pin){return crypto.createHash('sha256').update('vq2026:'+pin).digest('hex');}
 
 const app=express();
 const srv=http.createServer(app);
@@ -79,6 +88,38 @@ const zonePlayers=(zone,excl)=>
 // ── Socket events ─────────────────────────────────────────────────────────────
 io.on('connection',socket=>{
   console.log('connect',socket.id);
+
+  socket.accountId=null;
+
+  socket.on('auth_register',({username,pin})=>{
+    if(!username||!pin||username.length<2||String(pin).length<4)
+      return socket.emit('auth_result',{ok:false,error:'Username (min 2 chars) and PIN (min 4 digits) required.'});
+    if(username.length>20)
+      return socket.emit('auth_result',{ok:false,error:'Username max 20 characters.'});
+    const key=username.toLowerCase();
+    if(pdb[key])
+      return socket.emit('auth_result',{ok:false,error:'Username already taken.'});
+    pdb[key]={username,pin_hash:hashPin(String(pin)),data:null,created:Date.now()};
+    saveDb();
+    socket.accountId=key;
+    socket.emit('auth_result',{ok:true,isNew:true,username});
+  });
+
+  socket.on('auth_login',({username,pin})=>{
+    const key=username.toLowerCase();
+    const row=pdb[key];
+    if(!row||row.pin_hash!==hashPin(String(pin)))
+      return socket.emit('auth_result',{ok:false,error:'Invalid username or PIN.'});
+    socket.accountId=key;
+    socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:row.data||null});
+  });
+
+  socket.on('save_character',data=>{
+    if(!socket.accountId)return;
+    pdb[socket.accountId].data=data;
+    pdb[socket.accountId].updated=Date.now();
+    saveDb();
+  });
 
   socket.on('join',data=>{
     players[socket.id]={
