@@ -72,6 +72,9 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 #hud-hearts{display:flex;gap:2px}
 #hud-gold{color:#FFD700;min-width:80px;text-align:right}
 #hud-players{color:#888;font-size:.7rem}
+#hud-level{color:#8BC34A;font-weight:bold;font-size:.75rem;min-width:36px;text-align:center}
+#hud-xp-bar{position:fixed;top:36px;left:0;right:0;height:5px;background:#111;z-index:10}
+#hud-xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#4CAF50,#CDDC39);transition:width .4s}
 
 /* ── CHAT ── */
 #chat-panel{position:fixed;bottom:0;left:0;width:min(320px,100vw);z-index:10;
@@ -236,9 +239,11 @@ body.touch #mobile-act{display:flex}
   <div id="hud">
     <span id="hud-zone">TOWN SQUARE</span>
     <span id="hud-hearts"></span>
+    <span id="hud-level">Lv.1</span>
     <span id="hud-gold">0 ₴</span>
     <span id="hud-players">1 online</span>
   </div>
+  <div id="hud-xp-bar"><div id="hud-xp-fill"></div></div>
   <div id="chat-panel">
     <div id="chat-log"></div>
     <input type="text" id="chat-input" placeholder="Press T to chat…" maxlength="80">
@@ -1782,6 +1787,9 @@ const G = {
   schmeckles:CFG.START_GOLD,
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
+  xp:0,
+  level:1,
+  statPoints:0,
   nickname:'Hero',
   color:PLAYER_COLORS[0],
   hairColor:HAIR_COLORS[1],
@@ -2083,7 +2091,34 @@ function makeScaledEnemy(key,depth){
     atk:     Math.max(1, Math.round(pl*m*0.70)),
     def:     Math.max(0, Math.round(pl*m*0.28)),
     currentHp:Math.max(6,Math.round(pl*m*3.6)),
+    xp:      Math.max(tmpl.xp, Math.round(tmpl.xp*m*G.level)),
   };
+}
+
+// ── XP & LEVELING ──────────────────────────────────────────────────────────────
+// XP required to advance from level L to L+1. Grows by ~50% per level.
+function xpForLevel(l){ return Math.floor(100*Math.pow(1.5,l-1)); }
+
+// Call after adding XP — handles multi-level-ups in one call.
+function checkLevelUp(){
+  while(G.xp>=xpForLevel(G.level)){
+    G.xp-=xpForLevel(G.level);
+    G.level++;
+    G.statPoints+=3;
+    G.maxHp++;
+    G.hp=Math.min(G.maxHp,G.hp+2); // partial HP restore on level-up
+    chatLog(`★ LEVEL UP! You are now level ${G.level}! +3 stat points, +1 max HP`,'#FFD700');
+    if(G.paused)renderInventoryScreen(); // refresh stat panel if open
+  }
+}
+
+// Spend one stat point into the given stat key.
+function spendStat(st){
+  if(G.statPoints<=0)return;
+  G.stats[st]++;
+  G.statPoints--;
+  if(st==='vit'){G.maxHp++;G.hp=Math.min(G.maxHp,G.hp+1);}
+  renderInventoryScreen();
 }
 
 // Safe ring defined by four rivers. Depth = tiles outside the ring.
@@ -2531,7 +2566,9 @@ function doBattleAction(action){
     bt.xpGained=bt.enemy.xp;
     bt.goldGained=bt.enemy.gold;
     G.schmeckles+=bt.goldGained;
-    chatLog(`Battle won! +${bt.goldGained} ₴`,'#FFD700');
+    G.xp+=bt.xpGained;
+    checkLevelUp();
+    chatLog(`Battle won! +${bt.xpGained} XP  +${bt.goldGained} ₴`,'#FFD700');
     // Wait for player input — do NOT auto-advance
     return;
   }
@@ -2715,6 +2752,9 @@ function renderHUD(){
   const locked=G.lockedSchmeckles;
   document.getElementById('hud-gold').textContent=
     locked>0?`${G.schmeckles} ₴  🔒${locked}`:`${G.schmeckles} ₴`;
+  document.getElementById('hud-level').textContent=`Lv.${G.level}`;
+  const xpPct=Math.min(1,G.xp/xpForLevel(G.level))*100;
+  document.getElementById('hud-xp-fill').style.width=xpPct+'%';
   {
     let zoneName=ZONES[G.zone]?.name||G.zone;
     if(G.zone==='world'){
@@ -2745,13 +2785,23 @@ function renderInventoryScreen(){
   });
   const stats=document.getElementById('stats-box');
   const s=G.stats;
+  const xpNeeded=xpForLevel(G.level);
+  const btnStyle=G.statPoints>0
+    ?'cursor:pointer;background:#4CAF50;color:#fff;border:none;border-radius:3px;padding:0 5px;font-size:11px;margin-left:4px;'
+    :'display:none';
+  const statRows=[
+    ['str','STR (Attack)'],['vit','VIT (HP)'],['agi','AGI (Speed)'],
+    ['end','END (Defense)'],['lck','LCK (Crit/Drop)'],
+  ].map(([k,label])=>`
+    <div class="stat-line"><span>${label}</span><span>${s[k]}
+      <button style="${btnStyle}" onclick="spendStat('${k}')">+</button>
+    </span></div>`).join('');
   stats.innerHTML=`
-    <div class="stat-line"><span>STR (Attack)</span><span>${s.str}</span></div>
-    <div class="stat-line"><span>VIT (HP)</span><span>${s.vit}</span></div>
-    <div class="stat-line"><span>AGI (Speed)</span><span>${s.agi}</span></div>
-    <div class="stat-line"><span>END (Defense)</span><span>${s.end}</span></div>
-    <div class="stat-line"><span>LCK (Drop rate)</span><span>${s.lck}</span></div>
-    <div class="stat-line" style="margin-top:6px"><span>Schmeckles</span><span>${G.schmeckles} ₴</span></div>
+    <div class="stat-line" style="color:#8BC34A;font-weight:bold"><span>Level ${G.level}</span><span>${G.xp} / ${xpNeeded} XP</span></div>
+    ${G.statPoints>0?`<div class="stat-line" style="color:#FFD700"><span>Unspent Points</span><span>${G.statPoints} ★</span></div>`:''}
+    ${statRows}
+    <div class="stat-line" style="margin-top:6px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
+    <div class="stat-line"><span>Schmeckles</span><span>${G.schmeckles} ₴</span></div>
   `;
 }
 
@@ -3060,7 +3110,8 @@ function saveState(){
   const s={
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     species:G.species,class_:G.class_,
-    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp
+    schmeckles:G.schmeckles,stats:G.stats,hp:G.hp,
+    xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp
   };
   localStorage.setItem('vq_state',JSON.stringify(s));
 }
@@ -3076,6 +3127,10 @@ function loadState(){
     G.schmeckles=s.schmeckles??G.schmeckles;
     G.stats=s.stats||G.stats;
     G.hp=s.hp||G.hp;
+    G.xp=s.xp??0;
+    G.level=s.level??1;
+    G.statPoints=s.statPoints??0;
+    if(s.maxHp)G.maxHp=s.maxHp;
   }catch(e){}
 }
 
