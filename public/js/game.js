@@ -14,7 +14,7 @@ const G = {
   alcx: CFG.START_ALCX,
   bankPositions: [],
   transmuterDeposits: [], // [{type:'alUSD'|'alETH', amount, available}]
-  _queueAlcxDripTick: 0,
+  _shownQueueTip: false,
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
   xp:0,
@@ -189,6 +189,10 @@ function getQuestDialog(npc){
   if(!qdef)return npc.dialog;
   const qs=G.quests[qid];
   if(!qs){
+    // Gate quests with a prerequisite
+    if(qdef.prereq&&G.quests[qdef.prereq]?.status!=='completed'){
+      return["I'm not sure you're ready for this yet.","Come back after you've proven yourself in the field."];
+    }
     // Quest not yet accepted — offer it
     return[...qdef.offerLines,'[ Accept: Space/E  |  Decline: Esc ]'];
   }
@@ -214,6 +218,8 @@ function handleQuestDialogClose(npc){
   if(!qdef)return;
   const qs=G.quests[qid];
   if(!qs){
+    // Don't accept if prereq not yet completed
+    if(qdef.prereq&&G.quests[qdef.prereq]?.status!=='completed')return;
     // Accept the quest
     G.quests[qid]={progress:0,status:'active'};
     chatLog(`★ Quest accepted: "${qdef.title}" — ${qdef.inProgressLine}`,'#FFD700');
@@ -2844,6 +2850,7 @@ function applyServerState(s){
   G.dungeonBossDefeated=s.dungeonBossDefeated||false;
   if(s.kills!=null)G.kills=s.kills;
   if(s.zoneSeniority!=null)G.zoneSeniority=s.zoneSeniority;
+  if(s._shownQueueTip!=null)G._shownQueueTip=s._shownQueueTip;
 }
 
 function saveToServer(){
@@ -2860,6 +2867,7 @@ function saveToServer(){
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
     kills:G.kills||0,
     zoneSeniority:G.zoneSeniority||0,
+    _shownQueueTip:G._shownQueueTip||false,
   });
 }
 function updateOnlineCount(){

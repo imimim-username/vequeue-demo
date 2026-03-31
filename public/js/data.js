@@ -258,11 +258,13 @@ const QUEST_DEFS = {
     readyLines:[
       "It is done. I can feel the darkness lifting even here in this hall.",
       "The realm owes you a debt beyond measure. Take this — it is the least we can offer.",
+      "That reward includes alETH — a synthetic asset backed by ETH yield. Rare, and valuable. Spend it in the Marketplace.",
     ],
     completedLines:["Peace shall reign. We'll need to update the records. Extensively."],
   },
   dark_knight_elite:{
     id:'dark_knight_elite', title:'Knight Slayer Elite', giver:'Armorer Brix',
+    prereq:'dark_knight_hunt',
     type:'kill', target:'darkKnight', required:3,
     reward:{xp:500,alETH:0.02},
     offerLines:[
