@@ -2688,6 +2688,7 @@ const G = {
   paused:false,
   tick:0,
   camX:0,camY:0,
+  _prevX:0,_prevY:0,_camVx:0,_camVy:0,  // camera lead tracking
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedAlcx:0,         // ALCX locked while in entry queue
   battle:null,          // active battle state or null
@@ -2705,14 +2706,19 @@ const serverQueues={};
 function updateCamera(){
   const z=ZONES[G.zone];
   if(z&&(z.w*TS>W||z.h*TS>H)){
-    // Scrolling zone: camera follows player, clamped to map bounds
+    // Scrolling zone: camera leads slightly in movement direction
+    const CFG_CAM_LEAD=24; // px nudge ahead of player
+    G._camVx=G._camVx*0.7+(G.x-G._prevX)*0.3;
+    G._camVy=G._camVy*0.7+(G.y-G._prevY)*0.3;
+    G._prevX=G.x; G._prevY=G.y;
     const maxCX=Math.max(0,(z.w*TS)-W),maxCY=Math.max(0,(z.h*TS)-H);
-    const targetX=Math.max(0,Math.min(maxCX,G.x-W/2));
-    const targetY=Math.max(0,Math.min(maxCY,G.y-H/2));
+    const targetX=Math.max(0,Math.min(maxCX,G.x-W/2+G._camVx*CFG_CAM_LEAD));
+    const targetY=Math.max(0,Math.min(maxCY,G.y-H/2+G._camVy*CFG_CAM_LEAD));
     G.camX+=(targetX-G.camX)*0.12;
     G.camY+=(targetY-G.camY)*0.12;
   } else {
     G.camX=0;G.camY=0;
+    G._prevX=G.x;G._prevY=G.y;G._camVx=0;G._camVy=0;
   }
 }
 
