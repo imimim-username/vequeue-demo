@@ -301,6 +301,46 @@ const publicP=id=>{
 const zonePlayers=(zone,excl)=>
   Object.values(players).filter(p=>p.zone===zone&&p.id!==excl).map(p=>publicP(p.id));
 
+// ── World Events ─────────────────────────────────────────────────────────────
+const WORLD_EVENT_DEFS = [
+  {type:'dark_storm',       icon:'⛈',  name:'Dark Storm',
+   desc:'Encounter rates are doubled in all danger zones.',
+   duration:5*60*1000},
+  {type:'blood_moon',       icon:'🌕',  name:'Blood Moon',
+   desc:'All enemies drop double Schmeckles under the crimson sky.',
+   duration:8*60*1000},
+  {type:'merchant_convoy',  icon:'🚛',  name:'Merchant Convoy',
+   desc:'A convoy arrives. Shop prices reduced 20% for a limited time.',
+   duration:6*60*1000},
+  {type:'monster_swarm',    icon:'👹',  name:'Monster Swarm',
+   desc:'A monster swarm erupts from the deep wilderness. Triple encounter rate!',
+   duration:3*60*1000},
+  {type:'treasure_surge',   icon:'💰',  name:'Treasure Surge',
+   desc:'Ancient caches surface. Loot drops are 50% richer.',
+   duration:7*60*1000},
+];
+let worldEvent=null; // {type,icon,name,desc,endsAt}
+
+function triggerWorldEvent(){
+  if(worldEvent&&Date.now()<worldEvent.endsAt)return; // already active
+  const def=WORLD_EVENT_DEFS[Math.floor(Math.random()*WORLD_EVENT_DEFS.length)];
+  worldEvent={...def,endsAt:Date.now()+def.duration};
+  io.emit('world_event_start',worldEvent);
+  io.emit('chat',{nickname:`${def.icon} World Event`,text:`${def.name} has begun! ${def.desc}`});
+  setTimeout(()=>{
+    if(worldEvent?.type===def.type){
+      io.emit('world_event_end',{type:def.type});
+      io.emit('chat',{nickname:`${def.icon} World Event`,text:`The ${def.name} has ended.`});
+      worldEvent=null;
+    }
+  },def.duration);
+}
+
+// Attempt a random event every 12 minutes; 45% chance to fire
+setInterval(()=>{ if(Math.random()<0.45) triggerWorldEvent(); }, 12*60*1000);
+// Also trigger one ~4 minutes after server start to make it feel alive
+setTimeout(()=>{ if(Math.random()<0.6) triggerWorldEvent(); }, 4*60*1000);
+
 // ── Socket events ─────────────────────────────────────────────────────────────
 io.on('connection',socket=>{
   console.log('connect',socket.id);
@@ -423,6 +463,10 @@ io.on('connection',socket=>{
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
     socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE});
+    // Send active world event to new joiner
+    if(worldEvent&&Date.now()<worldEvent.endsAt){
+      socket.emit('world_event_start',worldEvent);
+    }
   });
 
   socket.on('move',data=>{

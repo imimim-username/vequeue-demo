@@ -48,6 +48,7 @@ const G = {
   villageBossDefeated:false,
   worldLoot:[],
   marketListings:[],
+  worldEvent:null,      // active world event or null
   livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
   treasury:{alUSD:0,alETH:0},
   accessory:null,       // 'cape' | 'hat' | 'glasses' | null
@@ -704,7 +705,10 @@ function checkEncounter(){
   if(G.tick%50!==0)return;
   const depth=worldDangerDepth();
   if(depth<8)return;             // safe zone
-  if(Math.random()>0.22)return;
+  let encounterRate=0.22;
+  if(G.worldEvent?.type==='dark_storm')encounterRate=0.44;
+  if(G.worldEvent?.type==='monster_swarm')encounterRate=0.66;
+  if(Math.random()>encounterRate)return;
   let key;
   if(depth<20)      key=Math.random()<0.55?'wolf':'goblin';
   else if(depth<40) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
@@ -1447,8 +1451,10 @@ function doBattleAction(action){
     bt.result='win';
     bt.xpGained=bt.enemy.xp;
     const drops = bt.enemy.drops || {};
-    bt.spacebucksGained = drops.spacebucks || 0;
-    bt.schmecklesGained = drops.schmeckles || 0;
+    const lootMult=(G.worldEvent?.type==='treasure_surge')?1.5:1;
+    const moonMult=(G.worldEvent?.type==='blood_moon')?2:1;
+    bt.spacebucksGained = Math.round((drops.spacebucks || 0)*lootMult);
+    bt.schmecklesGained = Math.round((drops.schmeckles || 0)*lootMult*moonMult);
     G.spacebucks += bt.spacebucksGained;
     G.schmeckles += bt.schmecklesGained;
     G.xp+=bt.xpGained;
@@ -1972,6 +1978,7 @@ function renderShop(){
 function buyItem(vendorId,idx){
   const item=SHOP_CATALOG[vendorId]?.[idx];
   if(!item)return;
+  const convoyDisc=G.worldEvent?.type==='merchant_convoy'?0.80:1.0;
   let currency=item.currency||'alUSD';
   const balance=currency==='alETH'?G.alETH:G.alUSD;
   if(balance<item.cost){
@@ -1987,8 +1994,8 @@ function buyItem(vendorId,idx){
     }else{SFX.error();chatLog(`Not enough ${currency} (or ${altCur} to convert).`,'#FF4444');return;}
   }
   if(G.level<item.lvl){SFX.error();chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
-  if(currency==='alETH')G.alETH=parseFloat((G.alETH-item.cost).toFixed(4));
-  else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-item.cost).toFixed(2));
+  if(currency==='alETH')G.alETH=parseFloat((G.alETH-item.cost*convoyDisc).toFixed(4));
+  else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-item.cost*convoyDisc).toFixed(2));
   // if currency==='_converted', already deducted above
   if(item.type==='weapon'){
     G.inventory[0]={...item};
@@ -2324,6 +2331,18 @@ function renderHUD(){
       zoneName=(tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H)?'Town Square':'Wilderness';
     }
     document.getElementById('hud-zone').textContent=zoneName;
+  }
+  // World event banner
+  if(G.worldEvent&&Date.now()<G.worldEvent.endsAt){
+    const secsLeft=Math.max(0,Math.ceil((G.worldEvent.endsAt-Date.now())/1000));
+    const mins=Math.floor(secsLeft/60),secs=secsLeft%60;
+    const timeStr=`${mins}:${secs.toString().padStart(2,'0')}`;
+    const bw=220,bh=20,bx=W/2-bw/2,by=6;
+    ctxUI.fillStyle='rgba(0,0,0,0.65)';ctxUI.fillRect(bx,by,bw,bh);
+    ctxUI.strokeStyle='#FF8C00';ctxUI.lineWidth=1;ctxUI.strokeRect(bx,by,bw,bh);
+    ctxUI.fillStyle='#FF8C00';ctxUI.font='bold 10px monospace';ctxUI.textAlign='center';
+    ctxUI.fillText(`${G.worldEvent.icon} ${G.worldEvent.name}  ${timeStr}`,W/2,by+13);
+    ctxUI.textAlign='left';
   }
 }
 
@@ -2921,6 +2940,15 @@ function initSocket(){
     }
     if(document.getElementById('transmuter-ui').style.display!=='none')renderTransmuterUI();
   });
+    socket.on('world_event_start', d => {
+  G.worldEvent = d;
+  chatLog(`${d.icon} WORLD EVENT: ${d.name} — ${d.desc}`, '#FF8C00');
+  SFX.levelUp(); // dramatic flourish
+});
+socket.on('world_event_end', d => {
+  if(G.worldEvent?.type === d.type) G.worldEvent = null;
+  chatLog('The world event has ended.', '#888');
+});
     socket.on('world_loot_init',data=>{G.worldLoot=data.piles||[];});
     socket.on('world_loot_added',data=>{if(!G.worldLoot.find(l=>l.id===data.pile.id))G.worldLoot.push(data.pile);});
     socket.on('world_loot_removed',data=>{G.worldLoot=G.worldLoot.filter(l=>l.id!==data.id);});
