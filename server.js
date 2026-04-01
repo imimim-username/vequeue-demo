@@ -341,6 +341,22 @@ setInterval(()=>{ if(Math.random()<0.45) triggerWorldEvent(); }, 12*60*1000);
 // Also trigger one ~4 minutes after server start to make it feel alive
 setTimeout(()=>{ if(Math.random()<0.6) triggerWorldEvent(); }, 4*60*1000);
 
+// ── 20Hz position tick (smooth multiplayer sync) ──────────────────────────────
+// Instead of broadcasting player_moved on every event (causes jitter), we
+// collect positions and broadcast each zone's state at a fixed 20Hz interval.
+// Clients get predictable update intervals → cleaner interpolation + dead reckoning.
+setInterval(()=>{
+  const byZone={};
+  for(const p of Object.values(players)){
+    if(!byZone[p.zone])byZone[p.zone]=[];
+    byZone[p.zone].push({id:p.id,x:p.x,y:p.y,dir:p.dir,frame:p.frame,moving:p.moving});
+  }
+  for(const[zone,list]of Object.entries(byZone)){
+    // Broadcast to whole room — clients skip their own id
+    io.to(zone).emit('zone_pos_tick',{t:Date.now(),players:list});
+  }
+},50); // 20Hz
+
 // ── Socket events ─────────────────────────────────────────────────────────────
 io.on('connection',socket=>{
   console.log('connect',socket.id);
@@ -472,14 +488,14 @@ io.on('connection',socket=>{
   socket.on('move',data=>{
     const p=players[socket.id];if(!p)return;
     p.x=data.x;p.y=data.y;p.dir=data.dir;p.frame=data.frame;p.moving=data.moving;
+    // Zone change — handle room membership; position broadcast handled by 20Hz tick
     if(data.zone!==p.zone){
       socket.leave(p.zone);socket.to(p.zone).emit('player_left',socket.id);
       p.zone=data.zone;socket.join(p.zone);
       socket.emit('zone_players',zonePlayers(p.zone,socket.id));
       socket.to(p.zone).emit('player_joined',publicP(socket.id));
-    } else {
-      socket.to(p.zone).emit('player_moved',publicP(socket.id));
     }
+    // Same-zone movement: no per-event broadcast — 20Hz tick handles it
   });
 
   socket.on('zone_change',data=>{

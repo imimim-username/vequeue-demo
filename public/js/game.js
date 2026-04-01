@@ -2904,14 +2904,38 @@ function initSocket(){
     delete others[id];
     document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
   });
+  // Legacy per-event fallback (server no longer sends this for movement, only kept for compatibility)
   socket.on('player_moved',data=>{
     if(!others[data.id])return;
     const o=others[data.id];
-    // Update interpolation target — rendered x/y will lerp toward these each frame
-    o.targetX=data.x; o.targetY=data.y;
-    o.dir=data.dir; o.frame=data.frame; o.moving=data.moving;
-    // If the player teleported far (zone entry), snap immediately
-    if(Math.abs(data.x-o.x)>200||Math.abs(data.y-o.y)>200){o.x=data.x;o.y=data.y;}
+    if(Math.abs(data.x-o.x)>300||Math.abs(data.y-o.y)>300){o.x=data.x;o.y=data.y;}
+    o.targetX=data.x;o.targetY=data.y;
+    o.dir=data.dir;o.frame=data.frame;o.moving=data.moving;
+  });
+  // 20Hz server position tick — primary sync mechanism with dead reckoning
+  socket.on('zone_pos_tick',data=>{
+    const now=Date.now();
+    // Clamp estimated one-way lag between 0 and 250ms
+    const lag=Math.min(250,Math.max(0,now-data.t));
+    const BASE_PX_S=132; // 2.2px/frame * 60fps — baseline player speed
+    data.players.forEach(pd=>{
+      if(pd.id===socket.id)return; // skip self
+      const o=others[pd.id];
+      if(!o)return; // player_joined handles initialization
+      // Snap if teleported (zone entry etc.)
+      if(Math.abs(pd.x-o.x)>300||Math.abs(pd.y-o.y)>300){o.x=pd.x;o.y=pd.y;}
+      // Dead reckoning: extrapolate position forward by network lag
+      let ex=pd.x,ey=pd.y;
+      if(pd.moving&&lag>5){
+        const dt=lag/1000;
+        if(pd.dir==='right')ex+=BASE_PX_S*dt;
+        else if(pd.dir==='left')ex-=BASE_PX_S*dt;
+        if(pd.dir==='down')ey+=BASE_PX_S*dt;
+        else if(pd.dir==='up')ey-=BASE_PX_S*dt;
+      }
+      o.targetX=ex;o.targetY=ey;
+      o.dir=pd.dir;o.frame=pd.frame;o.moving=pd.moving;
+    });
   });
   socket.on('zone_players',list=>{
     others={};
@@ -2970,16 +2994,16 @@ function initSocket(){
     }
     if(document.getElementById('transmuter-ui').style.display!=='none')renderTransmuterUI();
   });
-    socket.on('world_event_start', d => {
-  G.worldEvent = d;
-  chatLog(`${d.icon} WORLD EVENT: ${d.name} — ${d.desc}`, '#FF8C00');
-  SFX.levelUp(); // dramatic flourish
-});
-socket.on('world_event_end', d => {
-  if(G.worldEvent?.type === d.type) G.worldEvent = null;
-  chatLog('The world event has ended.', '#888');
-});
-    socket.on('world_loot_init',data=>{G.worldLoot=data.piles||[];});
+  socket.on('world_event_start',d=>{
+    G.worldEvent=d;
+    chatLog(`${d.icon} WORLD EVENT: ${d.name} — ${d.desc}`,'#FF8C00');
+    SFX.levelUp();
+  });
+  socket.on('world_event_end',d=>{
+    if(G.worldEvent?.type===d.type)G.worldEvent=null;
+    chatLog('The world event has ended.','#888');
+  });
+  socket.on('world_loot_init',data=>{G.worldLoot=data.piles||[];});
     socket.on('world_loot_added',data=>{if(!G.worldLoot.find(l=>l.id===data.pile.id))G.worldLoot.push(data.pile);});
     socket.on('world_loot_removed',data=>{G.worldLoot=G.worldLoot.filter(l=>l.id!==data.id);});
     socket.on('loot_claimed',data=>{
