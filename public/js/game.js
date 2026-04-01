@@ -529,6 +529,9 @@ function updateQueuePanel(){
 }
 
 function changeZone(zone,sx,sy){
+  // alert()/confirm() dialogs swallow keyup events — clear stale key state
+  // so the character doesn't walk on its own after zone transitions
+  Object.keys(KEYS).forEach(k=>delete KEYS[k]);
   SFX.door();
   G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;G.camX=0;G.camY=0;
   // Reset seniority when leaving economic zones
