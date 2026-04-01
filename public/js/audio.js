@@ -141,7 +141,9 @@ function _snesNoise(start, dur, vol, cutoff=4000){
 // p = { k: kickVol, s: snareVol, h: hatVol }  (0 = skip that component)
 function _percHit(p, t){
   if(!p) return;
-  const ctx=getAudioCtx(), out=_getOut();
+  const ctx=getAudioCtx();
+  // Route percussion through _musGain so mute/unmute applies to drums too
+  const dest=_musGain||_getOut();
 
   // Kick: pitched sine sweep 110→35 Hz + low noise thump
   if(p.k){
@@ -150,13 +152,13 @@ function _percHit(p, t){
     ko.frequency.exponentialRampToValueAtTime(35, t+0.10);
     kg.gain.setValueAtTime(p.k*0.55,t);
     kg.gain.exponentialRampToValueAtTime(0.0001, t+0.14);
-    ko.connect(kg); kg.connect(out);
+    ko.connect(kg); kg.connect(dest);
     ko.start(t); ko.stop(t+0.15);
     // Noise click attack
     const ns=ctx.createBufferSource(), nf=ctx.createBiquadFilter(), ng=ctx.createGain();
     ns.buffer=_getNoiseBuf(); nf.type='lowpass'; nf.frequency.value=200;
     ng.gain.setValueAtTime(p.k*0.18,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
-    ns.connect(nf); nf.connect(ng); ng.connect(out);
+    ns.connect(nf); nf.connect(ng); ng.connect(dest);
     ns.start(t); ns.stop(t+0.06);
   }
 
@@ -165,13 +167,13 @@ function _percHit(p, t){
     const ns=ctx.createBufferSource(), nf=ctx.createBiquadFilter(), ng=ctx.createGain();
     ns.buffer=_getNoiseBuf(); nf.type='bandpass'; nf.frequency.value=3500; nf.Q.value=0.8;
     ng.gain.setValueAtTime(p.s*0.62,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+0.11);
-    ns.connect(nf); nf.connect(ng); ng.connect(out);
+    ns.connect(nf); nf.connect(ng); ng.connect(dest);
     ns.start(t); ns.stop(t+0.12);
     // Snare body (180 Hz ping)
     const so=ctx.createOscillator(), sg=ctx.createGain();
     so.frequency.value=180;
     sg.gain.setValueAtTime(p.s*0.14,t); sg.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
-    so.connect(sg); sg.connect(out);
+    so.connect(sg); sg.connect(dest);
     so.start(t); so.stop(t+0.07);
   }
 
@@ -180,7 +182,7 @@ function _percHit(p, t){
     const hs=ctx.createBufferSource(), hf=ctx.createBiquadFilter(), hg=ctx.createGain();
     hs.buffer=_getNoiseBuf(); hf.type='highpass'; hf.frequency.value=8500;
     hg.gain.setValueAtTime(p.h*0.22,t); hg.gain.exponentialRampToValueAtTime(0.0001,t+0.045);
-    hs.connect(hf); hf.connect(hg); hg.connect(out);
+    hs.connect(hf); hf.connect(hg); hg.connect(dest);
     hs.start(t); hs.stop(t+0.05);
   }
 }
