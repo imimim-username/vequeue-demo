@@ -16,6 +16,7 @@ const G = {
   transmuterDeposits: [], // [{type:'alUSD'|'alETH', amount, available}]
   _shownQueueTip: false,
   _pendingConfirm: null,  // {_info, onYes, onNo} — active in-game confirm/info dialog
+  _queueDeclinedTile: null, // {tx,ty} — tile where player last declined a queue prompt
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
   xp:0,
@@ -458,10 +459,16 @@ function showNpcDialog(){
 // ── ZONE TRANSITION ───────────────────────────────────────────────────────────
 function checkDoorTrigger(){
   const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  // Clear the decline flag as soon as the player steps off that tile
+  if(G._queueDeclinedTile&&(G._queueDeclinedTile.tx!==tx||G._queueDeclinedTile.ty!==ty)){
+    G._queueDeclinedTile=null;
+  }
   for(const[key,door] of Object.entries(ZONE_DOORS)){
     if(G.zone===door.from&&door.tileRows.includes(ty)&&door.tileCols.includes(tx)){
-      if(door.queue){handleQueueDoor(key,door);}
-      else{changeZone(door.to,door.sx,door.sy);}
+      if(door.queue){
+        // Only prompt if the player hasn't already declined on this exact tile this visit
+        if(!G._queueDeclinedTile) handleQueueDoor(key,door);
+      } else{changeZone(door.to,door.sx,door.sy);}
       return;
     }
   }
@@ -522,6 +529,8 @@ function joinQueue(zone,type){
   if(G.queueState)return;
   const lockAmt=type==='entry'?Math.min(G.alcx,Math.max(5,Math.floor(G.alcx*0.20))):0;
   const zl=zone[0].toUpperCase()+zone.slice(1);
+  // Remember which tile the player is standing on so a "No" answer prevents re-prompting
+  const _declineTx=Math.floor(G.x/TS), _declineTy=Math.floor(G.y/TS);
 
   // Final step: commit the join
   function _doJoin(){
@@ -533,13 +542,18 @@ function joinQueue(zone,type){
     updateQueuePanel();
   }
 
+  // Called when player explicitly selects No — suppress re-prompting on same tile
+  function _onDecline(){
+    G._queueDeclinedTile={tx:_declineTx,ty:_declineTy};
+  }
+
   // Step 2: confirm ALCX lock (or skip if no lock)
   function _confirmLock(){
     if(lockAmt>0){
       showGameConfirm(7,'Queue System',[
         `Join the ${zl} entry queue?`,
         `⚗ ${lockAmt} ALCX (20% of your balance) will be locked as a commitment signal.\nYou get it all back when you enter or leave the zone.`,
-      ],_doJoin,null);
+      ],_doJoin,_onDecline);
     } else { _doJoin(); }
   }
 
@@ -1806,6 +1820,8 @@ function claimBankPosition(idx){
 }
 
 // ── TRANSMUTER ────────────────────────────────────────────────────────────────
+const TRANSMUTER_EXIT_FEE = 0.10; // 10% early-withdrawal penalty (mirrors v3 exitFee)
+
 function openTransmuter(){
   G.paused=true;
   renderTransmuterUI();
@@ -1823,13 +1839,22 @@ function renderTransmuterUI(){
     if(dep.amount<=0.001&&dep.available<=0.001)return;
     const syn=dep.type==='alUSD'?'$ alUSD':'⟠ alETH';
     const col=dep.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles';
-    const pct=dep.amount+dep.available>0?Math.min(100,Math.round(dep.available/(dep.amount+dep.available)*100)):100;
+    const total=dep.amount+dep.available;
+    const pct=total>0?Math.min(100,Math.round(dep.available/total*100)):100;
     const canClaim=dep.available>0.001;
+    const canExit=dep.amount>0.001; // unconverted portion still pending
+    const exitReturn=parseFloat((dep.amount*(1-TRANSMUTER_EXIT_FEE)).toFixed(dep.type==='alUSD'?2:4));
+    const exitFeeAmt=parseFloat((dep.amount*TRANSMUTER_EXIT_FEE).toFixed(dep.type==='alUSD'?2:4));
     html+=`<div class="bank-pos">
-      <b>${syn}</b> deposited: ${(dep.amount+dep.available).toFixed(2)} → ${col}<br>
+      <b>${syn}</b> deposited: ${total.toFixed(2)} → ${col}<br>
       <div class="bank-bar"><div class="bank-bar-fill" style="width:${pct}%;background:#4FC3F7"></div></div>
-      <span style="font-size:.75rem;color:#4FC3F7">${dep.available.toFixed(2)} ready to claim</span>
-      ${canClaim?`<button onclick="claimTransmuter(${i})" style="background:#4FC3F7;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${dep.available.toFixed(2)} ${dep.type==='alUSD'?'🪙':'💀'}</button>`:''}
+      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+        <span style="font-size:.75rem;color:#4FC3F7">${dep.available.toFixed(2)} ready</span>
+        ${canClaim?`<button onclick="claimTransmuter(${i})" style="background:#4FC3F7;color:#000;border:none;padding:3px 9px;border-radius:4px;cursor:pointer;font-size:.78rem">✓ CLAIM ${dep.available.toFixed(2)} ${dep.type==='alUSD'?'🪙':'💀'}</button>`:''}
+        ${canExit?`<button onclick="earlyWithdrawTransmuter(${i})" title="Early exit — ${(TRANSMUTER_EXIT_FEE*100).toFixed(0)}% exitFee applies to unconverted balance"
+          style="background:#5A2020;color:#FF8888;border:1px solid #FF4444;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:.78rem">
+          ⚠ EXIT EARLY (${exitReturn.toFixed(dep.type==='alUSD'?2:4)} back, ${exitFeeAmt.toFixed(dep.type==='alUSD'?2:4)} fee)</button>`:''}
+      </div>
     </div>`;
   });
   if(!html)html='<p style="color:#aaa;font-size:.85rem">No active deposits. Deposit alUSD or alETH above to participate in redemptions.</p>';
@@ -1862,6 +1887,24 @@ function claimTransmuter(idx){
   SFX.coin();
   socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
   renderTransmuterUI();
+  saveToServer();
+}
+
+// Early withdrawal — returns unconverted synthetic minus exitFee (10%)
+function earlyWithdrawTransmuter(idx){
+  const dep=G.transmuterDeposits[idx];
+  if(!dep||dep.amount<=0.001)return;
+  const gross=dep.amount;
+  const fee=parseFloat((gross*TRANSMUTER_EXIT_FEE).toFixed(dep.type==='alUSD'?2:4));
+  const returned=parseFloat((gross-fee).toFixed(dep.type==='alUSD'?2:4));
+  dep.amount=0; // unconverted portion is gone
+  if(dep.type==='alUSD') G.alUSD=parseFloat((G.alUSD+returned).toFixed(2));
+  else                   G.alETH=parseFloat((G.alETH+returned).toFixed(4));
+  chatLog(`⚠ Transmuter early exit: returned ${returned} ${dep.type} (${fee} exitFee burned).`,'#FF8C00');
+  SFX.error();
+  socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
+  renderTransmuterUI();
+  saveToServer();
 }
 function distributeTransmuterPool(sbAmount,ethAmount){
   // alUSD depositors get Spacebucks, alETH depositors get Schmeckles
