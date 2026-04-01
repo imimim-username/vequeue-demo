@@ -465,7 +465,7 @@ function makeVillage(){
   for(let c=13;c<=19;c++){m[2][c]=T.WALL;}
   m[2][13]=T.WALL;m[2][19]=T.WALL;m[5][13]=T.WALL;m[5][19]=T.WALL;
   // Overgrown areas
-  [3,14],[4,17],[10,17],[11,15],[6,3],[6,18].forEach(([r,c])=>{m[r][c]=T.SHRUB;});
+  [[3,14],[4,17],[10,17],[11,15],[6,3],[6,18]].forEach(([r,c])=>{m[r][c]=T.SHRUB;});
   // Well in centre
   m[7][10]=T.FOUNTAIN;m[7][11]=T.FOUNTAIN;
   // Entry south
