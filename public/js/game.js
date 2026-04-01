@@ -2689,11 +2689,11 @@ function renderInventoryScreen(){
 
   // Equipped slots row
   const eqRow=document.createElement('div');
-  eqRow.style.cssText='display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+  eqRow.style.cssText='display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;width:100%;';
 
   const makeEquipSlot=(label,item,onUnequip)=>{
     const d=document.createElement('div');
-    d.style.cssText=`background:#111;border:${rarBorder(item)};border-radius:4px;padding:4px 6px;min-width:80px;max-width:110px;font-size:.65rem;color:#ccc;position:relative`;
+    d.style.cssText=`background:#111;border:${rarBorder(item)};border-radius:4px;padding:4px 6px;flex:1;min-width:80px;max-width:130px;font-size:.65rem;color:#ccc;position:relative;box-sizing:border-box;overflow:hidden;`;
     const icon=item?item.icon:'—';
     const name=item?item.name:'(empty)';
     const stat=item?(item.type==='weapon'?`+${item.dmg} dmg`:item.type==='armor'||item.type==='shield'?`+${item.def} def`:''):'';
@@ -2723,7 +2723,7 @@ function renderInventoryScreen(){
   // ── General bag slots (idx 2+) ────────────────────────────────────────────
   while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   const bagGrid=document.createElement('div');
-  bagGrid.style.cssText='display:flex;flex-wrap:wrap;gap:4px;';
+  bagGrid.style.cssText='display:flex;flex-wrap:wrap;gap:4px;width:100%;';
   for(let i=2;i<G.maxInvSlots;i++){
     const item=G.inventory[i];
     const s=document.createElement('div');
@@ -2783,14 +2783,14 @@ function renderInventoryScreen(){
       <button style="${btnStyle}" onclick="spendStat('${k}')">+</button>
     </span></div>`).join('');
   const wpn=G.inventory[0];
-  const wpnStr=wpn?`${wpn.icon} ${wpn.name} (+${wpn.dmg} dmg, ${wpn.dmgType||'phys'})`:'None';
+  const wpnStr=wpn?`${wpn.icon} ${wpn.name} +${wpn.dmg}⚔ [${wpn.dmgType||'phys'}]`:'None';
   stats.innerHTML=`
-    <div class="stat-line" style="color:#8BC34A;font-weight:bold"><span>Level ${G.level}</span><span>${G.xp} / ${xpNeeded} XP</span></div>
+    <div class="stat-line" style="color:#8BC34A;font-weight:bold"><span>Level ${G.level}</span><span>${G.xp}/${xpNeeded} XP</span></div>
     ${G.statPoints>0?`<div class="stat-line" style="color:#FFD700"><span>Unspent Points</span><span>${G.statPoints} ★</span></div>`:''}
     ${statRows}
     <div class="stat-line" style="margin-top:4px;color:#7CC"><span>⚔ Weapon</span><span style="font-size:.7rem">${wpnStr}</span></div>
-    <div class="stat-line" style="color:#7CC"><span>🛡 Total DEF</span><span>${totalDef} (END:${endDef}+shield:${shieldDef}+armor:${armorDef})</span></div>
-    <div class="stat-line" style="margin-top:4px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
+    <div class="stat-line" style="color:#7CC"><span>🛡 DEF</span><span>${totalDef} (${endDef}end+${shieldDef}sh+${armorDef}arm)</span></div>
+    <div class="stat-line" style="margin-top:4px"><span>HP</span><span>${G.hp}/${G.maxHp}</span></div>
     <div class="stat-line" style="margin-top:4px;color:#FDD835"><span>🪙 Spacebucks</span><span>${G.spacebucks}</span></div>
     <div class="stat-line" style="color:#888"><span>💀 Schmeckles</span><span>${G.schmeckles}</span></div>
     <div class="stat-line" style="color:#4CAF50"><span>$ alUSD</span><span>${G.alUSD.toFixed(2)}</span></div>
