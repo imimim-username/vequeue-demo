@@ -61,6 +61,28 @@ const G = {
   snowballEnemies:[],   // [{id, zone, tileX, tileY, baseType, name, killCount, loot}]
 };
 
+// ── Global error display (debug overlay) ──────────────────────────────────────
+window.addEventListener('error', e => {
+  const el = document.getElementById('_debug_err') || (() => {
+    const d = document.createElement('div');
+    d.id = '_debug_err';
+    d.style.cssText = 'position:fixed;top:36px;left:0;right:0;background:rgba(180,0,0,0.95);color:#fff;font:11px monospace;padding:6px 8px;z-index:99999;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:auto;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  el.textContent += `[ERR] ${e.message} @ ${e.filename?.split('/').pop()}:${e.lineno}\n`;
+});
+window.addEventListener('unhandledrejection', e => {
+  const el = document.getElementById('_debug_err') || (() => {
+    const d = document.createElement('div');
+    d.id = '_debug_err';
+    d.style.cssText = 'position:fixed;top:36px;left:0;right:0;background:rgba(180,0,0,0.95);color:#fff;font:11px monospace;padding:6px 8px;z-index:99999;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:auto;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  el.textContent += `[PROMISE] ${e.reason}\n`;
+});
+
 // Cache of server-broadcast queue states
 const serverQueues={};
 
@@ -2687,6 +2709,7 @@ function buildCreateScreen(){
 // ── MAIN GAME LOOP ────────────────────────────────────────────────────────────
 let lastTime=0;
 function gameLoop(ts){
+  try{
   const dt=Math.min(32,ts-lastTime);lastTime=ts;
   if(!G.paused){
     G.tick++;
@@ -2780,6 +2803,16 @@ function gameLoop(ts){
       if(G.battle.animTimer<=0)doEnemyTurn();
     }
     renderBattleScreen();
+  }
+  }catch(_e){
+    const el=document.getElementById('_debug_err')||(() => {
+      const d=document.createElement('div');
+      d.id='_debug_err';
+      d.style.cssText='position:fixed;top:36px;left:0;right:0;background:rgba(180,0,0,0.95);color:#fff;font:11px monospace;padding:6px 8px;z-index:99999;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:auto;';
+      document.body.appendChild(d);
+      return d;
+    })();
+    el.textContent+=`[LOOP] ${_e.message}\n${_e.stack||''}\n`;
   }
   requestAnimationFrame(gameLoop);
 }
