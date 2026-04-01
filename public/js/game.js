@@ -971,6 +971,10 @@ function drawEnemySprite(ctx,type,x,y){
     case'bandit':      drawBattleBandit(ctx,S);      break;
     case'specter':     drawBattleSpecter(ctx,S);     break;
     case'ruinGuardian':drawBattleRuinGuardian(ctx,S);break;
+    case'wraith':      drawBattleWraith(ctx,S);      break;
+    case'voidMage':    drawBattleVoidMage(ctx,S);    break;
+    case'stoneGolem':  drawBattleStoneGolem(ctx,S);  break;
+    case'shadowMage':  drawBattleShadowMage(ctx,S);  break;
   }
   ctx.restore();
 }
@@ -1106,6 +1110,193 @@ function drawBattleRuinGuardian(ctx,S){
   ctx.fillStyle=dark;
   [S*5,S*8,S*11,S*14,S*17].forEach(cx=>{ctx.fillRect(cx,0,S*2,S*3);});
   ctx.fillStyle=rune;[S*6,S*9,S*12,S*15,S*18].forEach(cx=>{ctx.fillRect(cx,0,S,S*2);});
+}
+
+function drawBattleWraith(ctx,S){
+  // Ghostly undead — dark violet with skeletal face, wispy trailing form
+  const base='#4A2080',dark='#1A0840',glow='#9060E0',bone='#C8C0A0',eye='#FF0060';
+  // outer aura
+  ctx.fillStyle='#6030A018';
+  ctx.beginPath();ctx.arc(S*9,S*11,S*11,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#9060E010';
+  ctx.beginPath();ctx.arc(S*9,S*11,S*14,0,Math.PI*2);ctx.fill();
+  // wispy trailing bottom — ragged tendrils
+  ctx.fillStyle=dark;
+  [[S*3,S*18,S*3,S*7],[S*6,S*17,S*3,S*8],[S*9,S*18,S*3,S*7],[S*12,S*17,S*3,S*8]].forEach(([x,y,w,h])=>ctx.fillRect(x,y,w,h));
+  // tendril tips (glow)
+  ctx.fillStyle=glow;
+  ctx.fillRect(S*3,S*24,S*2,S*2);ctx.fillRect(S*7,S*25,S*2,S*3);
+  ctx.fillRect(S*10,S*24,S*2,S*2);ctx.fillRect(S*13,S*25,S*2,S*3);
+  // body mass
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*8,S*14,S*11);
+  ctx.fillStyle=base;ctx.fillRect(S*3,S*9,S*12,S*9);
+  ctx.fillStyle=glow;ctx.fillRect(S*5,S*10,S*8,S*6);
+  // shadow side
+  ctx.fillStyle=dark;ctx.fillRect(S*13,S*9,S*2,S*9);
+  // wispy arms
+  ctx.fillStyle=glow;
+  ctx.fillRect(0,S*9,S*3,S*3);ctx.fillRect(0,S*11,S*2,S*4);
+  ctx.fillRect(S*15,S*9,S*3,S*3);ctx.fillRect(S*16,S*11,S*2,S*4);
+  ctx.fillStyle=base;
+  ctx.fillRect(S,S*10,S*2,S*2);ctx.fillRect(S*15,S*10,S*2,S*2);
+  // skeletal face (peeking through wisp)
+  ctx.fillStyle=bone;ctx.fillRect(S*4,S*2,S*10,S*7);
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*2,S*2,S*7);ctx.fillRect(S*12,S*2,S*2,S*7);// shadow sides
+  // hollow eye sockets
+  ctx.fillStyle='#0A0018';ctx.fillRect(S*5,S*3,S*3,S*3);ctx.fillRect(S*10,S*3,S*3,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*5,S*3,S*2,S*2);ctx.fillRect(S*10,S*3,S*2,S*2);
+  ctx.fillStyle='#FF80B0';ctx.fillRect(S*5,S*3,S,S);ctx.fillRect(S*10,S*3,S,S);
+  // nose cavity
+  ctx.fillStyle=dark;ctx.fillRect(S*7,S*5,S*2,S*2);
+  // jaw + teeth
+  ctx.fillStyle=bone;ctx.fillRect(S*4,S*7,S*10,S*2);
+  ctx.fillStyle='#FFF';[S*5,S*7,S*9,S*11].forEach(tx=>ctx.fillRect(tx,S*7,S,S*2));
+  ctx.fillStyle=dark;[S*6,S*8,S*10].forEach(tx=>ctx.fillRect(tx,S*7,S,S*2));
+  // tattered hood/shroud behind head
+  ctx.fillStyle=dark;ctx.fillRect(S*3,0,S*12,S*3);ctx.fillRect(S*2,S*2,S*14,S*2);
+  ctx.fillStyle=base;ctx.fillRect(S*4,S,S*10,S*2);
+}
+
+function drawBattleVoidMage(ctx,S){
+  // Robed caster wreathed in void energy — deep indigo/black, void orb staff
+  const robe='#160828',trim='#5020A0',glow='#B060FF',skin='#8878A8',eye='#00FFCC',staff='#2A1040',orb='#C080FF';
+  // void aura
+  ctx.fillStyle='#8040FF14';
+  ctx.beginPath();ctx.arc(S*9,S*12,S*12,0,Math.PI*2);ctx.fill();
+  // staff (behind body)
+  ctx.fillStyle=staff;ctx.fillRect(S*15,S,S*2,S*22);
+  ctx.fillStyle='#4A2070';ctx.fillRect(S*15,S,S,S*22);
+  // staff orb
+  ctx.fillStyle=orb;ctx.fillRect(S*13,0,S*4,S*4);
+  ctx.fillStyle='#E0B0FF';ctx.fillRect(S*14,0,S*2,S*2);
+  ctx.fillStyle=glow;ctx.fillRect(S*13,S,S*4,S);
+  // robe (wide at base)
+  ctx.fillStyle=robe;ctx.fillRect(S*3,S*8,S*12,S*16);
+  ctx.fillStyle=trim;ctx.fillRect(S*4,S*9,S*10,S*14);
+  // robe highlight stripe
+  ctx.fillStyle=glow;ctx.fillRect(S*9,S*9,S,S*13);
+  // robe hem (widening)
+  ctx.fillStyle=robe;ctx.fillRect(S*2,S*18,S*14,S*6);
+  ctx.fillStyle=trim;ctx.fillRect(S*3,S*19,S*12,S*5);
+  // robe trim / border glow
+  ctx.fillStyle=glow;
+  ctx.fillRect(S*3,S*8,S,S*16);ctx.fillRect(S*14,S*8,S,S*16);
+  ctx.fillRect(S*2,S*23,S*14,S);
+  // arms/sleeves
+  ctx.fillStyle=robe;ctx.fillRect(0,S*9,S*4,S*8);ctx.fillRect(S*14,S*9,S*4,S*8);
+  ctx.fillStyle=trim;ctx.fillRect(S,S*10,S*3,S*7);ctx.fillRect(S*14,S*10,S*3,S*7);
+  ctx.fillStyle=skin;ctx.fillRect(S,S*16,S*3,S*3);ctx.fillRect(S*14,S*16,S*3,S*3);
+  // cowl / hood
+  ctx.fillStyle=robe;ctx.fillRect(S*3,S*2,S*12,S*8);
+  ctx.fillStyle=trim;ctx.fillRect(S*4,S*3,S*10,S*6);
+  ctx.fillStyle=robe;ctx.fillRect(S*2,S*4,S*14,S*6); // wider cowl shadow
+  // face (shadowed inside hood)
+  ctx.fillStyle='#0A0018';ctx.fillRect(S*5,S*4,S*8,S*5);
+  ctx.fillStyle=skin;ctx.fillRect(S*6,S*5,S*6,S*3);
+  // glowing eyes
+  ctx.fillStyle=eye;ctx.fillRect(S*6,S*5,S*2,S*2);ctx.fillRect(S*10,S*5,S*2,S*2);
+  ctx.fillStyle='#AAFFEE';ctx.fillRect(S*6,S*5,S,S);ctx.fillRect(S*10,S*5,S,S);
+  // void sigil on chest
+  ctx.fillStyle=glow;
+  ctx.fillRect(S*7,S*11,S*4,S);ctx.fillRect(S*9,S*10,S,S*3);
+  ctx.fillRect(S*7,S*13,S*2,S);ctx.fillRect(S*9,S*13,S*2,S);
+}
+
+function drawBattleStoneGolem(ctx,S){
+  // Hulking rock creature — mossy grey stone, glowing amber core, massive fists
+  const stone='#686050',dark='#3A3028',light='#9A9078',moss='#3A5020',core='#FF8800',crack='#201810';
+  // shadow
+  ctx.fillStyle='#00000050';ctx.fillRect(S,S*22,S*22,S*3);
+  // feet/base (massive flat stones)
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*20,S*8,S*5);ctx.fillRect(S*14,S*20,S*8,S*5);
+  ctx.fillStyle=stone;ctx.fillRect(S*3,S*21,S*6,S*3);ctx.fillRect(S*15,S*21,S*6,S*3);
+  ctx.fillStyle=moss;ctx.fillRect(S*3,S*21,S*6,S);ctx.fillRect(S*15,S*21,S*6,S); // moss top
+  // legs (squat stone pillars)
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*14,S*7,S*8);ctx.fillRect(S*14,S*14,S*7,S*8);
+  ctx.fillStyle=stone;ctx.fillRect(S*4,S*15,S*5,S*6);ctx.fillRect(S*15,S*15,S*5,S*6);
+  ctx.fillStyle=light;ctx.fillRect(S*4,S*15,S*2,S*3);ctx.fillRect(S*15,S*15,S*2,S*3);
+  // torso (huge rectangular block)
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*5,S*20,S*11);
+  ctx.fillStyle=stone;ctx.fillRect(S*3,S*6,S*18,S*9);
+  ctx.fillStyle=light;ctx.fillRect(S*4,S*7,S*7,S*4);
+  ctx.fillStyle=dark;ctx.fillRect(S*17,S*7,S*3,S*7); // shadow side
+  // moss patches on torso
+  ctx.fillStyle=moss;ctx.fillRect(S*3,S*6,S*4,S);ctx.fillRect(S*14,S*6,S*5,S);
+  // glowing amber core (chest crack)
+  ctx.fillStyle=crack;ctx.fillRect(S*9,S*7,S*6,S*6);
+  ctx.fillStyle=core;ctx.fillRect(S*10,S*8,S*4,S*4);
+  ctx.fillStyle='#FFCC44';ctx.fillRect(S*11,S*9,S*2,S*2);
+  // massive arms (slabs)
+  ctx.fillStyle=dark;ctx.fillRect(0,S*6,S*4,S*12);ctx.fillRect(S*20,S*6,S*4,S*12);
+  ctx.fillStyle=stone;ctx.fillRect(S,S*7,S*3,S*10);ctx.fillRect(S*21,S*7,S*3,S*10);
+  ctx.fillStyle=light;ctx.fillRect(S,S*7,S,S*4);ctx.fillRect(S*21,S*7,S,S*4);
+  // giant fists
+  ctx.fillStyle=dark;ctx.fillRect(0,S*17,S*5,S*6);ctx.fillRect(S*19,S*17,S*5,S*6);
+  ctx.fillStyle=stone;ctx.fillRect(S,S*18,S*3,S*4);ctx.fillRect(S*20,S*18,S*3,S*4);
+  ctx.fillStyle=light;ctx.fillRect(S,S*18,S,S*2);ctx.fillRect(S*20,S*18,S,S*2);
+  // head (square boulder)
+  ctx.fillStyle=dark;ctx.fillRect(S*4,0,S*16,S*7);
+  ctx.fillStyle=stone;ctx.fillRect(S*5,S,S*14,S*5);
+  ctx.fillStyle=light;ctx.fillRect(S*6,S*2,S*5,S*2);
+  ctx.fillStyle=moss;ctx.fillRect(S*5,S,S*8,S); // moss on top
+  // craggy brow / eye sockets
+  ctx.fillStyle=dark;ctx.fillRect(S*5,S*2,S*5,S*3);ctx.fillRect(S*14,S*2,S*5,S*3);
+  ctx.fillStyle=core;ctx.fillRect(S*6,S*3,S*3,S*2);ctx.fillRect(S*15,S*3,S*3,S*2);
+  ctx.fillStyle='#FFEE88';ctx.fillRect(S*7,S*3,S,S);ctx.fillRect(S*16,S*3,S,S);
+  // cracks on face
+  ctx.fillStyle=crack;ctx.fillRect(S*10,S*2,S,S*4);ctx.fillRect(S*7,S*5,S*4,S);
+}
+
+function drawBattleShadowMage(ctx,S){
+  // Shadow caster — dark robe, shadow tendrils, red/black eyes, sinister silhouette
+  const robe='#0E0018',trim='#3A0050',shadow='#200030',glow='#800080',eye='#FF2020',skin='#6A4050',staff='#1A0028',orb='#C000C0';
+  // shadow miasma aura
+  ctx.fillStyle='#60006020';
+  ctx.beginPath();ctx.arc(S*9,S*12,S*13,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#40004018';
+  ctx.beginPath();ctx.arc(S*9,S*12,S*16,0,Math.PI*2);ctx.fill();
+  // shadow tendrils (dark, wispy)
+  ctx.fillStyle=shadow;
+  [[0,S*12,S*3,S*4],[S*2,S*17,S*2,S*5],[S*16,S*13,S*3,S*3],[S*17,S*18,S*2,S*5]].forEach(([x,y,w,h])=>ctx.fillRect(x,y,w,h));
+  ctx.fillStyle=glow;
+  ctx.fillRect(0,S*15,S*2,S*3);ctx.fillRect(S*18,S*16,S*2,S*3);// tendril tips
+  // staff (left hand, behind body)
+  ctx.fillStyle=staff;ctx.fillRect(S,S*2,S*2,S*20);
+  ctx.fillStyle='#3A005A';ctx.fillRect(S,S*2,S,S*20);
+  // dark orb on staff
+  ctx.fillStyle=orb;ctx.fillRect(0,0,S*4,S*4);
+  ctx.fillStyle='#FF60FF';ctx.fillRect(S,0,S*2,S*2);
+  ctx.fillStyle=glow;ctx.fillRect(0,S*2,S*4,S);
+  // robe body
+  ctx.fillStyle=robe;ctx.fillRect(S*4,S*8,S*12,S*16);
+  ctx.fillStyle=trim;ctx.fillRect(S*5,S*9,S*10,S*14);
+  // robe highlight
+  ctx.fillStyle=glow;ctx.fillRect(S*4,S*8,S,S*15);ctx.fillRect(S*15,S*8,S,S*15);
+  ctx.fillStyle=shadow;ctx.fillRect(S*9,S*9,S*2,S*13);
+  // robe bottom (wide)
+  ctx.fillStyle=robe;ctx.fillRect(S*3,S*19,S*14,S*6);
+  ctx.fillStyle=trim;ctx.fillRect(S*4,S*20,S*12,S*5);
+  // shadow wisps at hem
+  ctx.fillStyle=shadow;
+  ctx.fillRect(S*3,S*23,S*2,S*3);ctx.fillRect(S*8,S*24,S*2,S*4);
+  ctx.fillRect(S*13,S*23,S*2,S*3);ctx.fillRect(S*6,S*25,S*2,S*2);
+  // arms
+  ctx.fillStyle=robe;ctx.fillRect(S*2,S*9,S*3,S*8);ctx.fillRect(S*15,S*9,S*3,S*8);
+  ctx.fillStyle=skin;ctx.fillRect(S*3,S*16,S*2,S*2);ctx.fillRect(S*15,S*16,S*2,S*2);
+  // head + deep hood
+  ctx.fillStyle=robe;ctx.fillRect(S*3,S*2,S*12,S*8);
+  ctx.fillStyle=shadow;ctx.fillRect(S*2,S*3,S*14,S*7); // wider hood shadow
+  // face deep in shadow
+  ctx.fillStyle='#050005';ctx.fillRect(S*5,S*3,S*8,S*5);
+  ctx.fillStyle=skin;ctx.fillRect(S*6,S*4,S*6,S*3);
+  // glowing red eyes
+  ctx.fillStyle=eye;ctx.fillRect(S*6,S*4,S*2,S*2);ctx.fillRect(S*10,S*4,S*2,S*2);
+  ctx.fillStyle='#FF9090';ctx.fillRect(S*6,S*4,S,S);ctx.fillRect(S*10,S*4,S,S);
+  // shadow sigil on chest (inverted triangle rune)
+  ctx.fillStyle=glow;
+  ctx.fillRect(S*7,S*11,S*6,S);
+  ctx.fillRect(S*7,S*11,S,S*4);ctx.fillRect(S*12,S*11,S,S*4);
+  ctx.fillRect(S*8,S*14,S*4,S);
 }
 
 function drawBattleLich(ctx,S){
