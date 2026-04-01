@@ -90,83 +90,121 @@ const SPECIES = {
 };
 
 // ── CLASSES ───────────────────────────────────────────────────────────────────
+// ── RARITY COLORS ─────────────────────────────────────────────────────────────
+const RARITY_COLOR={common:'#aaaaaa',rare:'#4A90E2',epic:'#9B59B6',legendary:'#F1C40F'};
+const RARITY_LABEL={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary'};
+
 const CLASSES = {
   warrior: {
     label:'Warrior', icon:'⚔',
-    classFloor:{str:2,end:2},   // locked minimums — identity you can't remove
-    startWeapon:{name:'Iron Sword',icon:'⚔',dmg:4,type:'melee'},
-    startShield:{name:'Kite Shield',icon:'🛡'},
+    classFloor:{str:2,end:2},
+    startWeapon:{name:'Iron Sword',icon:'⚔',dmg:4,dmgType:'physical',rarity:'common',critBonus:0,bound:true,type:'weapon'},
+    startShield:{name:'Kite Shield',icon:'🛡',def:2,rarity:'common',bound:true,type:'shield'},
     desc:'Frontline fighter. STR+END locked in — spend free pts on the rest.',
   },
   mage: {
     label:'Mage', icon:'🔮',
     classFloor:{lck:2,agi:1},
-    startWeapon:{name:'Arcane Staff',icon:'🔮',dmg:3,type:'magic'},
+    startWeapon:{name:'Arcane Staff',icon:'🔮',dmg:3,dmgType:'magic',rarity:'common',critBonus:0.04,bound:true,type:'weapon'},
     desc:'Spellcaster. LCK+AGI locked in — high crit ceiling, low durability.',
   },
   rogue: {
     label:'Rogue', icon:'🗡',
     classFloor:{agi:2,lck:1},
-    startWeapon:{name:'Twin Daggers',icon:'🗡',dmg:3,type:'melee'},
+    startWeapon:{name:'Twin Daggers',icon:'🗡',dmg:3,dmgType:'physical',rarity:'common',critBonus:0.06,bound:true,type:'weapon'},
     desc:'Swift striker. AGI+LCK locked in — hits first, hits often.',
   },
   paladin: {
     label:'Paladin', icon:'✝',
     classFloor:{vit:2,end:1},
-    startWeapon:{name:'Holy Mace',icon:'⚒',dmg:3,type:'holy'},
-    startShield:{name:'Sacred Shield',icon:'🛡'},
+    startWeapon:{name:'Holy Mace',icon:'⚒',dmg:3,dmgType:'holy',rarity:'common',critBonus:0.02,bound:true,type:'weapon'},
+    startShield:{name:'Sacred Shield',icon:'🛡',def:2,rarity:'common',bound:true,type:'shield'},
     desc:'Holy tank. VIT+END locked in — outlasts everything.',
   },
 };
 
 // ── ENEMIES ───────────────────────────────────────────────────────────────────
-// Wilderness danger-zone encounter table (south of river, rows 38+)
+// physWeakness / magicWeakness / holyWeakness: damage multipliers (1.0=neutral, >1=weak, <1=resistant)
 const ENEMIES = {
   wolf: {
     type:'wolf', name:'Dire Wolf', maxHp:12, atk:3, def:1, spd:5,
     xp:12, drops:{spacebucks:8},
+    physWeakness:1.2, magicWeakness:0.8, holyWeakness:1.0,
     msg:'A Dire Wolf lunges from the shadows!',
   },
   skeleton: {
     type:'skeleton', name:'Skeleton', maxHp:16, atk:5, def:2, spd:2,
     xp:20, drops:{spacebucks:15},
+    physWeakness:0.7, magicWeakness:1.0, holyWeakness:1.8,  // holy destroys undead
     msg:'A Skeleton rises from the ancient earth!',
   },
   goblin: {
     type:'goblin', name:'Cave Goblin', maxHp:9, atk:3, def:1, spd:6,
     xp:10, drops:{spacebucks:12},
+    physWeakness:1.1, magicWeakness:1.1, holyWeakness:1.0,
     msg:'A Cave Goblin springs an ambush!',
   },
   darkKnight: {
     type:'darkKnight', name:'Dark Knight', maxHp:28, atk:7, def:5, spd:2,
     xp:40, drops:{schmeckles:5},
+    physWeakness:1.0, magicWeakness:0.7, holyWeakness:1.5,  // holy punishes the corrupted
     msg:'A Dark Knight bars your path!',
   },
   lich: {
     type:'lich', name:'Ancient Lich', maxHp:80, atk:15, def:8, spd:1,
     xp:500, drops:{schmeckles:25},
+    physWeakness:0.5, magicWeakness:1.4, holyWeakness:2.0,  // very resistant to blades
     msg:'The Ancient Lich rises from its obsidian throne!',
   },
-  // ── Wilderness sub-zone enemies ─────────────────────────────────────────
+  // ── Wilderness sub-zone enemies ─────────────────────────────────────────────
   iceTroll: {
     type:'iceTroll', name:'Ice Troll', maxHp:22, atk:5, def:3, spd:2,
     xp:28, drops:{spacebucks:18},
+    physWeakness:1.3, magicWeakness:0.8, holyWeakness:1.0,
     msg:'A massive Ice Troll lurches forward, trailing frost!',
   },
   bandit: {
     type:'bandit', name:'Bandit Raider', maxHp:10, atk:4, def:1, spd:5,
     xp:16, drops:{spacebucks:22},
+    physWeakness:1.0, magicWeakness:1.0, holyWeakness:1.0,
     msg:'A Bandit Raider springs from the shadows, blade gleaming!',
   },
   specter: {
     type:'specter', name:'Wailing Specter', maxHp:14, atk:6, def:0, spd:5,
     xp:24, drops:{schmeckles:3},
+    physWeakness:0.3, magicWeakness:1.6, holyWeakness:1.8,  // blades pass through, magic harms
     msg:'A Wailing Specter tears through the stone — it cannot be reasoned with!',
   },
   ruinGuardian: {
     type:'ruinGuardian', name:'Ruin Guardian', maxHp:38, atk:9, def:6, spd:1,
     xp:65, drops:{schmeckles:8},
+    physWeakness:1.4, magicWeakness:0.6, holyWeakness:0.8,  // stone — bludgeon it
     msg:'A Ruin Guardian awakens from ages of slumber, its stone eyes blazing!',
+  },
+  // ── New magical enemies ──────────────────────────────────────────────────────
+  wraith: {
+    type:'wraith', name:'Shadow Wraith', maxHp:18, atk:8, def:0, spd:5,
+    xp:35, drops:{schmeckles:5, alUSD:8},
+    physWeakness:0.25, magicWeakness:1.7, holyWeakness:2.0,  // barely touched by blades
+    msg:'A Shadow Wraith tears from the darkness — blades pass through it!',
+  },
+  voidMage: {
+    type:'voidMage', name:'Void Mage', maxHp:20, atk:10, def:2, spd:3,
+    xp:45, drops:{alUSD:20},
+    physWeakness:0.8, magicWeakness:1.5, holyWeakness:1.2,
+    msg:'A Void Mage tears open a rift and steps through — reality bends!',
+  },
+  stoneGolem: {
+    type:'stoneGolem', name:'Stone Golem', maxHp:40, atk:7, def:10, spd:1,
+    xp:60, drops:{spacebucks:30, schmeckles:6},
+    physWeakness:1.5, magicWeakness:0.4, holyWeakness:0.6,  // magic slides off stone
+    msg:'The earth trembles as a Stone Golem tears free of the ground!',
+  },
+  shadowMage: {
+    type:'shadowMage', name:'Shadow Mage', maxHp:24, atk:11, def:3, spd:4,
+    xp:55, drops:{schmeckles:7, alUSD:12},
+    physWeakness:0.6, magicWeakness:1.3, holyWeakness:1.6,
+    msg:'A Shadow Mage emerges from the dark, eyes burning with void-fire!',
   },
 };
 
@@ -367,23 +405,40 @@ const QUEST_DEFS = {
 };
 
 // ── SHOP CATALOG ───────────────────────────────────────────────────────────────
+// weapon fields: dmg, dmgType ('physical'|'magic'|'holy'), rarity, critBonus, statReq (optional)
+// armor/shield fields: def, rarity
 const SHOP_CATALOG = {
   zelda: [
-    // Weapons
-    {name:'Iron Sword',    icon:'⚔',  desc:'Balanced starter blade.',         type:'weapon', dmg:4,  cost:50,  lvl:1, currency:'alUSD'},
-    {name:'Steel Sword',   icon:'⚔',  desc:'Forged for seasoned fighters.',   type:'weapon', dmg:7,  cost:160, lvl:2, currency:'alUSD'},
-    {name:'War Axe',       icon:'🪓', desc:'Heavy, brutal, effective.',        type:'weapon', dmg:9,  cost:280, lvl:3, currency:'alUSD'},
-    {name:'Flame Blade',   icon:'🔥', desc:'Burns with ancient fire magic.',   type:'weapon', dmg:12, cost:0.5, lvl:5, currency:'alETH'},
-    {name:'Shadow Blade',  icon:'🌑', desc:'Strikes from darkness for big crits.', type:'weapon', dmg:15, cost:0.9, lvl:8, currency:'alETH'},
-    // Potions
-    {name:'Health Potion', icon:'🧪', desc:'Restores 5 HP.',                  type:'potion', heal:5,       cost:25, lvl:1, currency:'alUSD'},
-    {name:'Mega Potion',   icon:'💊', desc:'Fully restores HP.',               type:'potion', healFull:true,cost:80, lvl:3, currency:'alUSD'},
+    // ── Physical weapons ────────────────────────────────────────────────────
+    {name:'Steel Sword',  icon:'⚔',  desc:'A reliable blade for seasoned fighters.',     type:'weapon', dmg:7,  dmgType:'physical', rarity:'common',    critBonus:0,    cost:160, lvl:2, currency:'alUSD'},
+    {name:'War Axe',      icon:'🪓', desc:'Brutal and heavy — crushes armor.',           type:'weapon', dmg:10, dmgType:'physical', rarity:'common',    critBonus:0,    statReq:{str:3}, cost:280, lvl:3, currency:'alUSD'},
+    {name:'Rogue Knife',  icon:'🗡', desc:'Light blade, razor-sharp edge. High crit.',   type:'weapon', dmg:6,  dmgType:'physical', rarity:'rare',      critBonus:0.08, cost:320, lvl:3, currency:'alUSD'},
+    {name:'Flame Blade',  icon:'🔥', desc:'Sears with ancient fire. Melts through bone.',type:'weapon', dmg:13, dmgType:'physical', rarity:'rare',      critBonus:0.02, cost:0.5, lvl:5, currency:'alETH'},
+    {name:'Shadow Blade', icon:'🌑', desc:'Strikes from darkness. Massive crits.',       type:'weapon', dmg:16, dmgType:'physical', rarity:'epic',      critBonus:0.12, statReq:{lck:4}, cost:0.9, lvl:8, currency:'alETH'},
+    // ── Magic weapons ───────────────────────────────────────────────────────
+    {name:'Spell Rod',    icon:'🪄', desc:'Channels raw magic. Bypasses most armor.',    type:'weapon', dmg:6,  dmgType:'magic',    rarity:'common',    critBonus:0.03, cost:200, lvl:2, currency:'alUSD'},
+    {name:'Void Wand',    icon:'💜', desc:'Tears at reality. Devastating vs undead.',    type:'weapon', dmg:9,  dmgType:'magic',    rarity:'rare',      critBonus:0.05, cost:420, lvl:4, currency:'alUSD'},
+    {name:'Storm Grimoire',icon:'⚡',desc:'Summons lightning. Devastating to golems.',   type:'weapon', dmg:12, dmgType:'magic',    rarity:'rare',      critBonus:0.04, cost:0.4, lvl:5, currency:'alETH'},
+    {name:'Void Crystal', icon:'🔮', desc:'Pure void energy. Wrecks magical foes.',      type:'weapon', dmg:18, dmgType:'magic',    rarity:'epic',      critBonus:0.08, statReq:{lck:5}, cost:1.2, lvl:9, currency:'alETH'},
+    // ── Holy weapons ────────────────────────────────────────────────────────
+    {name:'Silver Mace',  icon:'🔨', desc:'Blessed silver. Holy power slays undead.',    type:'weapon', dmg:8,  dmgType:'holy',     rarity:'rare',      critBonus:0.03, cost:350, lvl:4, currency:'alUSD'},
+    {name:'Radiant Blade',icon:'✨', desc:'Radiates holy light. Cleanses corruption.',   type:'weapon', dmg:14, dmgType:'holy',     rarity:'epic',      critBonus:0.06, cost:0.8, lvl:7, currency:'alETH'},
+    // ── Potions ─────────────────────────────────────────────────────────────
+    {name:'Health Potion',icon:'🧪', desc:'Restores 5 HP.',                              type:'potion', heal:5,       cost:25, lvl:1, currency:'alUSD'},
+    {name:'Mega Potion',  icon:'💊', desc:'Fully restores HP.',                          type:'potion', healFull:true,cost:80, lvl:3, currency:'alUSD'},
   ],
   flint: [
-    {name:'Wooden Shield', icon:'🛡', desc:'Better than nothing.',             type:'shield', def:1, cost:40,  lvl:1, currency:'alUSD'},
-    {name:'Iron Shield',   icon:'🛡', desc:'Solid protection.',                type:'shield', def:3, cost:150, lvl:2, currency:'alUSD'},
-    {name:'Steel Shield',  icon:'🛡', desc:'Heavy but tough.',                 type:'shield', def:5, cost:350, lvl:4, currency:'alUSD'},
-    {name:'Elven Ward',    icon:'✨', desc:'Magical barrier. Rare find.',       type:'shield', def:8, cost:0.7, lvl:7, currency:'alETH'},
+    // ── Shields ─────────────────────────────────────────────────────────────
+    {name:'Wooden Shield',icon:'🛡', desc:'Better than nothing. Absorbs 1 damage.',      type:'shield', def:1, rarity:'common',    cost:40,  lvl:1, currency:'alUSD'},
+    {name:'Iron Shield',  icon:'🛡', desc:'Solid steel — absorbs 3 damage.',             type:'shield', def:3, rarity:'common',    cost:150, lvl:2, currency:'alUSD'},
+    {name:'Steel Shield', icon:'🛡', desc:'Heavy but nearly impenetrable. +5 DEF.',      type:'shield', def:5, rarity:'rare',      cost:350, lvl:4, currency:'alUSD'},
+    {name:'Elven Ward',   icon:'🌿', desc:'Magical barrier — blocks physical and magic.', type:'shield', def:8, rarity:'epic',      cost:0.7, lvl:7, currency:'alETH'},
+    // ── Armor ───────────────────────────────────────────────────────────────
+    {name:'Leather Armor',icon:'🥋', desc:'Light protection. Easy to move in. +2 DEF.',  type:'armor',  def:2, rarity:'common',    cost:80,  lvl:1, currency:'alUSD'},
+    {name:'Chain Mail',   icon:'⛓', desc:'Linked metal rings — solid coverage. +4 DEF.',type:'armor',  def:4, rarity:'common',    cost:240, lvl:3, currency:'alUSD'},
+    {name:'Plate Armor',  icon:'🪖', desc:'Full plate protection. Heavy but mighty. +7.',type:'armor',  def:7, rarity:'rare',      cost:500, lvl:5, currency:'alUSD'},
+    {name:'Void Robe',    icon:'🟣', desc:'Woven from void-thread. Resists magic. +5.',  type:'armor',  def:5, rarity:'rare',      cost:0.5, lvl:6, currency:'alETH'},
+    {name:'Dragon Scale', icon:'🐉', desc:'Shed scale of an ancient drake. +10 DEF.',    type:'armor',  def:10,rarity:'epic',      cost:1.5, lvl:10,currency:'alETH'},
   ],
 };
 

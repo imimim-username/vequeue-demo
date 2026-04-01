@@ -54,6 +54,7 @@ const G = {
   livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
   treasury:{alUSD:0,alETH:0},
   accessory:null,       // 'cape' | 'hat' | 'glasses' | null
+  equippedArmor:null,   // armor item object or null
   maxInvSlots:8,        // 8–12; upgradeable at Expansion Vendor in marketplace
   quests:{},            // {questId: {progress, status:'active'|'ready'|'completed'}}
   kills:0,              // total enemy kills (tracked for Hall of Fame)
@@ -816,9 +817,9 @@ function checkEncounter(){
   if(G.worldEvent?.type==='monster_swarm')encounterRate=0.66;
   if(Math.random()>encounterRate)return;
   let key;
-  if(depth<20)      key=Math.random()<0.55?'wolf':'goblin';
-  else if(depth<40) key=['wolf','skeleton','goblin'][Math.floor(Math.random()*3)];
-  else              key=Math.random()<0.35?'darkKnight':'skeleton';
+  if(depth<20)      key=['wolf','goblin','wraith'][Math.floor(Math.random()*3)]==='wraith'&&Math.random()<0.15?'wraith':Math.random()<0.55?'wolf':'goblin';
+  else if(depth<40) key=['wolf','skeleton','goblin','wraith','voidMage'][Math.floor(Math.random()*5)];
+  else              key=['darkKnight','skeleton','stoneGolem','shadowMage','voidMage'][Math.floor(Math.random()*5)];
   triggerBattle(key,depth);
 }
 
@@ -833,10 +834,10 @@ function checkBossEncounter(){
 
 // Sub-zone random encounters — each zone has its own encounter table
 const SUBZONE_ENCOUNTERS = {
-  cavern:  {pool:['iceTroll','iceTroll','wolf'],    rate:0.20, depth:25},
-  hideout: {pool:['bandit','bandit','bandit','wolf'],rate:0.22, depth:20},
-  ruins:   {pool:['specter','specter','skeleton'],  rate:0.20, depth:28},
-  village: {pool:['ruinGuardian','skeleton','wolf'],rate:0.18, depth:30},
+  cavern:  {pool:['iceTroll','iceTroll','wolf','stoneGolem'],          rate:0.20, depth:25},
+  hideout: {pool:['bandit','bandit','voidMage','wolf'],                rate:0.22, depth:20},
+  ruins:   {pool:['specter','wraith','skeleton','shadowMage'],         rate:0.20, depth:28},
+  village: {pool:['ruinGuardian','stoneGolem','shadowMage','skeleton'],rate:0.18, depth:30},
 };
 // Boss-like zone bosses (one per zone, flagged on G)
 const SUBZONE_BOSSES = {
@@ -1381,24 +1382,54 @@ function renderBattleScreen(){
   // ── Action buttons ──
   const cls=G.class_||'warrior';
   const specialLabel={warrior:'⚔  POWER STRIKE',mage:'🔮  ARCANE BOLT',rogue:'🗡  TWIN DAGGERS',paladin:'✨  HOLY LIGHT'}[cls]||'✦  SPECIAL';
+  // Show SWITCH only if player has another weapon in bag
+  const bagWeapons=G.inventory.slice(2).map((it,i)=>it?.type==='weapon'?{item:it,idx:i+2}:null).filter(Boolean);
   const actions=[
     {id:'attack', label:'⚔  ATTACK',   bg:'#6B1818',hi:'#A02020'},
     {id:'special',label:specialLabel,  bg:'#183058',hi:'#2050A0'},
     {id:'potion', label:'🧪  POTION',  bg:'#183040',hi:'#204060'},
     {id:'flee',   label:'💨  FLEE',    bg:'#183018',hi:'#286028'},
+    ...(bagWeapons.length?[{id:'switch',label:'↔  SWITCH WPN',bg:'#2A1A08',hi:'#5A3A10'}]:[]),
   ];
-  const active=bt.phase==='player_turn'&&!bt.result;
-  const bX=274,bW=175,bH=30,bGap=9,bStartY=pY+14;
+  const active=bt.phase==='player_turn'&&!bt.result&&!bt._switching;
+  const bX=274,bW=175,bH=28,bGap=7,bStartY=pY+10;
   actions.forEach((a,i)=>{
     const bx=bX,by=bStartY+i*(bH+bGap);
     BATTLE_BTNS[a.id]={x:bx,y:by,w:bW,h:bH};
-    ctxUI.fillStyle='#000';ctxUI.fillRect(bx+2,by+2,bW,bH); // shadow
+    ctxUI.fillStyle='#000';ctxUI.fillRect(bx+2,by+2,bW,bH);
     ctxUI.fillStyle=active?a.bg:'#1E1E1E';ctxUI.fillRect(bx,by,bW,bH);
     ctxUI.fillStyle=active?a.hi:'#2E2E2E';ctxUI.fillRect(bx,by,bW,3);
     ctxUI.strokeStyle=active?'#FFD080':'#3A3A3A';ctxUI.lineWidth=1;ctxUI.strokeRect(bx,by,bW,bH);
-    ctxUI.fillStyle=active?'#FFFFFF':'#555555';ctxUI.font='bold 12px monospace';
-    ctxUI.fillText(a.label,bx+8,by+19);
+    ctxUI.fillStyle=active?'#FFFFFF':'#555555';ctxUI.font='bold 11px monospace';
+    ctxUI.fillText(a.label,bx+8,by+18);
   });
+
+  // ── Weapon switch overlay ────────────────────────────────────────────────────
+  if(bt._switching&&bagWeapons.length){
+    const ox=260,oy=pY-5,ow=200;
+    ctxUI.fillStyle='rgba(0,0,0,0.88)';ctxUI.fillRect(ox,oy,ow,16+bagWeapons.length*34+4);
+    ctxUI.strokeStyle='#FFD080';ctxUI.lineWidth=1;ctxUI.strokeRect(ox,oy,ow,16+bagWeapons.length*34+4);
+    ctxUI.fillStyle='#FFD080';ctxUI.font='bold 10px monospace';
+    ctxUI.fillText('SWITCH TO:',ox+6,oy+12);
+    bagWeapons.forEach(({item,idx},i)=>{
+      const wx=ox+4,wy=oy+16+i*34,ww=ow-8,wh=30;
+      const rarCol=RARITY_COLOR[item.rarity||'common'];
+      BATTLE_BTNS[`sw_${idx}`]={x:wx,y:wy,w:ww,h:wh};
+      ctxUI.fillStyle='#1a1208';ctxUI.fillRect(wx,wy,ww,wh);
+      ctxUI.strokeStyle=rarCol;ctxUI.lineWidth=1;ctxUI.strokeRect(wx,wy,ww,wh);
+      const dtCol={physical:'#aaa',magic:'#9B59B6',holy:'#F1C40F'}[item.dmgType||'physical']||'#aaa';
+      ctxUI.fillStyle='#fff';ctxUI.font='11px monospace';
+      ctxUI.fillText(`${item.icon} ${item.name}`,wx+4,wy+12);
+      ctxUI.fillStyle=dtCol;ctxUI.font='10px monospace';
+      ctxUI.fillText(`+${item.dmg} dmg [${item.dmgType||'phys'}]  crit+${Math.round((item.critBonus||0)*100)}%`,wx+4,wy+24);
+    });
+    // Cancel button
+    const cx=ox+4,cy=oy+16+bagWeapons.length*34,cw=ow-8,ch=18;
+    BATTLE_BTNS['sw_cancel']={x:cx,y:cy,w:cw,h:ch};
+    ctxUI.fillStyle='#200808';ctxUI.fillRect(cx,cy,cw,ch);
+    ctxUI.strokeStyle='#604040';ctxUI.lineWidth=1;ctxUI.strokeRect(cx,cy,cw,ch);
+    ctxUI.fillStyle='#888';ctxUI.font='10px monospace';ctxUI.fillText('✕ Cancel',cx+6,cy+13);
+  }
 
   // ── Player sprite (battle right side, facing left) ──
   {
@@ -1508,15 +1539,44 @@ function doBattleAction(action){
     return;
   }
 
+  // ── Helper: compute weapon damage with type/weakness system ─────────────────
+  function calcWeaponDmg(weapon, enemy, strMult=0.9, defMult=0.55, extraCritBonus=0){
+    const dt=weapon?.dmgType||'physical';
+    const base=(weapon?.dmg||2)+Math.floor(G.stats.str*strMult);
+    // Weakness multiplier: physWeakness, magicWeakness, holyWeakness (default 1.0)
+    const weak=dt==='magic'?(enemy.magicWeakness||1.0):
+                dt==='holy' ?(enemy.holyWeakness ||1.0):
+                              (enemy.physWeakness ||1.0);
+    // Magic/holy bypasses most armor; physical is fully blocked
+    const defReduction=dt==='magic'?enemy.def*0.15:dt==='holy'?enemy.def*0.20:enemy.def*defMult;
+    const critChance=Math.min(0.80, G.stats.lck*0.045+(weapon?.critBonus||0)+extraCritBonus);
+    const crit=Math.random()<critChance;
+    const raw=Math.max(0.5,(base-defReduction)*weak);
+    const dmg=Math.max(1,Math.floor(raw*(crit?1.6:1)+(Math.random()*2-1)));
+    return{dmg,crit,dt,weak};
+  }
+
   if(action==='attack'){
     const weapon=G.inventory[0];
-    const baseDmg=(weapon?.dmg||2)+Math.floor(G.stats.str*0.9);
-    const crit=Math.random()<G.stats.lck*0.045;
-    const dmg=Math.max(1,Math.floor((baseDmg-bt.enemy.def*0.55)*(crit?1.6:1)+(Math.random()*2-1)));
+    const{dmg,crit,dt,weak}=calcWeaponDmg(weapon,bt.enemy);
     bt.enemy.currentHp-=dmg;bt.hitShake=10;
-    SFX.swing();
-    setTimeout(()=>SFX.hitEnemy(),120);
-    bt.log.push(crit?`Critical hit! ${dmg} damage!`:`You attack for ${dmg} damage.`);
+    SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
+    const weakStr=weak>1.2?'⚡ WEAK! ':weak<0.6?'🛡 RESIST ':'' ;
+    bt.log.push(crit?`${weakStr}Critical hit! ${dmg} damage! [${dt}]`:`${weakStr}You attack for ${dmg} damage. [${dt}]`);
+  }
+
+  // ── Weapon switch (costs player turn) ──────────────────────────────────────
+  if(action==='switch_weapon'){
+    const idx=bt._switchTarget;
+    if(idx!=null&&G.inventory[idx]?.type==='weapon'){
+      const old=G.inventory[0];
+      G.inventory[0]=G.inventory[idx];
+      G.inventory[idx]=old;
+      bt.log.push(`Swapped to ${G.inventory[0].name}!`);
+    }
+    bt._switchTarget=null;bt._switching=false;
+    bt.phase='enemy_turn';bt.animTimer=75;
+    return;
   }
 
   if(action==='special'){
@@ -1525,31 +1585,39 @@ function doBattleAction(action){
     const mpCost=(cls==='rogue'||cls==='warrior')?1:2;
     if(!spendMp(mpCost)){
       bt.log.push(`Not enough MP! (need ${mpCost} ◆)`);
-      SFX.error();
-      bt.phase='player_turn';
-      return;
+      SFX.error();bt.phase='player_turn';return;
     }
     if(cls==='mage'){
-      dmg=Math.max(2,Math.floor(G.stats.lck*1.6+G.stats.agi*0.5+Math.random()*4));
+      // Arcane bolt — treated as magic, benefits from weapon critBonus
+      const weapon=G.inventory[0];
+      const weak=bt.enemy.magicWeakness||1.0;
+      dmg=Math.max(2,Math.floor((G.stats.lck*1.6+G.stats.agi*0.5+Math.random()*4)*weak));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
-      bt.log.push(`Arcane Bolt! ${dmg} magic damage! (−${mpCost} MP)`);
+      const weakStr=weak>1.2?'⚡ WEAK! ':weak<0.6?'🛡 RESIST ':'';
+      bt.log.push(`${weakStr}Arcane Bolt! ${dmg} magic damage! (−${mpCost} MP)`);
     } else if(cls==='paladin'){
       healAmt=Math.max(1,Math.floor(G.stats.vit*0.6)+2);
       G.hp=Math.min(G.maxHp,G.hp+healAmt);
       SFX.potion();
       bt.log.push(`Holy Light! Restored ${healAmt} HP. (−${mpCost} MP)`);
     } else if(cls==='rogue'){
-      dmg=Math.max(1,Math.floor(G.stats.agi*1.3)-Math.floor(bt.enemy.def*0.3));
+      // Piercing attack — physical, ignores 60% of armor
+      const weapon=G.inventory[0];
+      const weak=bt.enemy.physWeakness||1.0;
+      dmg=Math.max(1,Math.floor((G.stats.agi*1.3+Math.floor(G.stats.str*0.5)-Math.floor(bt.enemy.def*0.2))*weak));
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       bt.log.push(`Twin Daggers! ${dmg} piercing damage! (−${mpCost} MP)`);
-    } else { // warrior
+    } else { // warrior — power strike, uses weapon dmgType
       const weapon=G.inventory[0];
-      dmg=Math.max(1,Math.floor((weapon?.dmg||2)*1.9+G.stats.str*1.1-bt.enemy.def));
-      bt.enemy.currentHp-=dmg;bt.hitShake=10;
+      const{dmg:pd,crit:pc,dt:pdt,weak:pw}=calcWeaponDmg(weapon,bt.enemy,1.1,0.45);
+      const bonus=Math.floor((weapon?.dmg||2)*0.9);
+      const finalDmg=Math.max(1,pd+bonus);
+      bt.enemy.currentHp-=finalDmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
-      bt.log.push(`Power Strike! ${dmg} massive damage! (−${mpCost} MP)`);
+      const weakStr=pw>1.2?'⚡ WEAK! ':pw<0.6?'🛡 RESIST ':'';
+      bt.log.push(`${weakStr}Power Strike! ${finalDmg} ${pdt} damage! (−${mpCost} MP)`);
     }
   }
 
@@ -1613,24 +1681,26 @@ function doBattleAction(action){
 
 function doEnemyTurn(){
   const bt=G.battle,e=bt.enemy;
-  // AGI drives dodge chance (5% per point → 10% at agi=2, 25% at agi=5)
+  // AGI drives dodge chance (5% per point)
   const dodge=Math.random()<G.stats.agi*0.05;
   if(dodge){
     bt.log.push(`${e.name} attacks — you dodge!`);
   } else {
-    // END provides natural armor (0.5 per point → 1 at end=2, 2.5 at end=5)
-    const endArmor=Math.floor(G.stats.end*0.5);
-    const dmg=Math.max(1,e.atk-endArmor+(((Math.random()*3)|0)-1));
+    // Total player defense: END stat + equipped shield DEF + equipped armor DEF
+    const endArmor   = Math.floor(G.stats.end*0.5);
+    const shieldDef  = G.inventory[1]?.def||0;
+    const armorDef   = G.equippedArmor?.def||0;
+    const totalDef   = endArmor+shieldDef+armorDef;
+    const dmg=Math.max(1,e.atk-totalDef+(((Math.random()*3)|0)-1));
     G.hp=Math.max(0,G.hp-dmg);
     bt.playerHitShake=8;
     SFX.hitPlayer();
-    bt.log.push(`${e.name} hits you for ${dmg}!`);
+    bt.log.push(`${e.name} hits you for ${dmg}! [DEF:${totalDef}]`);
     if(G.hp<=0){
       G.hp=0;
       bt.log.push('You have been defeated...');
       SFX.gameOver();
       bt.result='lose';
-      // Wait for player input — do NOT auto-advance
       return;
     }
   }
@@ -1645,8 +1715,10 @@ function endBattle(){
   _snapCtx.fillStyle='#000';_snapCtx.fillRect(0,0,W,H);
   bt.phase='transition_out';
   if(bt.result==='lose'){
-    const droppedItems=G.inventory.slice(2).filter(Boolean);
-    G.inventory=[G.inventory[0],G.inventory[1],...new Array(6).fill(null)];
+    // Only drop non-bound bag items (slots 2+); keep bound items, equipped weapon/shield, armor
+    const droppedItems=G.inventory.slice(2).filter(it=>it&&!it.bound);
+    const keptBag=G.inventory.slice(2).map(it=>(it&&it.bound)?it:null);
+    G.inventory=[G.inventory[0],G.inventory[1],...keptBag,...new Array(Math.max(0,G.maxInvSlots-2-keptBag.length)).fill(null)];
     const sbDrop=Math.floor(G.spacebucks*0.30);
     const smDrop=Math.floor(G.schmeckles*0.30);
     const auDrop=parseFloat((G.alUSD*0.20).toFixed(2));
@@ -2172,23 +2244,24 @@ function buyItem(vendorId,idx){
   if(currency==='alETH')G.alETH=parseFloat((G.alETH-item.cost*convoyDisc).toFixed(4));
   else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-item.cost*convoyDisc).toFixed(2));
   // if currency==='_converted', already deducted above
-  if(item.type==='weapon'){
-    G.inventory[0]={...item};
-    SFX.buy();
-    chatLog(`Equipped ${item.name}! (+${item.dmg} DMG)`,'#4CAF50');
-  } else if(item.type==='shield'){
-    G.inventory[1]={...item};
-    SFX.buy();
-    chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
-  } else if(item.type==='potion'){
-    const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
-    if(slot===-1){
-      if(currency==='alETH')G.alETH+=item.cost;
-      else G.alUSD+=item.cost;
-      SFX.error();chatLog('Inventory full! No room for potions.','#FF4444');return;
-    }
-    G.inventory[slot]={...item};
-    SFX.buy();
+  // Gear (weapons/shields/armor) goes to general inventory — player equips manually
+  // Potions and consumables also go to general slots
+  const isGear=item.type==='weapon'||item.type==='shield'||item.type==='armor';
+  const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+  if(slot===-1){
+    // Refund on full inventory
+    if(currency==='alETH')G.alETH=parseFloat((G.alETH+item.cost*(currency==='_converted'?0:convoyDisc)).toFixed(4));
+    else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD+item.cost*convoyDisc).toFixed(2));
+    SFX.error();chatLog('Inventory full! Make room before buying.','#FF4444');return;
+  }
+  G.inventory[slot]={...item};
+  SFX.buy();
+  if(isGear){
+    const statStr=item.type==='weapon'?`+${item.dmg} DMG [${(item.dmgType||'physical')}]`:
+                  `+${item.def} DEF`;
+    const rarCol=RARITY_COLOR[item.rarity||'common'];
+    chatLog(`Bought ${item.name}! (${statStr}) — open inventory to equip`,'#4CAF50');
+  } else {
     chatLog(`Bought ${item.name}!`,'#4CAF50');
   }
   renderShop();
@@ -2529,50 +2602,196 @@ function togglePause(){
   if(G.paused)renderInventoryScreen();
 }
 
+// ── Helper: equip an item from a general inventory slot ──────────────────────
+function equipFromBag(slotIdx){
+  const item=G.inventory[slotIdx];
+  if(!item)return;
+  if(item.type==='weapon'){
+    const old=G.inventory[0];
+    G.inventory[0]=item;
+    G.inventory[slotIdx]=old; // swap old weapon back to bag (unless it's also the starting slot)
+    chatLog(`Equipped ${item.name}! (+${item.dmg} DMG [${item.dmgType||'physical'}])`,'#4CAF50');
+    SFX.buy();
+  } else if(item.type==='shield'){
+    const old=G.inventory[1];
+    G.inventory[1]=item;
+    G.inventory[slotIdx]=old;
+    chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
+    SFX.buy();
+  } else if(item.type==='armor'){
+    const old=G.equippedArmor;
+    G.equippedArmor=item;
+    G.inventory[slotIdx]=old; // old armor goes back to bag slot
+    chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
+    SFX.buy();
+  }
+  if(G.paused)renderInventoryScreen();
+  saveToServer();
+}
+function unequipWeapon(){
+  const item=G.inventory[0];
+  if(!item||item.bound)return; // can't unequip starting weapon
+  const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+  if(slot===-1){chatLog('No bag space to unequip!','#FF4444');return;}
+  G.inventory[slot]=item;
+  G.inventory[0]=null;
+  chatLog(`Unequipped ${item.name} to bag.`,'#aaa');
+  if(G.paused)renderInventoryScreen();
+}
+function unequipShield(){
+  const item=G.inventory[1];
+  if(!item||item.bound)return;
+  const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+  if(slot===-1){chatLog('No bag space to unequip!','#FF4444');return;}
+  G.inventory[slot]=item;
+  G.inventory[1]=null;
+  chatLog(`Unequipped ${item.name} to bag.`,'#aaa');
+  if(G.paused)renderInventoryScreen();
+}
+function unequipArmor(){
+  const item=G.equippedArmor;
+  if(!item)return;
+  const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+  if(slot===-1){chatLog('No bag space to unequip!','#FF4444');return;}
+  G.inventory[slot]=item;
+  G.equippedArmor=null;
+  chatLog(`Unequipped ${item.name} to bag.`,'#aaa');
+  if(G.paused)renderInventoryScreen();
+}
+function sellFromBag(slotIdx){
+  const item=G.inventory[slotIdx];
+  if(!item||item.bound){chatLog('This item cannot be sold.','#888');return;}
+  // Determine sell price: ~40% of cost, minimum 1 alUSD worth
+  const base=item.cost||0;
+  const sellPrice=item.currency==='alETH'
+    ?parseFloat((base*0.4).toFixed(4))
+    :Math.max(1,Math.round(base*0.4));
+  const cur=item.currency==='alETH'?'alETH':'alUSD';
+  G.inventory[slotIdx]=null;
+  if(cur==='alETH') G.alETH=parseFloat((G.alETH+sellPrice).toFixed(4));
+  else              G.alUSD=parseFloat((G.alUSD+sellPrice).toFixed(2));
+  chatLog(`Sold ${item.name} for ${sellPrice} ${cur}.`,'#FDD835');
+  SFX.coin();
+  if(G.paused)renderInventoryScreen();
+  saveToServer();
+}
+
 function renderInventoryScreen(){
+  // ── Equipped gear section ──────────────────────────────────────────────────
   const grid=document.getElementById('inv-grid');
   grid.innerHTML='';
-  // Show only up to maxInvSlots; grow array if needed
-  while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
-  for(let i=0;i<G.maxInvSlots;i++){
-    const item=G.inventory[i];
-    const slot=document.createElement('div');
-    slot.className='inv-slot'+(item?' has-item':'');
-    slot.textContent=item?item.icon||'?':(i===0?'⚔':(i===1?'🛡':''));
-    slot.title=i===0?`Weapon: ${item?.name||'—'}`:i===1?`Shield: ${item?.name||'—'}`:item?item.name:'Empty';
-    if(item&&item.type==='potion'&&!G.battle){
-      slot.title=`${item.name} — Click to use`;
-      slot.style.cursor='pointer';
-      slot.addEventListener('click',()=>usePotion(i));
-    }
-    grid.appendChild(slot);
+
+  function rarBorder(item){return item?`2px solid ${RARITY_COLOR[item.rarity||'common']}`:'2px solid #333';}
+  function dmgTypeTag(w){
+    const col={physical:'#aaa',magic:'#9B59B6',holy:'#F1C40F'}[w?.dmgType||'physical']||'#aaa';
+    return w?`<span style="color:${col};font-size:.6rem">[${w.dmgType||'phys'}]</span>`:'';
   }
+
+  // Equipped slots row
+  const eqRow=document.createElement('div');
+  eqRow.style.cssText='display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+
+  const makeEquipSlot=(label,item,onUnequip)=>{
+    const d=document.createElement('div');
+    d.style.cssText=`background:#111;border:${rarBorder(item)};border-radius:4px;padding:4px 6px;min-width:80px;max-width:110px;font-size:.65rem;color:#ccc;position:relative`;
+    const icon=item?item.icon:'—';
+    const name=item?item.name:'(empty)';
+    const stat=item?(item.type==='weapon'?`+${item.dmg} dmg`:item.type==='armor'||item.type==='shield'?`+${item.def} def`:''):'';
+    const boundMark=item?.bound?'🔒 ':'';
+    const rarLabel=item?`<span style="color:${RARITY_COLOR[item.rarity||'common']};font-size:.55rem">${RARITY_LABEL[item.rarity||'common']}</span>`:'';
+    const typeTag=item?.type==='weapon'?dmgTypeTag(item):'';
+    d.innerHTML=`<div style="font-size:.55rem;color:#555;margin-bottom:2px">${label}</div>
+      <div style="font-size:1rem">${icon}</div>
+      <div style="font-weight:bold;font-size:.62rem">${boundMark}${name}</div>
+      <div style="color:#8BC34A;font-size:.6rem">${stat} ${typeTag}</div>
+      ${rarLabel}
+      ${item&&!item.bound?`<button onclick="(${onUnequip.toString()})()" style="margin-top:3px;font-size:.55rem;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:2px;padding:1px 4px;cursor:pointer;width:100%">UNEQUIP</button>`:''}`;
+    return d;
+  };
+
+  eqRow.appendChild(makeEquipSlot('⚔ WEAPON',G.inventory[0],unequipWeapon));
+  eqRow.appendChild(makeEquipSlot('🛡 SHIELD',G.inventory[1],unequipShield));
+  eqRow.appendChild(makeEquipSlot('🥋 ARMOR', G.equippedArmor,unequipArmor));
+  grid.appendChild(eqRow);
+
+  // Separator
+  const sep=document.createElement('div');
+  sep.style.cssText='font-size:.6rem;color:#444;border-top:1px solid #222;padding-top:4px;margin-bottom:4px';
+  sep.textContent='BAG';
+  grid.appendChild(sep);
+
+  // ── General bag slots (idx 2+) ────────────────────────────────────────────
+  while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
+  const bagGrid=document.createElement('div');
+  bagGrid.style.cssText='display:flex;flex-wrap:wrap;gap:4px;';
+  for(let i=2;i<G.maxInvSlots;i++){
+    const item=G.inventory[i];
+    const s=document.createElement('div');
+    s.style.cssText=`width:44px;height:54px;background:#0d0d1a;border:${rarBorder(item)};border-radius:4px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.7rem;
+      color:#ccc;cursor:${item?'pointer':'default'};position:relative;overflow:hidden;padding:2px;`;
+    if(item){
+      const isGear=item.type==='weapon'||item.type==='shield'||item.type==='armor';
+      const rarCol=RARITY_COLOR[item.rarity||'common'];
+      s.innerHTML=`<div style="font-size:.9rem">${item.icon||'?'}</div>
+        <div style="font-size:.5rem;text-align:center;color:#ccc;line-height:1.1">${item.name}</div>
+        <div style="font-size:.5rem;color:${item.type==='potion'?'#4CAF50':'#8BC34A'}">${
+          item.type==='weapon'?`+${item.dmg}⚔`:
+          item.type==='armor'||item.type==='shield'?`+${item.def}🛡`:
+          item.healFull?'Full HP':`+${item.heal||0}♥`}</div>`;
+      s.title=`${item.name}${item.rarity?' ('+RARITY_LABEL[item.rarity||'common']+')':''}`;
+      if(isGear&&!G.battle){
+        s.addEventListener('click',()=>equipFromBag(i));
+        // Right-click / long-press to sell
+        s.addEventListener('contextmenu',e=>{e.preventDefault();sellFromBag(i);});
+      } else if(item.type==='potion'&&!G.battle){
+        s.addEventListener('click',()=>usePotion(i));
+        s.addEventListener('contextmenu',e=>{e.preventDefault();sellFromBag(i);});
+      }
+    } else {
+      s.innerHTML='<div style="color:#222;font-size:1rem">·</div>';
+    }
+    bagGrid.appendChild(s);
+  }
+  grid.appendChild(bagGrid);
+
   // Capacity line
   const capEl=document.getElementById('inv-capacity');
   if(capEl){
     const maxPossible=12;
-    capEl.innerHTML=`Slots: ${G.maxInvSlots}/${maxPossible}`
-      +(G.maxInvSlots<maxPossible?' — <span style="color:#B080FF">upgrade at Expansion Vendor in Marketplace</span>':'');
+    capEl.innerHTML=`Bag: ${G.maxInvSlots-2} slots (${G.inventory.slice(2).filter(Boolean).length} used)`
+      +` &nbsp;·&nbsp; Click gear to equip · Right-click to sell (40%)`
+      +(G.maxInvSlots<maxPossible?' — <span style="color:#B080FF">upgrade at Expansion Vendor</span>':'');
   }
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const stats=document.getElementById('stats-box');
   const s=G.stats;
   const xpNeeded=xpForLevel(G.level);
+  const shieldDef=G.inventory[1]?.def||0;
+  const armorDef=G.equippedArmor?.def||0;
+  const endDef=Math.floor(s.end*0.5);
+  const totalDef=endDef+shieldDef+armorDef;
   const btnStyle=G.statPoints>0
     ?'cursor:pointer;background:#4CAF50;color:#fff;border:none;border-radius:3px;padding:0 5px;font-size:11px;margin-left:4px;'
     :'display:none';
   const statRows=[
-    ['str','STR (Attack)'],['vit','VIT (HP)'],['agi','AGI (Speed)'],
-    ['end','END (Defense)'],['lck','LCK (Crit/Drop)'],
+    ['str','STR (Attack)'],['vit','VIT (HP / Regen)'],['agi','AGI (Speed / Dodge)'],
+    ['end','END (Defense)'],['lck','LCK (Crit / Drop)'],
   ].map(([k,label])=>`
     <div class="stat-line"><span>${label}</span><span>${s[k]}
       <button style="${btnStyle}" onclick="spendStat('${k}')">+</button>
     </span></div>`).join('');
+  const wpn=G.inventory[0];
+  const wpnStr=wpn?`${wpn.icon} ${wpn.name} (+${wpn.dmg} dmg, ${wpn.dmgType||'phys'})`:'None';
   stats.innerHTML=`
     <div class="stat-line" style="color:#8BC34A;font-weight:bold"><span>Level ${G.level}</span><span>${G.xp} / ${xpNeeded} XP</span></div>
     ${G.statPoints>0?`<div class="stat-line" style="color:#FFD700"><span>Unspent Points</span><span>${G.statPoints} ★</span></div>`:''}
     ${statRows}
-    <div class="stat-line" style="margin-top:6px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
-    <div class="stat-line" style="margin-top:6px;color:#FDD835"><span>🪙 Spacebucks</span><span>${G.spacebucks}</span></div>
+    <div class="stat-line" style="margin-top:4px;color:#7CC"><span>⚔ Weapon</span><span style="font-size:.7rem">${wpnStr}</span></div>
+    <div class="stat-line" style="color:#7CC"><span>🛡 Total DEF</span><span>${totalDef} (END:${endDef}+shield:${shieldDef}+armor:${armorDef})</span></div>
+    <div class="stat-line" style="margin-top:4px"><span>HP</span><span>${G.hp} / ${G.maxHp}</span></div>
+    <div class="stat-line" style="margin-top:4px;color:#FDD835"><span>🪙 Spacebucks</span><span>${G.spacebucks}</span></div>
     <div class="stat-line" style="color:#888"><span>💀 Schmeckles</span><span>${G.schmeckles}</span></div>
     <div class="stat-line" style="color:#4CAF50"><span>$ alUSD</span><span>${G.alUSD.toFixed(2)}</span></div>
     <div class="stat-line" style="color:#7B68EE"><span>⟠ alETH</span><span>${G.alETH.toFixed(4)}</span></div>
@@ -3022,7 +3241,7 @@ function saveState(){
     transmuterDeposits:G.transmuterDeposits,
     stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
-    inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
+    inventory:G.inventory,accessory:G.accessory,equippedArmor:G.equippedArmor,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
     cavernBossDefeated:G.cavernBossDefeated,hideoutBossDefeated:G.hideoutBossDefeated,
     ruinsBossDefeated:G.ruinsBossDefeated,villageBossDefeated:G.villageBossDefeated,
@@ -3057,6 +3276,7 @@ function loadState(){
     G.statPoints=s.statPoints??0;
     if(Array.isArray(s.inventory)) G.inventory=s.inventory;
     if(s.accessory!==undefined) G.accessory=s.accessory;
+    if(s.equippedArmor!==undefined) G.equippedArmor=s.equippedArmor;
     if(s.maxInvSlots!=null) G.maxInvSlots=s.maxInvSlots;
     while(G.inventory.length<G.maxInvSlots) G.inventory.push(null);
     if(s.quests) G.quests=s.quests;
@@ -3422,6 +3642,7 @@ function applyServerState(s){
   G.statPoints=s.statPoints??0;
   if(Array.isArray(s.inventory))G.inventory=s.inventory;
   if(s.accessory!==undefined)G.accessory=s.accessory;
+  if(s.equippedArmor!==undefined)G.equippedArmor=s.equippedArmor;
   if(s.maxInvSlots!=null)G.maxInvSlots=s.maxInvSlots;
   while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   G.quests=s.quests||{};
@@ -3445,7 +3666,7 @@ function saveToServer(){
     stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
     transmuterDeposits:G.transmuterDeposits,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
-    inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
+    inventory:G.inventory,accessory:G.accessory,equippedArmor:G.equippedArmor,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
     cavernBossDefeated:G.cavernBossDefeated,hideoutBossDefeated:G.hideoutBossDefeated,
     ruinsBossDefeated:G.ruinsBossDefeated,villageBossDefeated:G.villageBossDefeated,
@@ -3522,7 +3743,6 @@ document.getElementById('npc-dialog-inner')?.addEventListener('click',()=>{
 // ── Battle canvas click / key handler ─────────────────────────────────────────
 document.getElementById('cv-ui').addEventListener('click',e=>{
   const bt=G.battle;if(!bt)return;
-  // Result overlay: click anywhere to dismiss and continue
   if(bt.result){endBattle();return;}
   if(bt.phase!=='player_turn')return;
   const rect=e.target.getBoundingClientRect();
@@ -3531,6 +3751,14 @@ document.getElementById('cv-ui').addEventListener('click',e=>{
   const my=(e.clientY-rect.top)*scale;
   for(const[action,btn] of Object.entries(BATTLE_BTNS)){
     if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){
+      // Weapon switch flow
+      if(action==='switch'){bt._switching=true;return;}
+      if(action==='sw_cancel'){bt._switching=false;return;}
+      if(action.startsWith('sw_')){
+        const idx=parseInt(action.slice(3));
+        bt._switchTarget=idx;
+        doBattleAction('switch_weapon');return;
+      }
       doBattleAction(action);return;
     }
   }
