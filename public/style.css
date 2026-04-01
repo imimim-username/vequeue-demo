@@ -112,14 +112,7 @@ body.touch #chat-panel{bottom:170px;max-width:55vw}
   #hud-players{display:none}
 }
 
-body.touch #mobile-pad{display:flex}
-#mobile-pad{display:none;position:fixed;bottom:12px;right:8px;z-index:30;
-  flex-direction:column;align-items:center;gap:3px}
-.pad-row{display:flex;gap:3px}
-.pad-btn{width:48px;height:48px;background:#00000066;border:2px solid #ffffff55;
-  border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-size:1.2rem;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:none}
-.pad-btn:active{background:#ffffff33}
+/* d-pad removed — movement via tap-on-canvas */
 #mobile-act{position:fixed;bottom:12px;left:8px;z-index:30;display:none;flex-direction:column;gap:8px}
 body.touch #mobile-act{display:flex}
 .act-btn{width:54px;height:54px;background:#00000088;border:2px solid #FFD70099;
@@ -132,8 +125,8 @@ body.touch #mobile-act{display:flex}
 #pause-overlay{display:none;position:fixed;inset:0;background:#000c;z-index:20;
   align-items:center;justify-content:center}
 #pause-overlay.open{display:flex}
-#pause-box{background:#0d0d1f;border:3px solid #FFD700;padding:1.5rem;min-width:320px;max-width:90vw}
-#pause-box h2{color:#FFD700;letter-spacing:.2em;margin-bottom:1rem;font-size:1.1rem}
+#pause-box{background:#0d0d1f;border:3px solid #FFD700;padding:1.5rem;min-width:320px;max-width:92vw;max-height:88vh;overflow-y:auto}
+#pause-box h2{color:#FFD700;letter-spacing:.2em;margin:0;font-size:1.1rem}
 #inv-grid{display:grid;grid-template-columns:repeat(8,36px);gap:4px;margin-bottom:1rem}
 .inv-slot{width:36px;height:36px;border:2px solid #333;background:#111;
   display:flex;align-items:center;justify-content:center;font-size:.7rem;cursor:pointer}

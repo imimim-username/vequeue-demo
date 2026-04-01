@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Victory Quest</title>
-<link rel="stylesheet" href="/style.css?v=20260401g">
+<link rel="stylesheet" href="/style.css?v=20260401h">
 </head>
 <body>
 
@@ -121,11 +121,7 @@
     <div id="chat-log"></div>
     <input type="text" id="chat-input" placeholder="Press T to chat…" maxlength="80">
   </div>
-  <div id="mobile-pad">
-    <div class="pad-row"><div class="pad-btn" id="pd-ul">↖</div><div class="pad-btn" id="pd-u">↑</div><div class="pad-btn" id="pd-ur">↗</div></div>
-    <div class="pad-row"><div class="pad-btn" id="pd-l">←</div><div class="pad-btn" id="pd-c">·</div><div class="pad-btn" id="pd-r">→</div></div>
-    <div class="pad-row"><div class="pad-btn" id="pd-dl">↙</div><div class="pad-btn" id="pd-d">↓</div><div class="pad-btn" id="pd-dr">↘</div></div>
-  </div>
+  <!-- d-pad removed; movement via tap-anywhere on canvas -->
   <div id="mobile-act">
     <div class="act-btn" id="btn-act">ACT</div>
     <div class="act-btn" id="btn-esc">ESC</div>
@@ -137,12 +133,14 @@
 <!-- ═══════════════ PAUSE/INVENTORY ═══════════════ -->
 <div id="pause-overlay">
   <div id="pause-box">
-    <h2>⚔ CHARACTER</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
+      <h2 style="margin:0">⚔ CHARACTER</h2>
+      <button onclick="togglePause()" style="background:none;border:2px solid #FFD700;color:#FFD700;cursor:pointer;font-size:1rem;padding:4px 10px;border-radius:4px;font-family:inherit">✕ CLOSE</button>
+    </div>
     <div id="inv-grid"></div>
     <div id="inv-capacity" style="font-size:.65rem;color:#555;text-align:right;margin-top:2px"></div>
     <div id="stats-box"></div>
     <div id="quest-log-box" style="margin-top:.8rem;border-top:1px solid #222;padding-top:.5rem"></div>
-    <div style="margin-top:1rem;font-size:.7rem;color:#555">ESC / P to close</div>
   </div>
 </div>
 <div id="godmode-badge">★ GOD MODE</div>
@@ -169,9 +167,9 @@
     <div id="shop-header-row">
       <span id="shop-title">SHOP</span>
       <span id="shop-gold-display">💵 0 alUSD</span>
+      <button onclick="closeShop()" style="background:none;border:1px solid #666;color:#aaa;cursor:pointer;font-size:.85rem;padding:3px 8px;border-radius:4px;margin-left:8px">✕</button>
     </div>
     <div id="shop-items-list"></div>
-    <div style="margin-top:.8rem;font-size:.65rem;color:#445;text-align:right">[ ESC ] Close</div>
   </div>
 </div>
 
@@ -285,10 +283,10 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/data.js?v=20260401g"></script>
-<script src="/js/maps.js?v=20260401g"></script>
-<script src="/js/render.js?v=20260401g"></script>
-<script src="/js/audio.js?v=20260401g"></script>
-<script src="/js/game.js?v=20260401g"></script>
+<script src="/js/data.js?v=20260401h"></script>
+<script src="/js/maps.js?v=20260401h"></script>
+<script src="/js/render.js?v=20260401h"></script>
+<script src="/js/audio.js?v=20260401h"></script>
+<script src="/js/game.js?v=20260401h"></script>
 </body>
 </html>
