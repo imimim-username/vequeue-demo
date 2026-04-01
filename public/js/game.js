@@ -2900,11 +2900,14 @@ function saveState(){
     species:G.species,class_:G.class_,
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
-    stats:G.stats,hp:G.hp,
-    xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp,
+    transmuterDeposits:G.transmuterDeposits,
+    stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
+    xp:G.xp,level:G.level,statPoints:G.statPoints,
+    inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
     cavernBossDefeated:G.cavernBossDefeated,hideoutBossDefeated:G.hideoutBossDefeated,
     ruinsBossDefeated:G.ruinsBossDefeated,villageBossDefeated:G.villageBossDefeated,
+    kills:G.kills||0,zoneSeniority:G.zoneSeniority||0,
   };
   localStorage.setItem('vq_state',JSON.stringify(s));
 }
@@ -2924,21 +2927,27 @@ function loadState(){
     if(s.alcx!=null) G.alcx=s.alcx;
     if(s.lockedAlcx!=null) G.lockedAlcx=s.lockedAlcx;
     if(s.bankPositions!=null) G.bankPositions=s.bankPositions;
+    if(Array.isArray(s.transmuterDeposits)) G.transmuterDeposits=s.transmuterDeposits;
     G.stats=s.stats||G.stats;
-    G.hp=s.hp||G.hp;
+    if(s.maxHp) G.maxHp=s.maxHp;
+    G.hp=Math.min(s.hp||G.hp,G.maxHp);
+    if(s.maxMp) G.maxMp=s.maxMp;
+    if(s.mp!=null) G.mp=Math.min(s.mp,G.maxMp);
     G.xp=s.xp??0;
     G.level=s.level??1;
     G.statPoints=s.statPoints??0;
-    if(s.maxHp)G.maxHp=s.maxHp;
-    if(s.maxMp)G.maxMp=s.maxMp;
-    if(s.mp!=null)G.mp=Math.min(s.mp,G.maxMp);
-    if(s.transmuterDeposits)G.transmuterDeposits=s.transmuterDeposits;
-    if(s.quests)G.quests=s.quests;
-    if(s.dungeonBossDefeated)G.dungeonBossDefeated=s.dungeonBossDefeated;
-    if(s.cavernBossDefeated)G.cavernBossDefeated=s.cavernBossDefeated;
-    if(s.hideoutBossDefeated)G.hideoutBossDefeated=s.hideoutBossDefeated;
-    if(s.ruinsBossDefeated)G.ruinsBossDefeated=s.ruinsBossDefeated;
-    if(s.villageBossDefeated)G.villageBossDefeated=s.villageBossDefeated;
+    if(Array.isArray(s.inventory)) G.inventory=s.inventory;
+    if(s.accessory!==undefined) G.accessory=s.accessory;
+    if(s.maxInvSlots!=null) G.maxInvSlots=s.maxInvSlots;
+    while(G.inventory.length<G.maxInvSlots) G.inventory.push(null);
+    if(s.quests) G.quests=s.quests;
+    G.dungeonBossDefeated=s.dungeonBossDefeated||false;
+    G.cavernBossDefeated=s.cavernBossDefeated||false;
+    G.hideoutBossDefeated=s.hideoutBossDefeated||false;
+    G.ruinsBossDefeated=s.ruinsBossDefeated||false;
+    G.villageBossDefeated=s.villageBossDefeated||false;
+    if(s.kills!=null) G.kills=s.kills;
+    if(s.zoneSeniority!=null) G.zoneSeniority=s.zoneSeniority;
   }catch(e){}
 }
 
@@ -3272,9 +3281,12 @@ function applyServerState(s){
   if(s.alcx!=null) G.alcx=s.alcx;
   if(s.lockedAlcx!=null) G.lockedAlcx=s.lockedAlcx;
   if(s.bankPositions!=null) G.bankPositions=s.bankPositions;
+  if(Array.isArray(s.transmuterDeposits)) G.transmuterDeposits=s.transmuterDeposits;
   G.stats=s.stats||G.stats;
   G.maxHp=s.maxHp||G.maxHp;
   G.hp=Math.min(s.hp||G.hp,G.maxHp);
+  if(s.maxMp) G.maxMp=s.maxMp;
+  if(s.mp!=null) G.mp=Math.min(s.mp,G.maxMp);
   G.xp=s.xp??0;
   G.level=s.level??1;
   G.statPoints=s.statPoints??0;

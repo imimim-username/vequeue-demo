@@ -402,11 +402,25 @@ io.on('connection',socket=>{
     saveDb();
   });
 
-  // Sync transmuter deposits after any transmuter transaction
+  // Sync transmuter deposits after any transmuter transaction.
+  // Detects claimed amounts (drop in dep.available) and credits currency to pdb
+  // so the anti-cheat guard in save_character won't undo the gain.
   socket.on('transmuter_sync',data=>{
     if(!socket.accountId||!pdb[socket.accountId])return;
-    pdb[socket.accountId].data=pdb[socket.accountId].data||{};
-    pdb[socket.accountId].data.transmuterDeposits=data.transmuterDeposits;
+    const stored=pdb[socket.accountId].data=pdb[socket.accountId].data||{};
+    const oldDeps=stored.transmuterDeposits||[];
+    const newDeps=Array.isArray(data.transmuterDeposits)?data.transmuterDeposits:[];
+    // Credit any drop in `available` to the player's currency balance
+    newDeps.forEach((dep,i)=>{
+      const oldAvail=(oldDeps[i]?.available)||0;
+      const newAvail=dep.available||0;
+      const claimed=parseFloat((oldAvail-newAvail).toFixed(4));
+      if(claimed>0.0001){
+        if(dep.type==='alUSD') stored.alUSD=parseFloat(((stored.alUSD||0)+claimed).toFixed(2));
+        else                   stored.alETH=parseFloat(((stored.alETH||0)+claimed).toFixed(4));
+      }
+    });
+    stored.transmuterDeposits=newDeps;
     saveDb();
   });
 
@@ -446,10 +460,17 @@ io.on('connection',socket=>{
     if(prev){
       const alUSDPrev=prev.alUSD||0, alETHPrev=prev.alETH||0;
       // Block any save where alUSD/alETH rose without a server-initiated transaction
-      // (market payouts, loot, etc. are handled server-side and not via save_character)
+      // (transmuter_sync, loot_pickup, market_buy all update pdb first so the new value is accepted here)
       if(data.alUSD>alUSDPrev+0.01)data.alUSD=parseFloat(alUSDPrev.toFixed(2));
       if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
       if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
+      // Guard: client cannot inflate dep.available (only server transmuter tick may increase it)
+      if(Array.isArray(data.transmuterDeposits)&&Array.isArray(prev.transmuterDeposits)){
+        data.transmuterDeposits.forEach((dep,i)=>{
+          const storedAvail=(prev.transmuterDeposits[i]?.available)||0;
+          if((dep.available||0)>storedAvail+0.0001)dep.available=storedAvail;
+        });
+      }
     }
     data._sig      =signPlayerData(data);
     pdb[socket.accountId].data=data;
@@ -613,6 +634,22 @@ io.on('connection',socket=>{
       if(d.heal)d.heal=Math.max(1,Math.floor(d.heal*(1-DECAY)));
       return d;
     });
+    // Credit currencies to pdb so subsequent save_character won't be blocked by anti-cheat
+    if(socket.accountId&&pdb[socket.accountId]){
+      const pd=pdb[socket.accountId].data=pdb[socket.accountId].data||{};
+      const c=pile.currencies;
+      if(c.spacebucks>0) pd.spacebucks=(pd.spacebucks||0)+Math.floor(c.spacebucks);
+      if(c.schmeckles>0) pd.schmeckles=(pd.schmeckles||0)+Math.floor(c.schmeckles);
+      if(c.alUSD>0)      pd.alUSD=parseFloat(((pd.alUSD||0)+c.alUSD).toFixed(2));
+      // Add items to pdb inventory (first available slot >=2)
+      if(decayedItems.length&&pd.inventory){
+        decayedItems.forEach(item=>{
+          const slot=pd.inventory.findIndex((s,i)=>i>=2&&s===null);
+          if(slot!==-1)pd.inventory[slot]=item;
+        });
+      }
+      saveDb();
+    }
     socket.emit('loot_claimed',{ok:true,lootId,items:decayedItems,currencies:pile.currencies,decayPct:DECAY,fromPlayer:pile.ownerName});
     io.to(pile.zone).emit('world_loot_removed',{id:pile.id});
     io.to('world').emit('world_loot_removed',{id:pile.id});
