@@ -383,6 +383,15 @@ io.on('connection',socket=>{
     const row=pdb[key];
     if(!row||row.pin_hash!==hashPin(String(pin)))
       return socket.emit('auth_result',{ok:false,error:'Invalid username or PIN.'});
+    // Single-instance: kick any existing session for this account
+    const existingSid=socketsByAccount[key];
+    if(existingSid&&existingSid!==socket.id){
+      const existingSock=io.sockets.sockets.get(existingSid);
+      if(existingSock){
+        existingSock.emit('kicked',{reason:'Your account logged in from another device. This session has ended.'});
+        existingSock.disconnect(true);
+      }
+    }
     socket.accountId=key;
     socketsByAccount[key]=socket.id;
     const savedData=row.data||null;
@@ -874,7 +883,10 @@ io.on('connection',socket=>{
   });
 });
 
-// ── Global Transmuter Redemption (every 60s) ──────────────────────────────────
+// ── Global Transmuter Redemption (every 5 min) ────────────────────────────────
+// Slower cadence gives the economy more realistic debt-repayment pacing.
+// At default earmark rate 0.5%/tick: debt half-life ≈ 11 hours, full payoff ≈ 3 days.
+const TRANSMUTER_TICK_MS=5*60*1000; // 5 minutes
 setInterval(()=>{
   // 1. Compute total system debt across all accounts
   let totalDebt=0;
@@ -936,7 +948,7 @@ setInterval(()=>{
 
   saveDb();
   console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
-},60000);
+},TRANSMUTER_TICK_MS);
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||'vq-admin-2026';

@@ -183,6 +183,16 @@ padBtn('pd-dl','ArrowDown');padBtn('pd-dr','ArrowDown');
 document.getElementById('btn-act')?.addEventListener('touchstart',e=>{KEYS[' ']=true;e.preventDefault();});
 document.getElementById('btn-act')?.addEventListener('touchend',e=>{delete KEYS[' '];});
 document.getElementById('btn-esc')?.addEventListener('touchstart',e=>{togglePause();e.preventDefault();});
+document.getElementById('btn-map')?.addEventListener('touchstart',e=>{
+  G.showMinimap=!G.showMinimap;_mmCanvas=null;e.preventDefault();
+},{passive:false});
+document.getElementById('btn-mute-touch')?.addEventListener('touchstart',e=>{
+  toggleMute();
+  // toggleMute updates hud-mute; mirror icon on the touch button too
+  const el=document.getElementById('btn-mute-touch');
+  if(el)el.textContent=document.getElementById('hud-mute')?.textContent||'🔊';
+  e.preventDefault();
+},{passive:false});
 
 // ── COLLISION ─────────────────────────────────────────────────────────────────
 function isSolid(zone,tx,ty){
@@ -1602,7 +1612,7 @@ function renderGovernanceUI(){
   const rate=(G.earmarkRate||0.005)*100;
   const prop=G.govProposals.find(p=>p.passed===null);
   let html=`<div style="color:#FFD700;margin-bottom:8px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
-  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:12px">Higher rate = faster loan repayment & more transmuter activity</div>`;
+  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:12px">% of debt redeemed every 5 min. Higher = faster repayment & more transmuter yield.</div>`;
   if(prop){
     const msLeft=Math.max(0,prop.endsAt-Date.now());
     const mLeft=Math.ceil(msLeft/60000);
@@ -2871,8 +2881,9 @@ function gameLoop(ts){
 let ctxBG,ctxSprites,ctxUI,ctxCeiling,ctxFg;
 function setupCanvases(){
   const wrap=document.getElementById('game-wrap');
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const aw=window.innerWidth,ah=window.innerHeight-36;
+  const isMobile=document.body.classList.contains('touch');
+  // On touch devices the HUD is a fixed overlay, so use full viewport height
+  const aw=window.innerWidth,ah=isMobile?window.innerHeight:window.innerHeight-36;
   const scale=Math.min(aw/W,ah/H,2);
   const dw=Math.round(W*scale),dh=Math.round(H*scale);
   wrap.style.width=dw+'px';wrap.style.height=dh+'px';
