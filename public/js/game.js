@@ -887,6 +887,7 @@ function triggerBattle(key,depth=0){
     result:null,
     xpGained:0,spacebucksGained:0,schmecklesGained:0,
     savedX:G.x,savedY:G.y,
+    anims:[],
   };
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
@@ -919,6 +920,7 @@ function triggerSnowballBattle(se){
     result:null,xpGained:0,spacebucksGained:0,schmecklesGained:0,
     savedX:G.x,savedY:G.y,
     snowballId:se.id, // claim bonus loot on win
+    anims:[],
   };
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
@@ -1539,10 +1541,35 @@ function renderBattleScreen(){
   fog.addColorStop(0,'rgba(30,20,8,0)');fog.addColorStop(1,'rgba(30,20,8,0.7)');
   ctxUI.fillStyle=fog;ctxUI.fillRect(0,gY-20,W,24);
 
+  // ── Animation queue: prune expired, compute offsets ──────────────────────────
+  bt.anims=(bt.anims||[]).filter(a=>{
+    const age=G.tick-a.born;
+    if(a.type==='player_lunge'||a.type==='enemy_lunge') return age<BT_ANIM.LUNGE;
+    if(a.type==='hit_flash')   return age<BT_ANIM.FLASH;
+    if(a.type==='float_dmg')   return age<BT_ANIM.FLOAT;
+    if(a.type==='particles')   return age<BT_ANIM.PART;
+    if(a.type==='screen_flash')return age<BT_ANIM.SFLASH;
+    if(a.type==='enemy_dissolve') return age<BT_ANIM.DISSOLVE;
+    return false;
+  });
+  let playerLungeX=0,enemyLungeX=0,dissolveAlpha=1;
+  bt.anims.forEach(a=>{
+    const age=G.tick-a.born;
+    if(a.type==='player_lunge'||a.type==='enemy_lunge'){
+      const t=Math.min(1,age/BT_ANIM.LUNGE);
+      const peak=t<0.4?t/0.4:1-(t-0.4)/0.6;
+      if(a.type==='player_lunge') playerLungeX=-Math.round(peak*80);
+      else enemyLungeX=Math.round(peak*80);
+    }
+    if(a.type==='enemy_dissolve') dissolveAlpha=Math.max(0,1-age/BT_ANIM.DISSOLVE);
+  });
+
   // ── Enemy sprite (shake if hit) ──
   const shX=bt.hitShake>0?(Math.random()*8-4)|0:0;
   if(bt.hitShake>0)bt.hitShake--;
-  drawEnemySprite(ctxUI,e.type,shX+70,20);
+  ctxUI.globalAlpha=dissolveAlpha;
+  drawEnemySprite(ctxUI,e.type,shX+70+enemyLungeX,20);
+  ctxUI.globalAlpha=1;
 
   // ── Enemy name + HP bar ──
   ctxUI.fillStyle='#EEE8C0';ctxUI.font='bold 14px monospace';
@@ -1630,7 +1657,7 @@ function renderBattleScreen(){
     const phX=bt.playerHitShake>0?(Math.random()*6-3)|0:0;
     if(bt.playerHitShake>0)bt.playerHitShake--;
     ctxUI.save();
-    ctxUI.translate(bpX+phX,bpY);
+    ctxUI.translate(bpX+phX+playerLungeX,bpY);
     ctxUI.scale(btS,btS);
     drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory);
     ctxUI.restore();
@@ -1664,6 +1691,45 @@ function renderBattleScreen(){
     ctxUI.font='11px monospace';
     ctxUI.fillText(bt.phase==='player_turn'?'▶ Your turn':`▶ ${e.name}...`,piX,piY+52);
   }
+
+  // ── Anim overlay rendering ────────────────────────────────────────────────────
+  bt.anims.forEach(a=>{
+    const age=G.tick-a.born;
+    // Hit flash — semi-transparent color rect over sprite area
+    if(a.type==='hit_flash'){
+      ctxUI.globalAlpha=Math.max(0,(1-age/BT_ANIM.FLASH)*0.55);
+      ctxUI.fillStyle=a.color;ctxUI.fillRect(a.x,a.y,a.w,a.h);
+      ctxUI.globalAlpha=1;
+    }
+    // Floating damage / text numbers
+    if(a.type==='float_dmg'){
+      const t=age/BT_ANIM.FLOAT;
+      ctxUI.globalAlpha=t>0.55?Math.max(0,1-(t-0.55)/0.45):1;
+      ctxUI.font=`bold ${a.big?'17':'13'}px monospace`;
+      ctxUI.fillStyle=a.color||'#FFF';
+      ctxUI.textAlign='center';
+      ctxUI.fillText(String(a.val),a.x,a.y-Math.round(t*42));
+      ctxUI.textAlign='left';ctxUI.globalAlpha=1;
+    }
+    // Particle burst
+    if(a.type==='particles'){
+      const t=age/BT_ANIM.PART;
+      ctxUI.globalAlpha=Math.max(0,1-t);
+      ctxUI.fillStyle=a.color||'#FFF';
+      (a.vels||[]).forEach(v=>{
+        const sz=Math.max(1,3-Math.floor(t*3));
+        ctxUI.fillRect(Math.round(a.x+v.vx*age)-sz/2,Math.round(a.y+v.vy*age)-sz/2,sz,sz);
+      });
+      ctxUI.globalAlpha=1;
+    }
+    // Screen edge flash
+    if(a.type==='screen_flash'){
+      ctxUI.globalAlpha=Math.max(0,1-age/BT_ANIM.SFLASH);
+      ctxUI.fillStyle=a.color||'rgba(255,255,255,0.2)';
+      ctxUI.fillRect(0,0,W,H);
+      ctxUI.globalAlpha=1;
+    }
+  });
 
   // ── Result overlay ──
   if(bt.result){
@@ -1700,6 +1766,19 @@ function spendMp(cost){
 
 // ── Combat math ───────────────────────────────────────────────────────────────
 
+// ── Battle animation helpers ──────────────────────────────────────────────────
+const BT_ANIM={LUNGE:22,FLASH:8,FLOAT:55,PART:40,SFLASH:20,DISSOLVE:50};
+function btAnim(type,props){if(G.battle)(G.battle.anims=G.battle.anims||[]).push({type,born:G.tick,...props});}
+function btParticles(x,y,color,n=12){
+  const vels=[];
+  for(let i=0;i<n;i++){const a=(i/n)*Math.PI*2,spd=1.5+Math.random()*2;vels.push({vx:Math.cos(a)*spd,vy:Math.sin(a)*spd});}
+  btAnim('particles',{x,y,color,vels});
+}
+// Enemy sprite visual center (sprite drawn at x=70, y=20; ~80×100px body)
+const ENM_CX=150,ENM_CY=85;
+// Enemy hit-box rect for flash
+const ENM_FX=52,ENM_FY=8,ENM_FW=186,ENM_FH=198;
+
 function doBattleAction(action){
   const bt=G.battle;
   if(!bt||bt.phase!=='player_turn'||bt.result)return;
@@ -1715,6 +1794,8 @@ function doBattleAction(action){
     G.inventory[slot]=null;
     bt.log.push(`Used ${pot.name}! +${gained} HP.`);
     SFX.potion();
+    btAnim('float_dmg',{val:'+'+gained,x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#44FF88',big:true});
+    btAnim('screen_flash',{color:'rgba(0,200,80,0.12)'});
     bt.phase='enemy_turn';bt.animTimer=75;
     return;
   }
@@ -1754,6 +1835,12 @@ function doBattleAction(action){
     SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
     const weakStr=weak>1.2?'⚡ WEAK! ':weak<0.6?'🛡 RESIST ':'' ;
     bt.log.push(crit?`${weakStr}Critical hit! ${dmg} damage! [${dt}]`:`${weakStr}You attack for ${dmg} damage. [${dt}]`);
+    // Animations
+    const dmgCol=crit?'#FFD700':dt==='magic'?'#CC88FF':dt==='holy'?'#FFE566':'#FFFFFF';
+    btAnim('player_lunge',{});
+    btAnim('hit_flash',{x:ENM_FX,y:ENM_FY,w:ENM_FW,h:ENM_FH,color:dmgCol});
+    btAnim('float_dmg',{val:String(dmg)+(crit?' CRIT!':''),x:ENM_CX,y:ENM_CY-20,color:dmgCol,big:crit});
+    if(weak>1.2||crit) btParticles(ENM_CX,ENM_CY,dmgCol);
   }
 
   // ── Weapon switch (costs player turn) ──────────────────────────────────────
@@ -1787,11 +1874,19 @@ function doBattleAction(action){
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       const weakStr=weak>1.2?'⚡ WEAK! ':weak<0.6?'🛡 RESIST ':'';
       bt.log.push(`${weakStr}Arcane Bolt! ${dmg} magic damage! (−${mpCost} MP)`);
+      btAnim('player_lunge',{});
+      btAnim('hit_flash',{x:ENM_FX,y:ENM_FY,w:ENM_FW,h:ENM_FH,color:'#CC88FF'});
+      btAnim('float_dmg',{val:String(dmg),x:ENM_CX,y:ENM_CY-20,color:'#CC88FF',big:weak>1.2});
+      btParticles(ENM_CX,ENM_CY,'#9B59B6');
+      btAnim('screen_flash',{color:'rgba(150,0,220,0.10)'});
     } else if(cls==='paladin'){
       healAmt=Math.max(1,Math.floor(G.stats.vit*0.6)+2);
       G.hp=Math.min(G.maxHp,G.hp+healAmt);
       SFX.potion();
       bt.log.push(`Holy Light! Restored ${healAmt} HP. (−${mpCost} MP)`);
+      btAnim('float_dmg',{val:'+'+healAmt,x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#FFE566',big:true});
+      btParticles(ENM_CX,ENM_CY,'#FFE566');
+      btAnim('screen_flash',{color:'rgba(255,220,80,0.14)'});
     } else if(cls==='rogue'){
       // Piercing attack — physical, ignores 60% of armor
       const weapon=G.inventory[0];
@@ -1800,6 +1895,10 @@ function doBattleAction(action){
       bt.enemy.currentHp-=dmg;bt.hitShake=10;
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       bt.log.push(`Twin Daggers! ${dmg} piercing damage! (−${mpCost} MP)`);
+      btAnim('player_lunge',{});
+      btAnim('hit_flash',{x:ENM_FX,y:ENM_FY,w:ENM_FW,h:ENM_FH,color:'#AAAAFF'});
+      btAnim('float_dmg',{val:String(dmg),x:ENM_CX,y:ENM_CY-20,color:'#CCDDFF'});
+      if(weak>1.2) btParticles(ENM_CX,ENM_CY,'#AAAAFF');
     } else { // warrior — power strike, uses weapon dmgType
       const weapon=G.inventory[0];
       const{dmg:pd,crit:pc,dt:pdt,weak:pw}=calcWeaponDmg(weapon,bt.enemy,1.1,0.45);
@@ -1809,6 +1908,11 @@ function doBattleAction(action){
       SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
       const weakStr=pw>1.2?'⚡ WEAK! ':pw<0.6?'🛡 RESIST ':'';
       bt.log.push(`${weakStr}Power Strike! ${finalDmg} ${pdt} damage! (−${mpCost} MP)`);
+      const psCol=pdt==='magic'?'#CC88FF':pdt==='holy'?'#FFE566':'#FF8800';
+      btAnim('player_lunge',{});
+      btAnim('hit_flash',{x:ENM_FX,y:ENM_FY,w:ENM_FW,h:ENM_FH,color:psCol});
+      btAnim('float_dmg',{val:String(finalDmg)+(pc?' CRIT!':''),x:ENM_CX,y:ENM_CY-20,color:psCol,big:true});
+      btParticles(ENM_CX,ENM_CY,psCol);
     }
   }
 
@@ -1818,6 +1922,8 @@ function doBattleAction(action){
     bt.log.push(`${bt.enemy.name} is defeated!`);
     SFX.enemyDeath();
     setTimeout(()=>SFX.victory(),500);
+    btAnim('enemy_dissolve',{});
+    btAnim('screen_flash',{color:'rgba(255,215,0,0.22)'});
     bt.result='win';
     bt.xpGained=bt.enemy.xp;
     const drops = bt.enemy.drops || {};
@@ -1874,8 +1980,10 @@ function doEnemyTurn(){
   const bt=G.battle,e=bt.enemy;
   // AGI drives dodge chance (5% per point)
   const dodge=Math.random()<G.stats.agi*0.05;
+  const plrFX=Math.floor(W*0.72)-38, plrFY=Math.floor(H*0.56)-100, plrFW=76, plrFH=118;
   if(dodge){
     bt.log.push(`${e.name} attacks — you dodge!`);
+    btAnim('float_dmg',{val:'DODGE',x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#80FFAA'});
   } else {
     // Total player defense: END stat + equipped shield DEF + equipped armor DEF
     const endArmor   = Math.floor(G.stats.end*0.5);
@@ -1887,13 +1995,18 @@ function doEnemyTurn(){
     bt.playerHitShake=8;
     SFX.hitPlayer();
     bt.log.push(`${e.name} hits you for ${dmg}! [DEF:${totalDef}]`);
+    btAnim('enemy_lunge',{});
+    btAnim('hit_flash',{x:plrFX,y:plrFY,w:plrFW,h:plrFH,color:'#FF4040'});
+    btAnim('float_dmg',{val:'-'+dmg,x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#FF4040',big:dmg>=10});
     if(G.hp<=0){
       G.hp=0;
       bt.log.push('You have been defeated...');
       SFX.gameOver();
       bt.result='lose';
+      btAnim('screen_flash',{color:'rgba(200,0,0,0.30)'});
       return;
     }
+    if(dmg>=8) btAnim('screen_flash',{color:'rgba(200,0,0,0.12)'});
   }
   bt.phase='player_turn';
 }
