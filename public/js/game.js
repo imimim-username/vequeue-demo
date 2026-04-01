@@ -1787,12 +1787,16 @@ function renderBankUI(){
     const pct=pos.borrowed>0?Math.min(100,Math.round((1-pos.debt/pos.borrowed)*100)):100;
     const colLabel=pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles';
     const syn=pos.collateral==='spacebucks'?'alUSD':'alETH';
+    const icon=pos.collateral==='spacebucks'?'🪙':'💀';
     const claimable=pos.debt<=0.001;
+    const interest=pos.interestAccrued||0;
+    const totalClaim=pos.deposited+interest;
+    const interestStr=interest>0?`<span style="color:#FFD700;font-size:.72rem"> + ${interest} ${icon} interest</span>`:'';
     posHTML+=`<div class="bank-pos">
       <b>${colLabel}</b> deposited: ${pos.deposited} | borrowed: ${pos.borrowed.toFixed(2)} ${syn} | debt: ${pos.debt.toFixed(2)} ${syn}<br>
       <div class="bank-bar"><div class="bank-bar-fill" style="width:${pct}%"></div></div>
       <span style="font-size:.75rem">${pct}% repaid</span>
-      ${claimable?`<button onclick="claimBankPosition(${i})" style="background:#4CAF50;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙':'💀'}</button>`:''}
+      ${claimable?`${interestStr}<button onclick="claimBankPosition(${i})" style="background:#4CAF50;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${totalClaim} ${icon}</button>`:''}
     </div>`;
   });
   const active=G.bankPositions.filter(p=>!p.claimed);
@@ -1820,13 +1824,19 @@ function depositBank(collateral){
 function claimBankPosition(idx){
   const pos=G.bankPositions[idx];
   if(!pos||pos.debt>0.001||pos.claimed)return;
+  const interest=pos.interestAccrued||0;
+  const total=pos.deposited+interest;
   pos.claimed=true;
-  if(pos.collateral==='spacebucks')G.spacebucks+=pos.deposited;
-  else G.schmeckles+=pos.deposited;
-  chatLog(`✅ Claimed ${pos.deposited} ${pos.collateral==='spacebucks'?'🪙 Spacebucks':'💀 Schmeckles'} from fully repaid position!`,'#FFD700');
+  pos.interestAccrued=0;
+  if(pos.collateral==='spacebucks')G.spacebucks+=total;
+  else G.schmeckles+=total;
+  const icon=pos.collateral==='spacebucks'?'🪙':'💀';
+  const interestNote=interest>0?` (+${interest} ${icon} interest earned)`:'';
+  chatLog(`✅ Claimed ${total} ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'} ${icon}${interestNote}!`,'#FFD700');
   SFX.coin();
   socket?.emit('bank_sync',{bankPositions:G.bankPositions});
   renderBankUI();
+  saveToServer();
 }
 
 // ── TRANSMUTER ────────────────────────────────────────────────────────────────

@@ -883,71 +883,88 @@ io.on('connection',socket=>{
   });
 });
 
-// ── Global Transmuter Redemption (every 5 min) ────────────────────────────────
-// Slower cadence gives the economy more realistic debt-repayment pacing.
+// ── Global Transmuter Redemption + Interest (every 5 min) ────────────────────
 // At default earmark rate 0.5%/tick: debt half-life ≈ 11 hours, full payoff ≈ 3 days.
+// POST_REPAY_INTEREST: 0.1%/tick accrued on deposited collateral once debt = 0.
 const TRANSMUTER_TICK_MS=5*60*1000; // 5 minutes
+const POST_REPAY_INTEREST=0.001;    // 0.1% of deposited per tick on paid-off positions
 setInterval(()=>{
   // 1. Compute total system debt across all accounts
   let totalDebt=0;
   Object.values(pdb).forEach(acct=>{
     (acct.data?.bankPositions||[]).forEach(p=>{if(!p.claimed&&p.debt>0.001)totalDebt+=p.debt;});
   });
-  if(totalDebt<=0)return;
 
-  // 2. Earmark + redeem per position, collect collateral
+  // 2. Earmark + redeem per position, collect collateral (only when debt exists)
   let sbRedeemed=0,ethRedeemed=0;
+  if(totalDebt>0){
+    Object.entries(pdb).forEach(([id,acct])=>{
+      if(!acct.data?.bankPositions)return;
+      acct.data.bankPositions.forEach(pos=>{
+        if(pos.claimed||pos.debt<=0.001)return;
+        const redeem=EARMARK_RATE_LIVE*pos.debt;
+        pos.debt=Math.max(0,pos.debt-redeem);
+        pos.earmarked=0;
+        const net=redeem*(1-0.005); // 0.5% borrower redemption fee
+        const redemptionFee=redeem-net;
+        if(pos.collateral==='spacebucks'){sbRedeemed+=net;treasury.alUSD=parseFloat((treasury.alUSD+redemptionFee).toFixed(2));}
+        else{ethRedeemed+=net;treasury.alETH=parseFloat((treasury.alETH+redemptionFee).toFixed(4));}
+        if(pos.debt<=0.001)pos.debt=0;
+      });
+      // Push updated positions to connected player (debt repayment pass)
+      const sid=socketsByAccount[id];
+      if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
+    });
+    if(sbRedeemed>0||ethRedeemed>0)broadcastTreasury();
+  }
+
+  // 3. Accrue interest on fully-repaid, unclaimed positions (runs every tick)
   Object.entries(pdb).forEach(([id,acct])=>{
     if(!acct.data?.bankPositions)return;
+    let accrued=false;
     acct.data.bankPositions.forEach(pos=>{
-      if(pos.claimed||pos.debt<=0.001)return;
-      const redeem=EARMARK_RATE_LIVE*pos.debt; // proportional to own debt (=debt/totalDebt * totalDebt * rate)
-      pos.debt=Math.max(0,pos.debt-redeem);
-      pos.earmarked=0;
-      const net=redeem*(1-0.005); // 0.5% borrower redemption fee
-      const redemptionFee=redeem-net;
-      // Accumulate 0.5% redemption fee to treasury
-      if(pos.collateral==='spacebucks'){sbRedeemed+=net;treasury.alUSD=parseFloat((treasury.alUSD+redemptionFee).toFixed(2));}
-      else{ethRedeemed+=net;treasury.alETH=parseFloat((treasury.alETH+redemptionFee).toFixed(4));}
-      if(pos.debt<=0.001)pos.debt=0;
+      if(pos.claimed||pos.debt>0.001)return; // skip active-debt and claimed positions
+      // Floor to whole units — collateral is always integer (Spacebucks/Schmeckles)
+      const interest=Math.floor(pos.deposited*POST_REPAY_INTEREST);
+      if(interest>0){pos.interestAccrued=(pos.interestAccrued||0)+interest;accrued=true;}
     });
-    // Push updated positions to connected player
-    const sid=socketsByAccount[id];
-    if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
-  });
-
-  if(sbRedeemed>0||ethRedeemed>0)broadcastTreasury();
-  if(sbRedeemed<=0&&ethRedeemed<=0){saveDb();return;}
-
-  // 3. Distribute pro-rata to transmuter depositors
-  let totalTrAlUSD=0,totalTrAlETH=0;
-  Object.values(pdb).forEach(acct=>{
-    (acct.data?.transmuterDeposits||[]).forEach(d=>{
-      if(d.type==='alUSD'&&d.amount>0.001)totalTrAlUSD+=d.amount;
-      if(d.type==='alETH'&&d.amount>0.001)totalTrAlETH+=d.amount;
-    });
-  });
-  Object.entries(pdb).forEach(([id,acct])=>{
-    if(!acct.data?.transmuterDeposits)return;
-    let sbPayout=0,schmPayout=0;
-    acct.data.transmuterDeposits.forEach(dep=>{
-      if(dep.type==='alUSD'&&dep.amount>0.001&&totalTrAlUSD>0){
-        const recv=Math.min(dep.amount,sbRedeemed*(dep.amount/totalTrAlUSD));
-        dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); sbPayout+=recv;
-      }
-      if(dep.type==='alETH'&&dep.amount>0.001&&totalTrAlETH>0){
-        const recv=Math.min(dep.amount,ethRedeemed*(dep.amount/totalTrAlETH));
-        dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); schmPayout+=recv;
-      }
-    });
-    if(sbPayout>0||schmPayout>0){
+    if(accrued){
       const sid=socketsByAccount[id];
-      if(sid)io.to(sid).emit('transmuter_payout',{transmuterDeposits:acct.data.transmuterDeposits,sbPayout,schmPayout});
+      if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
     }
   });
 
+  // 4. Distribute pro-rata to transmuter depositors (only when collateral was redeemed)
+  if(sbRedeemed>0||ethRedeemed>0){
+    let totalTrAlUSD=0,totalTrAlETH=0;
+    Object.values(pdb).forEach(acct=>{
+      (acct.data?.transmuterDeposits||[]).forEach(d=>{
+        if(d.type==='alUSD'&&d.amount>0.001)totalTrAlUSD+=d.amount;
+        if(d.type==='alETH'&&d.amount>0.001)totalTrAlETH+=d.amount;
+      });
+    });
+    Object.entries(pdb).forEach(([id,acct])=>{
+      if(!acct.data?.transmuterDeposits)return;
+      let sbPayout=0,schmPayout=0;
+      acct.data.transmuterDeposits.forEach(dep=>{
+        if(dep.type==='alUSD'&&dep.amount>0.001&&totalTrAlUSD>0){
+          const recv=Math.min(dep.amount,sbRedeemed*(dep.amount/totalTrAlUSD));
+          dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); sbPayout+=recv;
+        }
+        if(dep.type==='alETH'&&dep.amount>0.001&&totalTrAlETH>0){
+          const recv=Math.min(dep.amount,ethRedeemed*(dep.amount/totalTrAlETH));
+          dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); schmPayout+=recv;
+        }
+      });
+      if(sbPayout>0||schmPayout>0){
+        const sid=socketsByAccount[id];
+        if(sid)io.to(sid).emit('transmuter_payout',{transmuterDeposits:acct.data.transmuterDeposits,sbPayout,schmPayout});
+      }
+    });
+  }
+
   saveDb();
-  console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
+  if(totalDebt>0)console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
 },TRANSMUTER_TICK_MS);
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
