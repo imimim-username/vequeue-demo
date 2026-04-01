@@ -15,6 +15,7 @@ const G = {
   bankPositions: [],
   transmuterDeposits: [], // [{type:'alUSD'|'alETH', amount, available}]
   _shownQueueTip: false,
+  _pendingConfirm: null,  // {_info, onYes, onNo} — active in-game confirm/info dialog
   inventory:new Array(8).fill(null),
   stats:{str:2,vit:2,agi:2,end:2,lck:2},
   xp:0,
@@ -90,6 +91,13 @@ window.addEventListener('keydown',e=>{
     document.getElementById('godmode-badge').className=G.godMode?'on':'';
     chatLog('★ GOD MODE '+(G.godMode?'ON':'OFF'),'#FFD700');
   }
+  // In-game confirm dialog: Y = accept, N = cancel
+  if((e.key==='y'||e.key==='Y')&&G._pendingConfirm&&!G._pendingConfirm._info){
+    _dismissConfirm(true); e.preventDefault(); return;
+  }
+  if((e.key==='n'||e.key==='N')&&G._pendingConfirm&&!G._pendingConfirm._info){
+    _dismissConfirm(false); e.preventDefault(); return;
+  }
   // NPC interaction
   if(e.key==='e'||e.key==='E'){
     if(G.npcDialog){ advanceDialog(); e.preventDefault(); }
@@ -105,6 +113,7 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.key==='Escape'){
+    if(G._pendingConfirm&&!G._pendingConfirm._info){ _dismissConfirm(false); e.preventDefault(); return; }
     if(document.getElementById('bank-ui').style.display!=='none'){ closeBank(); return; }
     if(document.getElementById('transmuter-ui').style.display!=='none'){ closeTransmuter(); return; }
     if(document.getElementById('market-ui').style.display!=='none'){ closeMarket(); return; }
@@ -264,24 +273,20 @@ function declineOrAbandonQuest(){
   } else if(qs.status==='active'){
     // Abandoning an active quest — charge penalty
     if(G.alUSD<QUEST_ABANDON_PENALTY){
-      // Can't pay — offer a penalty-free forfeit so the player is never permanently stuck
-      const forfeit=confirm(
-        `You can't pay the ${QUEST_ABANDON_PENALTY} alUSD penalty (you have ${G.alUSD.toFixed(2)} alUSD).\n\n`+
-        `Forfeit the quest for free instead? (No penalty, but you won't be able to restart it.)\n\n`+
-        `Click OK to forfeit, Cancel to keep the quest.`
-      );
-      if(!forfeit){
-        // Put the dialog back so they can keep the quest
+      // Can't pay — offer a penalty-free forfeit via in-game confirm dialog
+      showGameConfirm(npc.face??2,npc.name,[
+        `You can't pay the ${QUEST_ABANDON_PENALTY} alUSD penalty (you have ${G.alUSD.toFixed(2)} alUSD).`,
+        `Forfeit the quest for free? You won't be able to restart it, but you won't be stuck.`,
+      ],
+      ()=>{ // Yes — free forfeit
+        delete G.quests[qid];
+        chatLog(`Quest forfeited: "${qdef.title}" (no penalty — could not afford ${QUEST_ABANDON_PENALTY} alUSD).`,'#888888');
+        SFX.error(); saveToServer();
+      },
+      ()=>{ // No — reopen quest dialog so player can keep it
         G.npcDialog={npc,lineIdx:0,dialog:getQuestDialog(npc)};
-        G.paused=true;
-        showNpcDialog();
-        return;
-      }
-      // Free forfeit
-      delete G.quests[qid];
-      chatLog(`Quest forfeited: "${qdef.title}" (no penalty — could not afford ${QUEST_ABANDON_PENALTY} alUSD).`,'#888888');
-      SFX.error();
-      saveToServer();
+        G.paused=true; showNpcDialog();
+      });
       return;
     }
     G.alUSD=Math.max(0,G.alUSD-QUEST_ABANDON_PENALTY);
@@ -359,10 +364,20 @@ function advanceDialog(){
   nd.lineIdx++;
   SFX.select();
   if(nd.lineIdx>=nd.dialog.length){
+    // Confirm dialog (Y/N): stay on last page — don't close until Y or N pressed
+    if(G._pendingConfirm&&!G._pendingConfirm._info){
+      nd.lineIdx=nd.dialog.length-1;
+      showNpcDialog(); return;
+    }
     const npc=nd.npc;
     G.npcDialog=null;
     G.paused=false;
     document.getElementById('npc-dialog').style.display='none';
+    document.getElementById('npc-confirm-btns').style.display='none';
+    // Info dialog: fire the onClose callback
+    if(G._pendingConfirm&&G._pendingConfirm._info){
+      const cb=G._pendingConfirm.onYes; G._pendingConfirm=null; if(cb)cb(); return;
+    }
     // Inventory upgrade confirmation on last line accept
     if(G._pendingInvUpgrade){doInvUpgrade();return;}
     handleQuestDialogClose(npc);
@@ -386,8 +401,12 @@ function showNpcDialog(){
   document.getElementById('npc-dialog-text').textContent=nd.dialog[nd.lineIdx];
   const total=nd.dialog.length;
   const idx=nd.lineIdx+1;
-  const hint=idx<total?`[ E / Space ] Continue  (${idx}/${total})`:`[ E / Space ] Close  (${idx}/${total})`;
+  const isConfirmLast=G._pendingConfirm&&!G._pendingConfirm._info&&idx>=total;
+  const hint=isConfirmLast?'[ Y ] Yes   [ N / Esc ] No'
+    :idx<total?`[ E / Space ] Continue  (${idx}/${total})`:`[ E / Space ] Close  (${idx}/${total})`;
   document.getElementById('npc-dialog-hint').textContent=hint;
+  const btns=document.getElementById('npc-confirm-btns');
+  if(btns)btns.style.display=isConfirmLast?'flex':'none';
   document.getElementById('npc-dialog').style.display='block';
 }
 
@@ -430,35 +449,65 @@ function handleQueueDoor(key,door){
   // Different queue active: don't interfere
 }
 
+// ── In-game dialog helpers (replaces browser alert/confirm) ──────────────────
+// Show a multi-page info dialog; onClose fires when the last page is dismissed.
+function showGameInfo(face,name,lines,onClose){
+  G._pendingConfirm={_info:true,onYes:onClose||null,onNo:null};
+  G.npcDialog={npc:{name,type:'guard',face},lineIdx:0,dialog:lines};
+  G.paused=true; showNpcDialog();
+}
+// Show a Y/N confirm dialog; onYes fires on Y, onNo fires on N/Esc.
+function showGameConfirm(face,name,lines,onYes,onNo){
+  G._pendingConfirm={_info:false,onYes:onYes||null,onNo:onNo||null};
+  G.npcDialog={npc:{name,type:'guard',face},lineIdx:0,dialog:lines};
+  G.paused=true; showNpcDialog();
+}
+// Dismiss the active confirm dialog (accept=true → onYes, false → onNo).
+function _dismissConfirm(accept){
+  const pc=G._pendingConfirm;
+  G._pendingConfirm=null; G.npcDialog=null; G.paused=false;
+  document.getElementById('npc-dialog').style.display='none';
+  const btns=document.getElementById('npc-confirm-btns');
+  if(btns)btns.style.display='none';
+  const cb=pc?(accept?pc.onYes:pc.onNo):null;
+  if(cb)cb();
+}
+
 function joinQueue(zone,type){
-  if(G.queueState)return; // already in a queue
-  // Cap lockAmt to actual balance so locked amount never exceeds what was deducted
+  if(G.queueState)return;
   const lockAmt=type==='entry'?Math.min(G.alcx,Math.max(5,Math.floor(G.alcx*0.20))):0;
-  // First-time queue explanation (shown once, then flagged)
+  const zl=zone[0].toUpperCase()+zone.slice(1);
+
+  // Final step: commit the join
+  function _doJoin(){
+    G.alcx=Math.max(0,G.alcx-lockAmt);
+    G.lockedAlcx=lockAmt;
+    G.queueState={zone,type,ticket:null,served:false};
+    socket?.emit('queue_join',{zone,queueType:type,locked:lockAmt});
+    chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' ⚗'+lockAmt+' ALCX locked.':''}`, '#FFD700');
+    updateQueuePanel();
+  }
+
+  // Step 2: confirm ALCX lock (or skip if no lock)
+  function _confirmLock(){
+    if(lockAmt>0){
+      showGameConfirm(7,'Queue System',[
+        `Join the ${zl} entry queue?`,
+        `⚗ ${lockAmt} ALCX (20% of your balance) will be locked as a commitment signal.\nYou get it all back when you enter or leave the zone.`,
+      ],_doJoin,null);
+    } else { _doJoin(); }
+  }
+
+  // Step 1: show queue tutorial once, then confirm lock
   if(!G._shownQueueTip&&lockAmt>0){
     G._shownQueueTip=true;
-    alert(
-      '📖 How the Queue Works\n\n'+
-      '• You take a ticket and wait your turn — just like a real rate-limited protocol.\n'+
-      '• 20% of your ALCX is locked as a commitment signal. You get it all back when you enter or leave.\n'+
-      '• The longer you stay in the queue zone (Seniority ⭐), the more ALCX drip you earn per cycle.\n'+
-      '• You can bid ALCX to jump ahead in line — bid amount is split among other waiters.\n\n'+
-      'This teaches how veQueue protects economic zones from spam and rewards patient participants.'
-    );
-  }
-  // Warn player about ALCX lock before proceeding
-  if(lockAmt>0){
-    const zl=zone[0].toUpperCase()+zone.slice(1);
-    const msg=`Join ${zl} entry queue?\n\n⚗ ${lockAmt} ALCX (20% of your balance) will be locked until you enter or leave.\n\nClick OK to confirm.`;
-    if(!confirm(msg))return;
-  }
-  G.alcx=Math.max(0,G.alcx-lockAmt);
-  G.lockedAlcx=lockAmt;
-  G.queueState={zone,type,ticket:null,served:false};
-  socket?.emit('queue_join',{zone,queueType:type,locked:lockAmt});
-  const zl=zone[0].toUpperCase()+zone.slice(1);
-  chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' ⚗'+lockAmt+' ALCX locked.':''}`, '#FFD700');
-  updateQueuePanel();
+    showGameInfo(7,'📖 Queue System',[
+      'You take a ticket and wait your turn — just like a real rate-limited protocol.',
+      '20% of your ALCX is locked as a commitment signal.\nYou get it all back when you enter or leave.',
+      'Build Seniority (⭐) by staying in the zone to earn bonus ALCX drip each cycle.',
+      'Bid ALCX to jump the line — your bid amount splits among the other waiters.',
+    ],_confirmLock);
+  } else { _confirmLock(); }
 }
 
 function updateQueuePanel(){
@@ -2928,6 +2977,15 @@ document.getElementById('queue-leave-btn')?.addEventListener('click',()=>{
   G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
   updateQueuePanel();
   chatLog('Left the queue.','#888');
+});
+
+// ── In-game confirm touch buttons ────────────────────────────────────────────
+document.getElementById('npc-btn-yes')?.addEventListener('click',()=>_dismissConfirm(true));
+document.getElementById('npc-btn-no')?.addEventListener('click',()=>_dismissConfirm(false));
+// Tap the dialog body (outside buttons) to advance info dialogs on mobile
+document.getElementById('npc-dialog-inner')?.addEventListener('click',()=>{
+  if(G.npcDialog&&!(G._pendingConfirm&&!G._pendingConfirm._info&&G.npcDialog.lineIdx>=G.npcDialog.dialog.length-1))
+    advanceDialog();
 });
 
 // ── Battle canvas click / key handler ─────────────────────────────────────────
