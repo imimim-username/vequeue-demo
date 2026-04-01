@@ -32,6 +32,7 @@ const G = {
   tick:0,
   camX:0,camY:0,
   _prevX:0,_prevY:0,_camVx:0,_camVy:0,  // camera lead tracking
+  _lastEmitX:0,_lastEmitY:0,_lastEmitDir:2,_lastEmitMoving:false,_lastEmitTime:0, // net emit tracking
   queueState:null,      // {zone, type:'entry'|'exit', ticket, served}
   lockedAlcx:0,         // ALCX locked while in entry queue
   zoneSeniority:0,      // 5-min intervals spent in marketplace/treasury without leaving
@@ -2701,6 +2702,22 @@ function gameLoop(ts){
     if(G.moving)tryMove(dx,dy);
     if(G.moving){G.moveTimer++;G.frame=G.moveTimer;}
     else{G.moveTimer=0;}
+    // ── Broadcast position to server (max 20Hz, delta-compressed) ────────────
+    if(socket?.connected){
+      const _now=Date.now();
+      const _posChg=G.x!==G._lastEmitX||G.y!==G._lastEmitY||G.dir!==G._lastEmitDir||G.moving!==G._lastEmitMoving;
+      if((_posChg&&_now-G._lastEmitTime>=50)||_now-G._lastEmitTime>=500){
+        socket.emit('move',{x:G.x,y:G.y,dir:G.dir,frame:G.frame,moving:G.moving,zone:G.zone});
+        G._lastEmitX=G.x;G._lastEmitY=G.y;G._lastEmitDir=G.dir;G._lastEmitMoving=G.moving;G._lastEmitTime=_now;
+      }
+    }
+    // ── Interpolate other players toward their server-reported positions ──────
+    for(const p of Object.values(others)){
+      if(p.targetX!==undefined){
+        p.x+=(p.targetX-p.x)*0.25;
+        p.y+=(p.targetY-p.y)*0.25;
+      }
+    }
     checkDoorTrigger();
     checkEncounter();
     checkBossEncounter();
@@ -2878,6 +2895,8 @@ function initSocket(){
     document.getElementById('hud-players').textContent=`${data.count} online`;
   });
   socket.on('player_joined',data=>{
+    // Seed interpolation targets so player appears at correct spot immediately
+    data.targetX=data.x; data.targetY=data.y;
     others[data.id]=data;
     document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
   });
@@ -2885,10 +2904,21 @@ function initSocket(){
     delete others[id];
     document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
   });
-  socket.on('player_moved',data=>{if(others[data.id])others[data.id]=data;});
+  socket.on('player_moved',data=>{
+    if(!others[data.id])return;
+    const o=others[data.id];
+    // Update interpolation target — rendered x/y will lerp toward these each frame
+    o.targetX=data.x; o.targetY=data.y;
+    o.dir=data.dir; o.frame=data.frame; o.moving=data.moving;
+    // If the player teleported far (zone entry), snap immediately
+    if(Math.abs(data.x-o.x)>200||Math.abs(data.y-o.y)>200){o.x=data.x;o.y=data.y;}
+  });
   socket.on('zone_players',list=>{
     others={};
-    list.forEach(p=>{others[p.id]=p;});
+    list.forEach(p=>{
+      p.targetX=p.x; p.targetY=p.y; // seed interpolation targets
+      others[p.id]=p;
+    });
     document.getElementById('hud-players').textContent=`${1+Object.keys(others).length} online`;
   });
   socket.on('chat',data=>{
