@@ -424,6 +424,10 @@ function drawBackground(ctx,zone,camPx,camPy,W,H,tick){
   }
   if(zone==='town')            drawTownBG(ctx,camPx,camPy,W,H,tick);
   else if(zone==='wilderness') drawWildernessBG(ctx,camPx,camPy,W,H,tick);
+  else if(zone==='cavern')     drawCavernBG(ctx,W,H,tick);
+  else if(zone==='hideout')    drawHideoutBG(ctx,W,H,tick);
+  else if(zone==='ruins')      drawRuinsBG(ctx,W,H,tick);
+  else if(zone==='village')    drawVillageBG(ctx,W,H,tick);
   else                         drawInteriorBG(ctx,zone,W,H,tick);
 }
 
@@ -758,6 +762,76 @@ function drawDungeonCeiling(ctx,W,tick){
   ctx.fillStyle='#160030';ctx.fillRect(0,60,W,4);ctx.fillStyle='#220044';ctx.fillRect(0,60,W,1);
 }
 
+// ── CRYSTAL CAVERN CEILING ────────────────────────────────────────────────────
+function drawCavernCeiling(ctx,W,tick){
+  // Dark icy rock ceiling
+  ctx.fillStyle='#020818';ctx.fillRect(0,0,W,64);
+  // Stone texture bands
+  ['#030C1E','#040E22','#020A18','#050F24'].forEach((col,i,a)=>{
+    ctx.fillStyle=col;ctx.fillRect(0,i*(48/a.length),W,48/a.length+1);
+  });
+  // Stalactite formations hanging down
+  const stalPos=[W*0.08,W*0.18,W*0.30,W*0.42,W*0.55,W*0.65,W*0.76,W*0.88,W*0.95];
+  stalPos.forEach((sx,i)=>{
+    const sh=18+Math.round(Math.sin(i*1.9)*10); // varied heights
+    const sw=5+Math.round(Math.abs(Math.sin(i*2.3))*4);
+    ctx.fillStyle='#0A1828';ctx.fillRect(sx-sw/2,0,sw+2,sh+3);
+    ctx.fillStyle='#1A3450';ctx.fillRect(sx-sw/2,0,sw,sh);
+    ctx.fillStyle='#2A5080';ctx.fillRect(sx-sw/2,0,Math.ceil(sw*0.4),sh-4);
+    // Ice crystal tip
+    ctx.fillStyle='#80C0FF';ctx.fillRect(sx-1,sh-2,3,5);
+    ctx.fillStyle='#CCEEFF';ctx.fillRect(sx,sh,1,3);
+  });
+  // Glowing ice seams
+  [W*0.2,W*0.5,W*0.8].forEach((gx,i)=>{
+    const g=ctx.createRadialGradient(gx,0,0,gx,0,30);
+    g.addColorStop(0,`rgba(100,180,255,${0.12+0.06*Math.sin(tick*0.07+i)})`);
+    g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.fillRect(gx-30,0,60,40);
+  });
+  // Bottom trim / transition to tiles
+  ctx.fillStyle='#061020';ctx.fillRect(0,58,W,6);
+  ctx.fillStyle='#0A1E38';ctx.fillRect(0,58,W,2);
+}
+
+// ── BANDIT HIDEOUT CEILING ────────────────────────────────────────────────────
+function drawHideoutCeiling(ctx,W,tick){
+  // Rough stone + wood plank ceiling
+  ctx.fillStyle='#100800';ctx.fillRect(0,0,W,64);
+  // Stone base
+  ctx.fillStyle='#1A1000';ctx.fillRect(0,0,W,36);
+  // Rough horizontal cracks
+  [8,18,28].forEach(by=>{
+    ctx.fillStyle='#0A0600';ctx.fillRect(0,by,W,2);
+    ctx.fillStyle='#241800';ctx.fillRect(0,by-1,W,1);
+  });
+  // Wooden plank strips over lower part
+  [36,46,56].forEach(by=>{
+    ctx.fillStyle='#2E1A08';ctx.fillRect(0,by,W,9);
+    ctx.fillStyle='#3A2210';ctx.fillRect(0,by,W,3);
+    ctx.fillStyle='#1E0E04';ctx.fillRect(0,by+7,W,2);
+  });
+  // Plank seam lines (vertical)
+  for(let x=40;x<W;x+=48){
+    ctx.fillStyle='#140A02';ctx.fillRect(x,36,2,28);
+  }
+  // 2 hanging torches on rough brackets
+  [W*0.28,W*0.72].forEach((tx2,i)=>{
+    ctx.fillStyle='#2A1800';ctx.fillRect(tx2-2,34,4,10); // bracket
+    ctx.fillStyle='#3A2200';ctx.fillRect(tx2-4,42,8,5);  // torch body
+    // Flame
+    const flick=0.65+0.35*Math.sin(tick*0.18+i*2.1);
+    const fglow=ctx.createRadialGradient(tx2,42,0,tx2,42,22);
+    fglow.addColorStop(0,`rgba(255,140,0,${0.4*flick})`);fglow.addColorStop(1,'transparent');
+    ctx.fillStyle=fglow;ctx.fillRect(tx2-22,22,44,44);
+    ctx.fillStyle=`rgba(255,80,0,${0.5*flick})`;ctx.fillRect(tx2-2,36,4,7);
+    ctx.fillStyle=`rgba(255,160,40,${0.7*flick})`;ctx.fillRect(tx2-1,38,2,4);
+    ctx.fillStyle=`rgba(255,220,80,${0.8*flick})`;ctx.fillRect(tx2,39,1,3);
+  });
+  // Bottom trim
+  ctx.fillStyle='#201208';ctx.fillRect(0,60,W,4);ctx.fillStyle='#301C0C';ctx.fillRect(0,60,W,1);
+}
+
 function renderCeiling(ctx,zone,W,H,tick){
   ctx.clearRect(0,0,W,H);
   if(zone==='world')return;
@@ -766,11 +840,16 @@ function renderCeiling(ctx,zone,W,H,tick){
   else if(zone==='marketplace')drawMarketplaceCeiling(ctx,W,tick);
   else if(zone==='treasury')   drawTreasuryCeiling(ctx,W,tick);
   else if(zone==='dungeon')    drawDungeonCeiling(ctx,W,tick);
+  else if(zone==='cavern')     drawCavernCeiling(ctx,W,tick);
+  else if(zone==='hideout')    drawHideoutCeiling(ctx,W,tick);
+  else if(zone==='ruins')      { /* ruins are open-air — no ceiling */ }
+  else if(zone==='village')    { /* village is open-air — no ceiling */ }
 }
 
 // ── INTERIOR BG ROUTER (cv-bg — solid zone color, behind tiles) ───────────────
 function drawInteriorBG(ctx,zone,W,H,tick){
-  const colors={tavern:'#1A0D00',governance:'#050A1A',marketplace:'#0D0020',treasury:'#000D00',dungeon:'#050008'};
+  const colors={tavern:'#1A0D00',governance:'#050A1A',marketplace:'#0D0020',treasury:'#000D00',dungeon:'#050008',
+    cavern:'#020818',hideout:'#100800',ruins:'#090620',village:'#060A04'};
   ctx.fillStyle=colors[zone]||'#050A1A';ctx.fillRect(0,0,W,H);
 }
 
@@ -1038,6 +1117,190 @@ function drawDungeonBG(ctx,W,H,tick){
   // Heavy vignette
   const vig=ctx.createRadialGradient(W/2,H/2,H*0.1,W/2,H/2,H*0.85);
   vig.addColorStop(0,'transparent');vig.addColorStop(1,'#000000BB');
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+}
+
+// ── CRYSTAL CAVERN BG ────────────────────────────────────────────────────────
+function drawCavernBG(ctx,W,H,tick){
+  ctx.fillStyle='#020818';ctx.fillRect(0,0,W,H);
+  // Deep icy wall — lower half
+  ctx.fillStyle='#040C20';ctx.fillRect(0,H*0.5,W,H*0.5);
+  // Horizontal ice strata bands
+  ['#030D22','#051228','#03101F','#061428'].forEach((col,i,a)=>{
+    ctx.fillStyle=col;ctx.fillRect(0,H*0.5+i*(H*0.5/a.length),W,H*0.5/a.length+1);
+  });
+  // Crystal cluster suggestions on lower wall
+  [[W*0.07,H*0.55],[W*0.2,H*0.62],[W*0.42,H*0.58],[W*0.65,H*0.6],[W*0.8,H*0.55],[W*0.93,H*0.63]].forEach(([cx,cy],i)=>{
+    ctx.fillStyle='#1A3050';ctx.fillRect(cx-5,cy,10,20);
+    ctx.fillStyle='#2A5080';ctx.fillRect(cx-3,cy,6,18);
+    ctx.fillStyle='#4A80C0';ctx.fillRect(cx-1,cy,2,12);
+    ctx.fillStyle='#80C0FF';ctx.fillRect(cx,cy,1,8);
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,20);
+    g.addColorStop(0,`rgba(80,160,255,${0.08+0.04*Math.sin(tick*0.06+i)})`);
+    g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.fillRect(cx-20,cy-10,40,35);
+  });
+  // Upper wall — dark rock face with ice veins
+  ctx.fillStyle='#040B1A';ctx.fillRect(0,0,W,H*0.46);
+  // Vertical ice crack veins
+  [W*0.15,W*0.38,W*0.6,W*0.82].forEach((vx,i)=>{
+    ctx.fillStyle='#102040';ctx.fillRect(vx,0,2,H*0.46);
+    ctx.fillStyle='#204060';ctx.fillRect(vx,0,1,H*0.46);
+    ctx.fillStyle='#4080B0';ctx.fillRect(vx,H*0.1+i*20,1,40);
+    // glow
+    const gv=ctx.createRadialGradient(vx,H*0.23,0,vx,H*0.23,25);
+    gv.addColorStop(0,'rgba(64,128,255,0.08)');gv.addColorStop(1,'transparent');
+    ctx.fillStyle=gv;ctx.fillRect(vx-25,0,50,H*0.46);
+  });
+  // Floor/wall divider strip
+  ctx.fillStyle='#0A1828';ctx.fillRect(0,H*0.47,W,6);
+  ctx.fillStyle='#204060';ctx.fillRect(0,H*0.47,W,2);
+  // Ambient cold glow from ice
+  const coldGlow=ctx.createRadialGradient(W/2,H*0.3,0,W/2,H*0.3,W*0.5);
+  coldGlow.addColorStop(0,'rgba(50,100,200,0.06)');coldGlow.addColorStop(1,'transparent');
+  ctx.fillStyle=coldGlow;ctx.fillRect(0,0,W,H);
+  // Vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.15,W/2,H/2,H*0.9);
+  vig.addColorStop(0,'transparent');vig.addColorStop(1,'#000000AA');
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+}
+
+// ── BANDIT HIDEOUT BG ────────────────────────────────────────────────────────
+function drawHideoutBG(ctx,W,H,tick){
+  ctx.fillStyle='#100800';ctx.fillRect(0,0,W,H);
+  // Rough stone lower walls
+  ctx.fillStyle='#180C04';ctx.fillRect(0,H*0.5,W,H*0.5);
+  // Stone block texture
+  for(let bx=0;bx<W;bx+=36){
+    for(let by=Math.floor(H*0.5);by<H;by+=22){
+      ctx.fillStyle=((bx+by)%72===0)?'#1E1006':'#160A03';
+      ctx.fillRect(bx,by,35,21);
+      ctx.fillStyle='#0A0400';ctx.fillRect(bx+35,by,1,21);ctx.fillRect(bx,by+21,35,1);
+    }
+  }
+  // Stacked crates/barrels (silhouette) at side walls
+  [[W*0.04,H*0.48],[W*0.88,H*0.46]].forEach(([bx2,by2])=>{
+    ctx.fillStyle='#281408';ctx.fillRect(bx2-14,by2,28,H*0.54);
+    ctx.fillStyle='#3A1E0C';ctx.fillRect(bx2-12,by2+2,24,14);
+    ctx.fillStyle='#1C0C04';ctx.fillRect(bx2-12,by2+16,24,14);
+    ctx.fillStyle='#3A1E0C';ctx.fillRect(bx2-12,by2+30,24,16);
+  });
+  // Upper wall with rough stone and smoke stains
+  ctx.fillStyle='#160C04';ctx.fillRect(0,0,W,H*0.46);
+  // Horizontal mortar lines
+  [H*0.1,H*0.2,H*0.32,H*0.42].forEach(hy=>{
+    ctx.fillStyle='#0C0804';ctx.fillRect(0,hy,W,2);
+  });
+  // Smoke stains above torch positions
+  [W*0.3,W*0.7].forEach((sx,i)=>{
+    const sG=ctx.createRadialGradient(sx,H*0.46,0,sx,H*0.46,40);
+    sG.addColorStop(0,'rgba(10,5,0,0.3)');sG.addColorStop(1,'transparent');
+    ctx.fillStyle=sG;ctx.fillRect(sx-40,H*0.2,80,H*0.26);
+    // Warm torch glow on wall
+    const tG=ctx.createRadialGradient(sx,H*0.44,0,sx,H*0.44,50);
+    const flick=0.6+0.4*Math.sin(tick*0.17+i*2);
+    tG.addColorStop(0,`rgba(255,140,30,${0.12*flick})`);tG.addColorStop(1,'transparent');
+    ctx.fillStyle=tG;ctx.fillRect(sx-50,H*0.2,100,H*0.26);
+  });
+  // Wall/floor divider
+  ctx.fillStyle='#201008';ctx.fillRect(0,H*0.47,W,6);
+  ctx.fillStyle='#3A1C0A';ctx.fillRect(0,H*0.47,W,2);
+  // Vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.15,W/2,H/2,H*0.9);
+  vig.addColorStop(0,'transparent');vig.addColorStop(1,'#000000A0');
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+}
+
+// ── ANCIENT RUINS BG ─────────────────────────────────────────────────────────
+function drawRuinsBG(ctx,W,H,tick){
+  // Open-air night sky — ancient atmosphere
+  const sky=ctx.createLinearGradient(0,0,0,H*0.55);
+  sky.addColorStop(0,'#0A0520');sky.addColorStop(0.5,'#150A30');sky.addColorStop(1,'#1E1040');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.55);
+  // Stars (static)
+  ctx.fillStyle='#FFFFFF';
+  [[W*0.08,H*0.05],[W*0.2,H*0.12],[W*0.33,H*0.04],[W*0.48,H*0.08],[W*0.6,H*0.03],
+   [W*0.73,H*0.10],[W*0.85,H*0.06],[W*0.94,H*0.13],[W*0.15,H*0.18],[W*0.55,H*0.16],
+  ].forEach(([sx,sy])=>{ctx.fillRect(sx,sy,1,1);ctx.fillStyle='#FFFFFF';});
+  // Ruined colonnade silhouette on distant wall
+  [W*0.08,W*0.24,W*0.4,W*0.58,W*0.74,W*0.9].forEach((px,i)=>{
+    const ph=H*0.25+(i%2)*H*0.08;
+    ctx.fillStyle='#0E0828';ctx.fillRect(px-10,H*0.32-ph,20,ph);
+    ctx.fillStyle='#14103A';ctx.fillRect(px-8,H*0.32-ph,16,ph);
+    // broken tops on alternate columns
+    if(i%3===1){
+      ctx.fillStyle='#0E0828';ctx.fillRect(px-14,H*0.32-ph-8,28,10);
+    }
+  });
+  // Stone floor — ancient mossy slabs
+  ctx.fillStyle='#0C0A1E';ctx.fillRect(0,H*0.55,W,H*0.45);
+  for(let bx=0;bx<W;bx+=42){
+    for(let by=Math.floor(H*0.55);by<H;by+=28){
+      ctx.fillStyle=((bx+by)%84===0)?'#100E26':'#0E0C22';
+      ctx.fillRect(bx,by,41,27);
+      ctx.fillStyle='#08061A';ctx.fillRect(bx+41,by,1,27);ctx.fillRect(bx,by+27,41,1);
+    }
+  }
+  // Moss patches on floor
+  ctx.fillStyle='#0A1408';
+  [[W*0.15,H*0.6],[W*0.35,H*0.7],[W*0.6,H*0.65],[W*0.8,H*0.72]].forEach(([mx,my])=>{
+    ctx.fillRect(mx-10,my,20,8);ctx.fillRect(mx-7,my-3,14,5);
+  });
+  // Divider strip
+  ctx.fillStyle='#100E28';ctx.fillRect(0,H*0.55,W,5);
+  ctx.fillStyle='#1E1A40';ctx.fillRect(0,H*0.55,W,2);
+  // Mystic ambient glow
+  const mg=ctx.createRadialGradient(W/2,H*0.4,0,W/2,H*0.4,W*0.45);
+  mg.addColorStop(0,'rgba(80,40,160,0.08)');mg.addColorStop(1,'transparent');
+  ctx.fillStyle=mg;ctx.fillRect(0,0,W,H);
+  // Vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.15,W/2,H/2,H*0.9);
+  vig.addColorStop(0,'transparent');vig.addColorStop(1,'#00000099');
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+}
+
+// ── ABANDONED VILLAGE BG ─────────────────────────────────────────────────────
+function drawVillageBG(ctx,W,H,tick){
+  // Overcast dim sky — abandoned outdoor feel
+  const sky=ctx.createLinearGradient(0,0,0,H*0.5);
+  sky.addColorStop(0,'#151008');sky.addColorStop(0.5,'#201808');sky.addColorStop(1,'#2A2010');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.5);
+  // Distant tree line silhouette
+  ctx.fillStyle='#0C0A06';
+  for(let i=0;i<20;i++){
+    const tx=i*(W/18);
+    const th=H*0.14+H*0.08*Math.abs(Math.sin(i*1.7));
+    ctx.fillRect(tx-8,H*0.38-th,16,th+H*0.15);
+    // tree crown
+    ctx.fillRect(tx-14,H*0.36-th,28,th*0.4);
+  }
+  // Ruined roof silhouettes mid-distance
+  [[W*0.1,H*0.35],[W*0.4,H*0.32],[W*0.65,H*0.34],[W*0.88,H*0.36]].forEach(([rx,ry],i)=>{
+    ctx.fillStyle='#0E0A06';
+    ctx.fillRect(rx-20,ry,40,H*0.18); // wall
+    // broken roof angle
+    ctx.fillRect(rx-24,ry,4,18);
+    ctx.fillRect(rx+20,ry,4,18);
+    if(i%2===0){ctx.fillRect(rx-24,ry-10,26,12);} // left roof half
+    else{ctx.fillRect(rx+0,ry-10,24,12);}          // right roof half
+  });
+  // Dirt ground
+  ctx.fillStyle='#1A1208';ctx.fillRect(0,H*0.5,W,H*0.5);
+  // Dirt path texture
+  ctx.fillStyle='#221808';
+  for(let gx=0;gx<W;gx+=18){ctx.fillRect(gx,H*0.5,1,H*0.5);}
+  for(let gy=Math.floor(H*0.5);gy<H;gy+=14){ctx.fillRect(0,gy,W,1);}
+  // Overgrown weeds/grass patches
+  ctx.fillStyle='#0E1208';
+  [[W*0.12,H*0.55],[W*0.3,H*0.62],[W*0.5,H*0.58],[W*0.7,H*0.65],[W*0.88,H*0.6]].forEach(([gx2,gy2])=>{
+    ctx.fillRect(gx2-8,gy2,16,6);ctx.fillRect(gx2-5,gy2-4,10,6);ctx.fillRect(gx2-3,gy2-7,6,5);
+  });
+  // Wall/ground divider
+  ctx.fillStyle='#201408';ctx.fillRect(0,H*0.5,W,5);
+  ctx.fillStyle='#301E0C';ctx.fillRect(0,H*0.5,W,2);
+  // Vignette (warm, desaturated)
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.15,W/2,H/2,H*0.9);
+  vig.addColorStop(0,'transparent');vig.addColorStop(1,'#00000098');
   ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
 }
 

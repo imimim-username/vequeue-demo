@@ -257,6 +257,30 @@ const WORLD_MAP=(()=>{
    [5,180],[8,195],[12,188],[16,210],[18,175],[60,172],[65,195],[70,183],[75,205],
   ].forEach(([r,c])=>s(r,c,T.TREE));
 
+  // ── WILDERNESS SUB-ZONE ENTRANCES ─────────────────────────────────────────
+  // Crystal Cavern entrance (NW danger zone, row 8 col 70)
+  f(7,68,10,73,T.STONE);          // stone outcropping
+  s(9,69,T.WALL);s(9,70,T.WALL);s(9,71,T.WALL); // cave mouth top
+  s(10,69,T.GRATING);s(10,70,T.GRATING);s(10,71,T.GRATING); // entry tiles
+  s(6,70,T.SIGN);                  // sign marker
+
+  // Bandit Hideout entrance (SW danger zone, row 120 col 40)
+  f(118,37,122,44,T.STONE);        // ruined stone building
+  s(118,39,T.WALL);s(118,40,T.WALL);s(118,41,T.WALL);
+  s(120,39,T.GRATING);s(120,40,T.GRATING);s(120,41,T.GRATING); // entry
+  s(117,40,T.SIGN);
+
+  // Ancient Ruins entrance (NE danger zone, row 8 col 185)
+  f(6,182,11,190,T.STONE);         // ruined outer wall
+  s(6,184,T.COLUMN);s(6,188,T.COLUMN);
+  s(9,185,T.GRATING);s(9,186,T.GRATING);s(9,187,T.GRATING); // entry
+  s(5,185,T.SIGN);
+
+  // Abandoned Village entrance (central south, row 106 col 97)
+  f(104,93,108,101,T.DIRT);        // dusty village approach
+  s(104,95,T.SIGN);
+  s(106,95,T.GRATING);s(106,96,T.GRATING);s(106,97,T.GRATING); // entry
+
   return m;
 })();
 
@@ -266,7 +290,100 @@ const ZONE_MAPS = {
   governance: makeGovernance(),
   marketplace: makeMarketplace(),
   treasury: makeTreasury(),
+  cavern: makeCavern(),
+  hideout: makeHideout(),
+  ruins: makeRuins(),
+  village: makeVillage(),
 };
+
+// ── WILDERNESS SUB-ZONE MAPS ─────────────────────────────────────────────────
+
+function makeCavern(){
+  // 22×15 — Crystal Cavern (icy stone passages, frozen columns)
+  const{m,fill,wall}=makeInterior(22,15,T.STONE);
+  // Ice crystal columns
+  m[2][3]=T.COLUMN;m[2][18]=T.COLUMN;m[12][3]=T.COLUMN;m[12][18]=T.COLUMN;
+  m[5][10]=T.COLUMN;m[5][11]=T.COLUMN;m[9][10]=T.COLUMN;m[9][11]=T.COLUMN;
+  // Frozen grating pools
+  fill(4,5,6,8,T.GRATING);fill(8,13,10,16,T.GRATING);
+  // Rocky interior walls (create maze-like passages)
+  fill(3,5,3,8,T.WALL);fill(11,13,11,16,T.WALL);
+  fill(6,14,8,14,T.WALL);fill(5,7,9,7,T.WALL);
+  // Entry door (south) — player arrives from world
+  m[14][10]=T.DOOR_O;m[14][11]=T.DOOR_O;
+  // Exit same south door; boss chamber hint at north
+  fill(1,8,2,13,T.VAULT);  // icy throne area at the north
+  m[1][10]=T.COLUMN;m[1][11]=T.COLUMN;
+  // Velvet rugs as ice patches
+  fill(7,1,8,4,T.VELVET);fill(4,17,6,20,T.VELVET);
+  return m;
+}
+
+function makeHideout(){
+  // 22×15 — Bandit Hideout (rough stone walls, plank floors, treasure)
+  const{m,fill,wall}=makeInterior(22,15,T.PLANK);
+  // Rough stone walls subdividing the space
+  fill(4,8,10,9,T.WALL);  // central divider with gap
+  m[7][8]=T.PLANK;m[7][9]=T.PLANK; // gap in divider
+  // Treasure room (north side)
+  fill(1,1,3,20,T.VAULT);
+  m[3][10]=T.VAULT;m[3][11]=T.VAULT; // passage south through vault
+  // Counter tops (make-shift tables)
+  fill(5,1,6,5,T.COUNTER);fill(5,11,6,15,T.COUNTER);
+  fill(9,11,10,20,T.COUNTER);
+  // Columns (load-bearing posts)
+  m[4][2]=T.COLUMN;m[4][19]=T.COLUMN;m[11][2]=T.COLUMN;m[11][19]=T.COLUMN;
+  // Entry door south
+  m[14][10]=T.DOOR_O;m[14][11]=T.DOOR_O;
+  return m;
+}
+
+function makeRuins(){
+  // 24×16 — Ancient Ruins (open-air feel: columns, vault floors, overgrown)
+  const{m,fill,wall}=makeInterior(24,16,T.MARBLE);
+  // Central courtyard (open stone)
+  fill(4,4,11,19,T.STONE);
+  // Raised vault dais in center
+  fill(6,9,9,14,T.VAULT);
+  // Colonnade rows (N and S edges)
+  [2,6,10,14,18,21].forEach(c=>{m[2][c]=T.COLUMN;m[13][c]=T.COLUMN;});
+  // Inner shrubs (overgrown)
+  m[5][5]=T.SHRUB;m[5][18]=T.SHRUB;m[10][5]=T.SHRUB;m[10][18]=T.SHRUB;
+  m[4][11]=T.SHRUB;m[11][11]=T.SHRUB;
+  // Grating (ritual circles)
+  fill(7,10,8,13,T.GRATING);
+  // Entry south
+  m[15][11]=T.DOOR_O;m[15][12]=T.DOOR_O;
+  // Broken walls (rubble patches)
+  fill(3,1,3,3,T.WALL);fill(3,20,3,22,T.WALL);
+  fill(12,1,12,3,T.WALL);fill(12,20,12,22,T.WALL);
+  return m;
+}
+
+function makeVillage(){
+  // 22×15 — Abandoned Village (outdoor village, dirt paths, ruined buildings)
+  const{m,fill,wall}=makeInterior(22,15,T.DIRT);
+  // Dirt paths through village
+  fill(7,1,7,20,T.PATH);  // horizontal main path
+  fill(1,10,13,11,T.PATH); // vertical path
+  // Three ruined building footprints
+  fill(2,2,5,8,T.PLANK);   // SW building
+  fill(2,13,5,19,T.PLANK); // SE building
+  fill(9,2,12,8,T.STONE);  // NW building (stone ruin)
+  // Walls around buildings (broken — gaps represent collapsed walls)
+  for(let c=2;c<=8;c++){m[2][c]=T.WALL;m[5][c]=T.WALL;}
+  m[2][2]=T.WALL;m[2][8]=T.WALL;m[5][2]=T.WALL;m[5][8]=T.WALL;
+  m[3][8]=T.PLANK;m[4][8]=T.PLANK; // gap in east wall of SW building
+  for(let c=13;c<=19;c++){m[2][c]=T.WALL;}
+  m[2][13]=T.WALL;m[2][19]=T.WALL;m[5][13]=T.WALL;m[5][19]=T.WALL;
+  // Overgrown areas
+  [3,14],[4,17],[10,17],[11,15],[6,3],[6,18].forEach(([r,c])=>{m[r][c]=T.SHRUB;});
+  // Well in centre
+  m[7][10]=T.FOUNTAIN;m[7][11]=T.FOUNTAIN;
+  // Entry south
+  m[14][10]=T.DOOR_O;m[14][11]=T.DOOR_O;
+  return m;
+}
 
 function makeInterior(w,h,fill_tile){
   const m=Array.from({length:h},()=>new Array(w).fill(fill_tile));
@@ -360,6 +477,10 @@ const ZONES = {
   treasury:   {map:ZONE_MAPS.treasury,    w:20,h:13,spawnX:10,spawnY:2, solid:SOLID_TILES,
                name:'Treasury',bg:'treasury'},
   dungeon:    {map:DUNGEON_MAP,            w:DGN_W,h:DGN_H,spawnX:8,spawnY:6, solid:SOLID_TILES, name:'Ancient Dungeon',bg:'dungeon'},
+  cavern:     {map:ZONE_MAPS.cavern,       w:22,h:15,spawnX:11,spawnY:12, solid:SOLID_TILES, name:'Crystal Cavern',   bg:'cavern'},
+  hideout:    {map:ZONE_MAPS.hideout,      w:22,h:15,spawnX:11,spawnY:12, solid:SOLID_TILES, name:'Bandit Hideout',   bg:'hideout'},
+  ruins:      {map:ZONE_MAPS.ruins,        w:24,h:16,spawnX:12,spawnY:13, solid:SOLID_TILES, name:'Ancient Ruins',    bg:'ruins'},
+  village:    {map:ZONE_MAPS.village,      w:22,h:15,spawnX:11,spawnY:12, solid:SOLID_TILES, name:'Abandoned Village',bg:'village'},
 };
 
 // Zone entrance/exit connections
@@ -471,6 +592,70 @@ const NPCS = {
      dialog:['Need more bag space? I can help — for a price.','Inventory can be expanded up to 12 slots total.'],
      invUpgrade:true},
   ],
+  cavern:[
+    { id:'miner_gundra', x:11, y:8, type:'merchant', face:2, name:'Miner Gundra', questId:'cavern_quest',
+      dialog:[
+        "This cavern runs deep — deeper than anyone has mapped.",
+        "The Ice Trolls are the least of the dangers. There's something colder further in.",
+        "But for now? Three trolls dead and I'll share a discovery from the ice.",
+      ]
+    },
+    { id:'cavern_survivor', x:4, y:5, type:'guard', face:1, name:'Frostbitten Miner',
+      dialog:[
+        "Watch the ice patches — they crack without warning.",
+        "The crystal columns seem to grow. I've been here a week and they're taller.",
+        "I don't think I'm getting out of this cavern alive.",
+      ]
+    },
+  ],
+  hideout:[
+    { id:'captain_dura', x:11, y:7, type:'guard', face:2, name:'Captain Dura', questId:'hideout_quest',
+      dialog:[
+        "Marshal Corps. We tracked the Bandit Raiders here weeks ago.",
+        "There are dozens of them — too many for my squad. We need a champion.",
+        "Clear six Raiders and the trade roads open up. Simple as that.",
+      ]
+    },
+    { id:'hideout_prisoner', x:3, y:7, type:'merchant', face:1, name:'Merchant Prisoner',
+      dialog:[
+        "They caught me on the road — took everything. My cart, my goods, my horse.",
+        "I've been here three days. Please, just get me out of here.",
+        "The Raider leader is somewhere deeper in the hideout. He's the dangerous one.",
+      ]
+    },
+  ],
+  ruins:[
+    { id:'scholar_vex', x:12, y:7, type:'wizard', face:2, name:'Scholar Vex', questId:'ruins_quest',
+      dialog:[
+        "These ruins predate every civilization I've studied. Astonishing.",
+        "The Specters seem bound to the ruins — remnants of the original inhabitants.",
+        "Banish four of them and I'll give you a tome I recovered from the outer ring.",
+      ]
+    },
+    { id:'ruins_echo', x:5, y:4, type:'guard', face:0, name:'Ancient Echo',
+      dialog:[
+        "...We built... for eternity...",
+        "...The vault holds... what we could not carry...",
+        "...Seek... the centre...",
+      ]
+    },
+  ],
+  village:[
+    { id:'aldric', x:11, y:8, type:'merchant', face:2, name:'Aldric', questId:'village_quest',
+      dialog:[
+        "I grew up here. Twenty families lived in this village.",
+        "Then the Guardian appeared — ancient, unstoppable. We had nothing to fight it with.",
+        "If you can defeat the Guardian, maybe... maybe the village can live again.",
+      ]
+    },
+    { id:'village_ghost', x:4, y:4, type:'guard', face:1, name:'Village Memory',
+      dialog:[
+        "We had a good life here. Simple. Honest.",
+        "The Guardian appeared one day without warning. It didn't speak. It just...",
+        "It destroyed everything it touched. There was no malice. Just purpose.",
+      ]
+    },
+  ],
   dungeon:[
     { id:'dungeon_ghost', x:33, y:7, type:'guard', face:2, name:'Restless Spirit',
       dialog:[
@@ -519,5 +704,18 @@ const ZONE_DOORS = {
   world_dungeon:   {from:'world', tileRows:[139,140,141,142,143,144], tileCols:[108,109,110,111], to:'dungeon', sx:8, sy:6},
   // Dungeon exit: spawn NORTH of the grating (row 134) so player doesn't immediately re-trigger dungeon entry when walking back to town
   dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:134},
+  // ── Wilderness sub-zone entrances/exits ────────────────────────────────
+  // Crystal Cavern (NW danger, row 10 cols 69-71)
+  world_cavern:    {from:'world', tileRows:[10,11], tileCols:[69,70,71], to:'cavern', sx:11, sy:12},
+  cavern_exit:     {from:'cavern', tileRows:[14], tileCols:[10,11], to:'world', sx:70, sy:8},
+  // Bandit Hideout (SW danger, row 120 cols 39-41)
+  world_hideout:   {from:'world', tileRows:[120,121], tileCols:[39,40,41], to:'hideout', sx:11, sy:12},
+  hideout_exit:    {from:'hideout', tileRows:[14], tileCols:[10,11], to:'world', sx:40, sy:118},
+  // Ancient Ruins (NE danger, row 9 cols 185-187)
+  world_ruins:     {from:'world', tileRows:[9,10], tileCols:[185,186,187], to:'ruins', sx:12, sy:13},
+  ruins_exit:      {from:'ruins', tileRows:[15], tileCols:[11,12], to:'world', sx:186, sy:7},
+  // Abandoned Village (central south, row 106 cols 95-97)
+  world_village:   {from:'world', tileRows:[106,107], tileCols:[95,96,97], to:'village', sx:11, sy:12},
+  village_exit:    {from:'village', tileRows:[14], tileCols:[10,11], to:'world', sx:96, sy:104},
 };
 

@@ -42,6 +42,10 @@ const G = {
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
   shop:null,            // {vendorId} — active shop or null
   dungeonBossDefeated:false,
+  cavernBossDefeated:false,
+  hideoutBossDefeated:false,
+  ruinsBossDefeated:false,
+  villageBossDefeated:false,
   worldLoot:[],
   marketListings:[],
   livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
@@ -212,7 +216,7 @@ function getQuestDialog(npc){
     ];
   }
   if(qs.status==='ready'){
-    const rp=[qdef.reward.xp&&`+${qdef.reward.xp} XP`,qdef.reward.alUSD&&`+${qdef.reward.alUSD} alUSD`,qdef.reward.alETH&&`+${qdef.reward.alETH} alETH`,qdef.reward.alcx&&`+${qdef.reward.alcx} ALCX`].filter(Boolean).join(', ');
+    const rp=[qdef.reward.xp&&`+${qdef.reward.xp} XP`,qdef.reward.alUSD&&`+${qdef.reward.alUSD} alUSD`,qdef.reward.alETH&&`+${qdef.reward.alETH} alETH`,qdef.reward.alcx&&`+${qdef.reward.alcx} ALCX`,qdef.reward.item&&`${qdef.reward.item.icon} ${qdef.reward.item.name}`].filter(Boolean).join(', ');
     return[...qdef.readyLines,`[ Claim reward: ${rp} ]`];
   }
   // completed
@@ -239,6 +243,22 @@ function handleQuestDialogClose(npc){
     if(qdef.reward.alcx)G.alcx=parseFloat((G.alcx+qdef.reward.alcx).toFixed(4));
     G.xp+=qdef.reward.xp;
     checkLevelUp();
+    // Item reward — place in first free inventory slot (2-7)
+    if(qdef.reward.item){
+      const iSlot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+      if(iSlot!==-1){
+        G.inventory[iSlot]=qdef.reward.item;
+        // Apply stat boost (relic type)
+        if(qdef.reward.item.statBoost){
+          for(const[st,v] of Object.entries(qdef.reward.item.statBoost)){
+            G.stats[st]=(G.stats[st]||0)+v;
+          }
+          chatLog(`Relic bonus: ${Object.entries(qdef.reward.item.statBoost).map(([k,v])=>`+${v} ${k.toUpperCase()}`).join(', ')}!`,'#FFD700');
+        }
+      } else {
+        chatLog(`Inventory full! Item lost: ${qdef.reward.item.icon} ${qdef.reward.item.name}`,'#FF8800');
+      }
+    }
     qs.status='completed';
     SFX.questComplete();
     SFX.coin();
@@ -247,6 +267,7 @@ function handleQuestDialogClose(npc){
       qdef.reward.alUSD&&`+${qdef.reward.alUSD} alUSD`,
       qdef.reward.alETH&&`+${qdef.reward.alETH} alETH`,
       qdef.reward.alcx&&`+${qdef.reward.alcx} ALCX`,
+      qdef.reward.item&&`${qdef.reward.item.icon} ${qdef.reward.item.name}`,
     ].filter(Boolean).join(', ');
     chatLog(`★ Quest complete: "${qdef.title}"! ${rewardParts}`,'#4CAF50');
     if(G.paused)renderInventoryScreen();
@@ -625,7 +646,8 @@ function playerPowerLevel(){
 function makeScaledEnemy(key,depth){
   const tmpl=ENEMIES[key];
   const pl=playerPowerLevel();
-  const baseMult={wolf:0.65,goblin:0.55,skeleton:0.82,darkKnight:1.15,lich:2.2}[key]||0.75;
+  const baseMult={wolf:0.65,goblin:0.55,skeleton:0.82,darkKnight:1.15,lich:2.2,
+    iceTroll:0.88,bandit:0.60,specter:0.75,ruinGuardian:1.20}[key]||0.75;
   const depthBonus=Math.min(0.15,depth/130); // up to +15% at the very bottom
   const m=baseMult+depthBonus;
   return{
@@ -696,6 +718,44 @@ function checkBossEncounter(){
   if(ty>=26&&tx>=23&&tx<=47){
     chatLog('★ The air grows cold... something ancient stirs!','#AA00FF');
     triggerBattle('lich',999);
+  }
+}
+
+// Sub-zone random encounters — each zone has its own encounter table
+const SUBZONE_ENCOUNTERS = {
+  cavern:  {pool:['iceTroll','iceTroll','wolf'],    rate:0.20, depth:25},
+  hideout: {pool:['bandit','bandit','bandit','wolf'],rate:0.22, depth:20},
+  ruins:   {pool:['specter','specter','skeleton'],  rate:0.20, depth:28},
+  village: {pool:['ruinGuardian','skeleton','wolf'],rate:0.18, depth:30},
+};
+// Boss-like zone bosses (one per zone, flagged on G)
+const SUBZONE_BOSSES = {
+  cavern:  {flag:'cavernBossDefeated',  enemy:'iceTroll',  area:{tx0:3,ty0:1,tx1:19,ty1:4}},
+  hideout: {flag:'hideoutBossDefeated', enemy:'bandit',    area:{tx0:3,ty0:1,tx1:19,ty1:4}},
+  ruins:   {flag:'ruinsBossDefeated',   enemy:'ruinGuardian',area:{tx0:7,ty0:5,tx1:16,ty1:11}},
+  village: {flag:'villageBossDefeated', enemy:'ruinGuardian',area:{tx0:6,ty0:7,tx1:15,ty1:12}},
+};
+
+function checkSubZoneEncounter(){
+  if(G.battle)return;
+  if(!G.moving)return;
+  if(G.tick%55!==0)return;
+  const enc=SUBZONE_ENCOUNTERS[G.zone];
+  if(!enc)return;
+  if(Math.random()>enc.rate)return;
+  const key=enc.pool[Math.floor(Math.random()*enc.pool.length)];
+  triggerBattle(key,enc.depth);
+}
+
+function checkSubZoneBoss(){
+  const bossInfo=SUBZONE_BOSSES[G.zone];
+  if(!bossInfo)return;
+  if(G.battle||G[bossInfo.flag])return;
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  const {tx0,ty0,tx1,ty1}=bossInfo.area;
+  if(tx>=tx0&&tx<=tx1&&ty>=ty0&&ty<=ty1){
+    chatLog(`★ The ${ENEMIES[bossInfo.enemy]?.name||'creature'} senses an intruder!`,'#AA00FF');
+    triggerBattle(bossInfo.enemy,40);
   }
 }
 
@@ -791,13 +851,150 @@ function drawEnemySprite(ctx,type,x,y){
   ctx.save();ctx.translate(Math.round(x),Math.round(y));
   const S=4;
   switch(type){
-    case'wolf':      drawBattleWolf(ctx,S);      break;
-    case'skeleton':  drawBattleSkeleton(ctx,S);  break;
-    case'goblin':    drawBattleGoblin(ctx,S);     break;
-    case'darkKnight':drawBattleDarkKnight(ctx,S); break;
-    case'lich':      drawBattleLich(ctx,S);       break;
+    case'wolf':        drawBattleWolf(ctx,S);        break;
+    case'skeleton':    drawBattleSkeleton(ctx,S);    break;
+    case'goblin':      drawBattleGoblin(ctx,S);      break;
+    case'darkKnight':  drawBattleDarkKnight(ctx,S);  break;
+    case'lich':        drawBattleLich(ctx,S);        break;
+    case'iceTroll':    drawBattleIceTroll(ctx,S);    break;
+    case'bandit':      drawBattleBandit(ctx,S);      break;
+    case'specter':     drawBattleSpecter(ctx,S);     break;
+    case'ruinGuardian':drawBattleRuinGuardian(ctx,S);break;
   }
   ctx.restore();
+}
+
+function drawBattleIceTroll(ctx,S){
+  // big chunky ice-blue brute
+  const body='#3A7AB0',dark='#1A4A70',light='#7ABAEE',ice='#CCEEFF',eye='#FF2200';
+  ctx.fillStyle='#00000030';ctx.fillRect(S,S*18,S*20,S*2); // shadow
+  // torso
+  ctx.fillStyle=body;ctx.fillRect(S*3,S*7,S*14,S*13);
+  ctx.fillStyle=light;ctx.fillRect(S*4,S*8,S*4,S*4); // chest highlight
+  ctx.fillStyle=dark;ctx.fillRect(S*14,S*8,S*2,S*10); // shadow side
+  // arms
+  ctx.fillStyle=dark;ctx.fillRect(0,S*8,S*4,S*9);
+  ctx.fillStyle=body;ctx.fillRect(S,S*9,S*3,S*8);
+  ctx.fillStyle=dark;ctx.fillRect(S*17,S*8,S*4,S*9);
+  ctx.fillStyle=body;ctx.fillRect(S*18,S*9,S*3,S*8);
+  // claws
+  ctx.fillStyle=ice;
+  [0,S*2,S*4].forEach(dx=>{ctx.fillRect(dx,S*17,S,S*3);ctx.fillRect(S*18+dx,S*17,S,S*3);});
+  // legs
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*19,S*5,S*5);
+  ctx.fillStyle=body;ctx.fillRect(S*5,S*19,S*4,S*4);
+  ctx.fillStyle=dark;ctx.fillRect(S*11,S*19,S*5,S*5);
+  ctx.fillStyle=body;ctx.fillRect(S*12,S*19,S*4,S*4);
+  // head
+  ctx.fillStyle=body;ctx.fillRect(S*3,S,S*14,S*7);
+  ctx.fillStyle=light;ctx.fillRect(S*4,S*2,S*5,S*3);
+  // eyes
+  ctx.fillStyle=eye;ctx.fillRect(S*5,S*2,S*2,S*2);ctx.fillRect(S*12,S*2,S*2,S*2);
+  ctx.fillStyle='#FFF';ctx.fillRect(S*5,S*2,S,S);ctx.fillRect(S*12,S*2,S,S);
+  // horns
+  ctx.fillStyle=ice;
+  ctx.fillRect(S*5,0,S*2,S*2);ctx.fillRect(S*4,0,S,S);
+  ctx.fillRect(S*13,0,S*2,S*2);ctx.fillRect(S*15,0,S,S);
+  // ice shards on body
+  ctx.fillStyle=ice;
+  ctx.fillRect(S*8,S*8,S*2,S*4);ctx.fillRect(S*13,S*12,S*2,S*3);
+}
+
+function drawBattleBandit(ctx,S){
+  const skin='#C8A050',cloth='#4A3020',armor='#606060',mask='#2A1808',blade='#D0D8E0';
+  ctx.fillStyle='#00000030';ctx.fillRect(S*2,S*18,S*16,S*2); // shadow
+  // legs
+  ctx.fillStyle=cloth;ctx.fillRect(S*4,S*14,S*5,S*6);ctx.fillRect(S*11,S*14,S*5,S*6);
+  // boots
+  ctx.fillStyle='#1A0A00';ctx.fillRect(S*4,S*18,S*5,S*4);ctx.fillRect(S*11,S*18,S*5,S*4);
+  // torso / jacket
+  ctx.fillStyle=cloth;ctx.fillRect(S*4,S*8,S*12,S*8);
+  ctx.fillStyle=armor;ctx.fillRect(S*5,S*9,S*10,S*5); // chest plate
+  ctx.fillStyle='#808080';ctx.fillRect(S*6,S*10,S*8,S*3); // plate highlight
+  // arms
+  ctx.fillStyle=cloth;ctx.fillRect(0,S*8,S*5,S*7);ctx.fillRect(S*15,S*8,S*5,S*7);
+  ctx.fillStyle=skin;ctx.fillRect(0,S*13,S*4,S*4);ctx.fillRect(S*16,S*13,S*4,S*4);
+  // head + mask
+  ctx.fillStyle=skin;ctx.fillRect(S*5,S*2,S*10,S*7);
+  ctx.fillStyle=mask;ctx.fillRect(S*5,S*4,S*10,S*3); // bandit mask
+  ctx.fillStyle=cloth;ctx.fillRect(S*4,S,S*12,S*3); // hood
+  // eyes (gleam over mask)
+  ctx.fillStyle='#FF8800';ctx.fillRect(S*6,S*5,S*2,S*2);ctx.fillRect(S*12,S*5,S*2,S*2);
+  // knife / blade in one hand
+  ctx.fillStyle='#1A0A00';ctx.fillRect(S*17,S*9,S,S*6);
+  ctx.fillStyle=blade;ctx.fillRect(S*16,S*7,S,S*7);
+}
+
+function drawBattleSpecter(ctx,S){
+  const base='#7A60CC',glow='#AA88FF',dark='#3A2060',eye='#FFFFFF',aura='#6040AA';
+  // ethereal glow aura
+  ctx.fillStyle='#8060CC18';
+  ctx.beginPath();ctx.arc(S*10,S*10,S*10,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#AA88FF10';
+  ctx.beginPath();ctx.arc(S*10,S*10,S*13,0,Math.PI*2);ctx.fill();
+  // wispy lower form (tapers)
+  ctx.fillStyle=dark;
+  ctx.fillRect(S*5,S*14,S*10,S*6);
+  ctx.fillRect(S*4,S*15,S*12,S*5);
+  ctx.fillRect(S*3,S*16,S*14,S*4);
+  ctx.fillRect(S*2,S*18,S*16,S*2);
+  // wisp tendrils
+  ctx.fillStyle=aura;
+  ctx.fillRect(S*2,S*19,S*2,S*3);ctx.fillRect(S*7,S*20,S*2,S*4);
+  ctx.fillRect(S*12,S*20,S*2,S*3);ctx.fillRect(S*16,S*19,S*2,S*4);
+  // upper body (translucent-look)
+  ctx.fillStyle=base;ctx.fillRect(S*4,S*6,S*12,S*10);
+  ctx.fillStyle=glow;ctx.fillRect(S*6,S*7,S*8,S*7);
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*6,S*2,S*9);ctx.fillRect(S*14,S*6,S*2,S*9);
+  // arms (wispy)
+  ctx.fillStyle=aura;
+  ctx.fillRect(0,S*8,S*5,S*4);ctx.fillRect(S*15,S*8,S*5,S*4);
+  ctx.fillRect(0,S*11,S*3,S*4);ctx.fillRect(S*17,S*11,S*3,S*4);
+  // head
+  ctx.fillStyle=base;ctx.fillRect(S*4,S,S*12,S*6);
+  ctx.fillStyle=glow;ctx.fillRect(S*6,S*2,S*8,S*4);
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S,S*2,S*5);ctx.fillRect(S*14,S,S*2,S*5);
+  // hollow eyes
+  ctx.fillStyle=eye;ctx.fillRect(S*5,S*2,S*3,S*3);ctx.fillRect(S*12,S*2,S*3,S*3);
+  ctx.fillStyle='#AA88FF';ctx.fillRect(S*6,S*3,S,S);ctx.fillRect(S*13,S*3,S,S);
+  ctx.fillStyle=dark;ctx.fillRect(S*6,S*2,S,S);ctx.fillRect(S*13,S*2,S,S);
+}
+
+function drawBattleRuinGuardian(ctx,S){
+  const stone='#707060',dark='#404030',light='#9A9A80',rune='#60A0FF',eye='#40FFFF';
+  ctx.fillStyle='#00000040';ctx.fillRect(S,S*20,S*24,S*3); // shadow
+  // massive legs (pillars)
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*17,S*7,S*8);ctx.fillRect(S*14,S*17,S*7,S*8);
+  ctx.fillStyle=stone;ctx.fillRect(S*4,S*18,S*5,S*6);ctx.fillRect(S*15,S*18,S*5,S*6);
+  // foot stones
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*23,S*9,S*3);ctx.fillRect(S*13,S*23,S*9,S*3);
+  // torso (massive rectangular block)
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*6,S*20,S*13);
+  ctx.fillStyle=stone;ctx.fillRect(S*3,S*7,S*18,S*11);
+  ctx.fillStyle=light;ctx.fillRect(S*4,S*8,S*6,S*5); // stone face highlight
+  ctx.fillStyle=dark;ctx.fillRect(S*16,S*8,S*4,S*9); // shadow side
+  // stone arms (slabs)
+  ctx.fillStyle=dark;ctx.fillRect(0,S*7,S*4,S*11);ctx.fillRect(S*20,S*7,S*4,S*11);
+  ctx.fillStyle=stone;ctx.fillRect(S,S*8,S*3,S*10);ctx.fillRect(S*21,S*8,S*3,S*10);
+  // fist stones
+  ctx.fillStyle=dark;ctx.fillRect(0,S*16,S*5,S*5);ctx.fillRect(S*19,S*16,S*5,S*5);
+  ctx.fillStyle=stone;ctx.fillRect(S,S*17,S*3,S*4);ctx.fillRect(S*20,S*17,S*3,S*4);
+  // stone chest rune
+  ctx.fillStyle=rune;
+  ctx.fillRect(S*9,S*9,S*6,S*2);ctx.fillRect(S*11,S*7,S*2,S*6);
+  ctx.fillRect(S*8,S*11,S*8,S*2);
+  // head (square stone block)
+  ctx.fillStyle=dark;ctx.fillRect(S*4,0,S*16,S*8);
+  ctx.fillStyle=stone;ctx.fillRect(S*5,S,S*14,S*6);
+  ctx.fillStyle=light;ctx.fillRect(S*6,S*2,S*5,S*3);
+  // glowing eye slots
+  ctx.fillStyle='#001020';ctx.fillRect(S*6,S*2,S*4,S*3);ctx.fillRect(S*14,S*2,S*4,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*7,S*3,S*2,S*2);ctx.fillRect(S*15,S*3,S*2,S*2);
+  ctx.fillStyle='#AAFFFF';ctx.fillRect(S*7,S*3,S,S);ctx.fillRect(S*15,S*3,S,S);
+  // crown of stone spikes
+  ctx.fillStyle=dark;
+  [S*5,S*8,S*11,S*14,S*17].forEach(cx=>{ctx.fillRect(cx,0,S*2,S*3);});
+  ctx.fillStyle=rune;[S*6,S*9,S*12,S*15,S*18].forEach(cx=>{ctx.fillRect(cx,0,S,S*2);});
 }
 
 function drawBattleLich(ctx,S){
@@ -1262,6 +1459,12 @@ function doBattleAction(action){
       G.dungeonBossDefeated=true;
       chatLog('★ THE LICH IS DEFEATED! Ancient evil vanquished!','#AA00FF');
     }
+    // Sub-zone boss defeat flags
+    {const bossInfo=SUBZONE_BOSSES[G.zone];
+    if(bossInfo&&bt.enemy.type===bossInfo.enemy&&!G[bossInfo.flag]){
+      G[bossInfo.flag]=true;
+      chatLog(`★ The ${bt.enemy.name} falls! The zone is safer now.`,'#AA88FF');
+    }}
     updateQuestProgress(bt.enemy.type);
     SFX.coin();
     const dropStr = bt.spacebucksGained>0?`+${bt.spacebucksGained} 🪙`:bt.schmecklesGained>0?`+${bt.schmecklesGained} 💀`:'';
@@ -2482,6 +2685,8 @@ function gameLoop(ts){
     checkDoorTrigger();
     checkEncounter();
     checkBossEncounter();
+    checkSubZoneEncounter();
+    checkSubZoneBoss();
     updateCamera();
     // Update music: world zone switches between town/wilderness tracks by position
     if(G.zone==='world'){const _tx=Math.floor(G.x/TS),_ty=Math.floor(G.y/TS);musPlay((_tx>=TOWN_OX&&_tx<TOWN_OX+MAP_W&&_ty>=TOWN_OY&&_ty<TOWN_OY+MAP_H)?'world':'wilderness');}
@@ -2578,7 +2783,9 @@ function saveState(){
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
     stats:G.stats,hp:G.hp,
     xp:G.xp,level:G.level,statPoints:G.statPoints,maxHp:G.maxHp,
-    quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated
+    quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
+    cavernBossDefeated:G.cavernBossDefeated,hideoutBossDefeated:G.hideoutBossDefeated,
+    ruinsBossDefeated:G.ruinsBossDefeated,villageBossDefeated:G.villageBossDefeated,
   };
   localStorage.setItem('vq_state',JSON.stringify(s));
 }
@@ -2609,6 +2816,10 @@ function loadState(){
     if(s.transmuterDeposits)G.transmuterDeposits=s.transmuterDeposits;
     if(s.quests)G.quests=s.quests;
     if(s.dungeonBossDefeated)G.dungeonBossDefeated=s.dungeonBossDefeated;
+    if(s.cavernBossDefeated)G.cavernBossDefeated=s.cavernBossDefeated;
+    if(s.hideoutBossDefeated)G.hideoutBossDefeated=s.hideoutBossDefeated;
+    if(s.ruinsBossDefeated)G.ruinsBossDefeated=s.ruinsBossDefeated;
+    if(s.villageBossDefeated)G.villageBossDefeated=s.villageBossDefeated;
   }catch(e){}
 }
 
@@ -2908,6 +3119,10 @@ function applyServerState(s){
   while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   G.quests=s.quests||{};
   G.dungeonBossDefeated=s.dungeonBossDefeated||false;
+  G.cavernBossDefeated=s.cavernBossDefeated||false;
+  G.hideoutBossDefeated=s.hideoutBossDefeated||false;
+  G.ruinsBossDefeated=s.ruinsBossDefeated||false;
+  G.villageBossDefeated=s.villageBossDefeated||false;
   if(s.kills!=null)G.kills=s.kills;
   if(s.zoneSeniority!=null)G.zoneSeniority=s.zoneSeniority;
   if(s._shownQueueTip!=null)G._shownQueueTip=s._shownQueueTip;
@@ -2925,6 +3140,8 @@ function saveToServer(){
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,
+    cavernBossDefeated:G.cavernBossDefeated,hideoutBossDefeated:G.hideoutBossDefeated,
+    ruinsBossDefeated:G.ruinsBossDefeated,villageBossDefeated:G.villageBossDefeated,
     kills:G.kills||0,
     zoneSeniority:G.zoneSeniority||0,
     _shownQueueTip:G._shownQueueTip||false,

@@ -147,6 +147,27 @@ const ENEMIES = {
     xp:500, drops:{schmeckles:25},
     msg:'The Ancient Lich rises from its obsidian throne!',
   },
+  // ── Wilderness sub-zone enemies ─────────────────────────────────────────
+  iceTroll: {
+    type:'iceTroll', name:'Ice Troll', maxHp:22, atk:5, def:3, spd:2,
+    xp:28, drops:{spacebucks:18},
+    msg:'A massive Ice Troll lurches forward, trailing frost!',
+  },
+  bandit: {
+    type:'bandit', name:'Bandit Raider', maxHp:10, atk:4, def:1, spd:5,
+    xp:16, drops:{spacebucks:22},
+    msg:'A Bandit Raider springs from the shadows, blade gleaming!',
+  },
+  specter: {
+    type:'specter', name:'Wailing Specter', maxHp:14, atk:6, def:0, spd:5,
+    xp:24, drops:{schmeckles:3},
+    msg:'A Wailing Specter tears through the stone — it cannot be reasoned with!',
+  },
+  ruinGuardian: {
+    type:'ruinGuardian', name:'Ruin Guardian', maxHp:38, atk:9, def:6, spd:1,
+    xp:65, drops:{schmeckles:8},
+    msg:'A Ruin Guardian awakens from ages of slumber, its stone eyes blazing!',
+  },
 };
 
 // ── DUNGEON MAP ───────────────────────────────────────────────────────────────
@@ -278,6 +299,70 @@ const QUEST_DEFS = {
       "Here — alETH, the currency of the on-chain realm. Spend it wisely in the Marketplace.",
     ],
     completedLines:["Try the Marketplace inside the economic zone — alETH buys the finest gear."],
+  },
+  cavern_quest:{
+    id:'cavern_quest', title:'Frozen Depths', giver:'Miner Gundra',
+    type:'kill', target:'iceTroll', required:3,
+    reward:{xp:220, alUSD:110, item:{name:'Ice Crystal Shard',icon:'💎',desc:'A fragment of ancient glacial crystal. Rare crafting material.',type:'material'}},
+    offerLines:[
+      "Adventurer, the Crystal Cavern is overrun with Ice Trolls.",
+      "They drove out my whole mining crew. Three dead, the rest fled.",
+      "Slay three of the brutes and I'll share something valuable from the dig.",
+    ],
+    inProgressLine:"The Ice Trolls still haunt the cavern. Don't give up!",
+    readyLines:[
+      "Three Ice Trolls down! My crew can finally go back to work.",
+      "Here — we found this shard deep in the ice. It's worth keeping.",
+    ],
+    completedLines:["The Crystal Cavern is ours again. Come back anytime, hero."],
+  },
+  hideout_quest:{
+    id:'hideout_quest', title:'Bandit Bounty', giver:'Captain Dura',
+    type:'kill', target:'bandit', required:6,
+    reward:{xp:190, alUSD:95},
+    offerLines:[
+      "The Bandit Hideout is crawling with Raider gangs.",
+      "They've ambushed three trade caravans this moon. Six dead merchants.",
+      "I'll pay in alUSD for every six Raiders you put down.",
+    ],
+    inProgressLine:"Still bandits in the hideout. Keep clearing them!",
+    readyLines:[
+      "Six Raiders! Merchants can breathe again thanks to you.",
+      "Here's your bounty — coin well earned.",
+    ],
+    completedLines:["The trade roads are clear. You've earned a drink, if we had ale out here."],
+  },
+  ruins_quest:{
+    id:'ruins_quest', title:'Silence the Specters', giver:'Scholar Vex',
+    type:'kill', target:'specter', required:4,
+    reward:{xp:260, alUSD:130, item:{name:'Ancient Tome',icon:'📖',desc:'A weathered tome of forgotten lore. Collectors pay handsomely for these.',type:'material'}},
+    offerLines:[
+      "The Ancient Ruins are extraordinary — but the Specters make study impossible.",
+      "Four of them haunt the inner chambers. They phase through walls. Terrifying.",
+      "Banish four Specters and I'll give you a tome I recovered from the outer ring.",
+    ],
+    inProgressLine:"Still four Specters to banish. The ruins await, hero.",
+    readyLines:[
+      "The Specters are gone — finally silence! I can work in peace.",
+      "As promised, this tome. Treat it well — it predates the town by centuries.",
+    ],
+    completedLines:["The ruins yield their secrets slowly. Visit again when you have time."],
+  },
+  village_quest:{
+    id:'village_quest', title:'Guardian of the Fallen', giver:'Aldric',
+    type:'kill', target:'ruinGuardian', required:1,
+    reward:{xp:400, alUSD:220, item:{name:'Guardian Relic',icon:'🔮',desc:'A relic of immense power. Holding it, you feel stronger.',type:'relic',statBoost:{str:1,vit:1}}},
+    offerLines:[
+      "My family lived in this village before the Guardian drove us out.",
+      "It's a colossus of stone and ancient magic. It cannot be bargained with.",
+      "Defeat the Guardian and I'll give you the most precious thing I have left.",
+    ],
+    inProgressLine:"The Guardian still stands. Be strong — this matters.",
+    readyLines:[
+      "...It's really gone? You did it. After so many years.",
+      "Take this relic. It was the Guardian's own core — now it serves you.",
+    ],
+    completedLines:["Perhaps one day this village will live again. Because of you."],
   },
 };
 
