@@ -1890,18 +1890,25 @@ function claimTransmuter(idx){
   saveToServer();
 }
 
-// Early withdrawal — returns unconverted synthetic minus exitFee (10%)
+// Early withdrawal — returns unconverted synthetic minus exitFee (10% → Treasury)
 function earlyWithdrawTransmuter(idx){
   const dep=G.transmuterDeposits[idx];
   if(!dep||dep.amount<=0.001)return;
   const gross=dep.amount;
-  const fee=parseFloat((gross*TRANSMUTER_EXIT_FEE).toFixed(dep.type==='alUSD'?2:4));
-  const returned=parseFloat((gross-fee).toFixed(dep.type==='alUSD'?2:4));
-  dep.amount=0; // unconverted portion is gone
-  if(dep.type==='alUSD') G.alUSD=parseFloat((G.alUSD+returned).toFixed(2));
-  else                   G.alETH=parseFloat((G.alETH+returned).toFixed(4));
-  chatLog(`⚠ Transmuter early exit: returned ${returned} ${dep.type} (${fee} exitFee burned).`,'#FF8C00');
+  const isUSD=dep.type==='alUSD';
+  const dp=isUSD?2:4;
+  const fee=parseFloat((gross*TRANSMUTER_EXIT_FEE).toFixed(dp));
+  const returned=parseFloat((gross-fee).toFixed(dp));
+  dep.amount=0;
+  if(isUSD) G.alUSD=parseFloat((G.alUSD+returned).toFixed(2));
+  else      G.alETH=parseFloat((G.alETH+returned).toFixed(4));
+  chatLog(`⚠ Transmuter early exit: returned ${returned} ${dep.type} (${fee} exitFee → Treasury).`,'#FF8C00');
   SFX.error();
+  // Fee credited to the shared protocol Treasury on the server
+  socket?.emit('transmuter_exit_fee',{
+    feeAlUSD: isUSD?fee:0,
+    feeAlETH: isUSD?0:fee,
+  });
   socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
   renderTransmuterUI();
   saveToServer();

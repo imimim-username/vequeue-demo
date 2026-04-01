@@ -418,6 +418,14 @@ io.on('connection',socket=>{
     broadcastTreasury();
   });
 
+  // Transmuter early-exit fee → protocol Treasury (10% of unconverted amount)
+  socket.on('transmuter_exit_fee',data=>{
+    const{feeAlUSD,feeAlETH}=data;
+    if(feeAlUSD>0)treasury.alUSD=parseFloat((treasury.alUSD+feeAlUSD).toFixed(2));
+    if(feeAlETH>0)treasury.alETH=parseFloat((treasury.alETH+feeAlETH).toFixed(4));
+    broadcastTreasury();
+  });
+
   socket.on('save_character',data=>{
     if(!socket.accountId)return;
     // Sanity-clamp numeric fields to prevent client-side inflation
