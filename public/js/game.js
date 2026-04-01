@@ -2944,6 +2944,21 @@ function gameLoop(ts){
       });
       if(anyRepaid)socket?.emit('bank_sync',{bankPositions:G.bankPositions});
     }
+    // ── Passive HP regen ────────────────────────────────────────────────────
+    // Base: 1 HP per ~25 s at VIT 1 + full HP (≈ 1 500 ticks @ 60 fps).
+    // VIT multiplier: +20% per point above 1 (VIT 5 → 1.8×, VIT 10 → 2.8×).
+    // HP-ratio multiplier: 0.15 + 0.85*(hp/maxHp) — slows at low HP but
+    // never reaches zero, so even a near-dead player slowly recovers.
+    if(!G.battle&&G.hp>0&&G.hp<G.maxHp){
+      const _vitMult=1+(G.stats.vit-1)*0.2;
+      const _hpMult=0.15+0.85*(G.hp/G.maxHp);
+      G._regenAcc=(G._regenAcc||0)+(1/1500)*_vitMult*_hpMult;
+      if(G._regenAcc>=1){
+        const _gained=Math.floor(G._regenAcc);
+        G.hp=Math.min(G.maxHp,G.hp+_gained);
+        G._regenAcc-=_gained;
+      }
+    }
     // persist
     if(G.tick%90===0&&G.mp<G.maxMp){G.mp=Math.min(G.maxMp,G.mp+1);}
     if(G.tick%300===0){if(G.persist)saveState(); saveToServer();}
