@@ -1453,7 +1453,12 @@ function renderBattleScreen(){
     if(bt.result==='win'){
       ctxUI.fillStyle='#C8B860';ctxUI.font='16px monospace';
       const winDropStr=bt.spacebucksGained>0?`+${bt.spacebucksGained} 🪙`:bt.schmecklesGained>0?`+${bt.schmecklesGained} 💀`:'';
-      ctxUI.fillText(`+${bt.xpGained} XP   ${winDropStr}`,W/2,H/2+6);
+      const killHealDisp=Math.max(1,Math.round(G.maxHp*0.05));
+      ctxUI.fillText(`+${bt.xpGained} XP   ${winDropStr}   +${killHealDisp}♥`,W/2,H/2+6);
+      if(bt.potionDrop){
+        ctxUI.fillStyle='#80FF80';ctxUI.font='13px monospace';
+        ctxUI.fillText('🧪 Minor Potion dropped!',W/2,H/2+26);
+      }
     } else if(bt.result==='lose'){
       ctxUI.fillStyle='#FF8080';ctxUI.font='13px monospace';
       ctxUI.fillText('Respawning in town...',W/2,H/2+6);
@@ -1578,9 +1583,27 @@ function doBattleAction(action){
       chatLog(`★ The ${bt.enemy.name} falls! The zone is safer now.`,'#AA88FF');
     }}
     updateQuestProgress(bt.enemy.type);
+
+    // ── Kill-heal: 5% of max HP restored on every kill ──────────────────────
+    const killHeal=Math.max(1,Math.round(G.maxHp*0.05));
+    G.hp=Math.min(G.maxHp,G.hp+killHeal);
+
+    // ── Potion drop: 30% base + 3% per LCK above 1, capped at 60% ──────────
+    const potionChance=Math.min(0.60,0.30+(G.stats.lck-1)*0.03);
+    bt.potionDrop=false;
+    if(Math.random()<potionChance){
+      const freeSlot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
+      if(freeSlot!==-1){
+        G.inventory[freeSlot]={name:'Minor Potion',icon:'🧪',type:'potion',heal:20};
+        bt.potionDrop=true;
+      }
+    }
+
     SFX.coin();
     const dropStr = bt.spacebucksGained>0?`+${bt.spacebucksGained} 🪙`:bt.schmecklesGained>0?`+${bt.schmecklesGained} 💀`:'';
-    chatLog(`Battle won! +${bt.xpGained} XP  ${dropStr}`,'#FFD700');
+    const healStr = `+${killHeal}♥`;
+    const potStr  = bt.potionDrop?' · 🧪 Potion found!':'';
+    chatLog(`Battle won! +${bt.xpGained} XP  ${dropStr}  ${healStr}${potStr}`,'#FFD700');
     saveToServer();
     // Wait for player input — do NOT auto-advance
     return;
