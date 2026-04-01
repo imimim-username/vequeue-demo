@@ -105,8 +105,10 @@ input[type=text]:focus{outline:none;border-color:#FFD700}
 body.touch #screen-game{justify-content:flex-start}
 body.touch #game-wrap{position:absolute;top:0;left:0;right:0;bottom:0;
   width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center}
-/* Chat panel pushed up on touch so it doesn't overlap d-pad */
-body.touch #chat-panel{bottom:170px;max-width:55vw}
+/* Touch-only visibility helper */
+body.touch .touch-only{display:inline!important}
+/* Chat panel pushed up on touch so it doesn't overlap buttons */
+body.touch #chat-panel{bottom:90px;max-width:55vw}
 /* Hide desktop HUD currency details on small screens to save space */
 @media(max-width:400px){
   #hud-players{display:none}

@@ -2976,6 +2976,7 @@ window.addEventListener('resize',setupCanvases);
 function saveState(){
   if(!G.persist)return;
   const s={
+    _accountId:G_accountId||'',  // tag state with account so cross-user bleed is detectable
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     species:G.species,class_:G.class_,
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
@@ -3052,11 +3053,22 @@ function initSocket(){
       chatLog('⚠ Save data integrity check failed. Starting fresh.','#FF4444');
     }
     if(result.data){
-      // Returning player — load state and jump straight into game
+      // Returning player — load server state; clear any stale localStorage from a different account
+      try{
+        const ls=JSON.parse(localStorage.getItem('vq_state')||'null');
+        if(ls&&ls._accountId&&ls._accountId.toLowerCase()!==(result.username||'').toLowerCase())
+          localStorage.removeItem('vq_state');
+      }catch(e){}
       applyServerState(result.data);
       startGame();
     } else {
-      // New account or guest — go to character creation
+      // New account (or deleted account re-registered) — wipe any localStorage that belongs to
+      // a different user so their stats don't bleed into the new character creation flow.
+      try{
+        const ls=JSON.parse(localStorage.getItem('vq_state')||'null');
+        if(ls&&ls._accountId&&ls._accountId.toLowerCase()!==(result.username||'').toLowerCase())
+          localStorage.removeItem('vq_state');
+      }catch(e){}
       showScreen('screen-title');
       musPlay('title');
     }
