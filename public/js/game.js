@@ -582,7 +582,14 @@ function changeZone(zone,sx,sy){
   // so the character doesn't walk on its own after zone transitions
   Object.keys(KEYS).forEach(k=>delete KEYS[k]);
   SFX.door();
-  G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;G.camX=0;G.camY=0;
+  G.zone=zone;G.x=(sx+0.5)*TS;G.y=(sy+0.5)*TS;
+  // Snap camera to player immediately so there's no jarring pan from (0,0)
+  const _zd=ZONES[zone];
+  const _maxCX=_zd?Math.max(0,_zd.w*TS-W):0;
+  const _maxCY=_zd?Math.max(0,_zd.h*TS-H):0;
+  G.camX=Math.max(0,Math.min(_maxCX,G.x-W/2));
+  G.camY=Math.max(0,Math.min(_maxCY,G.y-H/2));
+  G._prevX=G.x;G._prevY=G.y;G._camVx=0;G._camVy=0;
   // Reset seniority when leaving economic zones
   if(G.zone!=='marketplace'&&G.zone!=='treasury')G.zoneSeniority=0;
   musPlay(zone);

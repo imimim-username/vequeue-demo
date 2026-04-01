@@ -505,8 +505,8 @@ const ZONE_DOORS = {
   // From world → building interiors (tileRows/Cols in WORLD coordinates)
   world_tavern:     {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'tavern',    sx:10,sy:11},
   world_governance: {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'governance',sx:10,sy:11},
-  world_marketplace:{from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'marketplace',sx:10,sy:1, queue:true},
-  world_treasury:   {from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'treasury',  sx:10,sy:1, queue:true},
+  world_marketplace:{from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'marketplace',sx:10,sy:11, queue:true},
+  world_treasury:   {from:'world',tileRows:[TOWN_OY+15],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'treasury',  sx:10,sy:11, queue:true},
   // From building interiors → world
   tavern_exit:           {from:'tavern',      tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
   governance_exit:       {from:'governance',  tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
