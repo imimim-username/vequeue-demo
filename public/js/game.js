@@ -194,6 +194,72 @@ document.getElementById('btn-mute-touch')?.addEventListener('touchstart',e=>{
   e.preventDefault();
 },{passive:false});
 
+// ── FULLSCREEN (mobile) ────────────────────────────────────────────────────────
+(function(){
+  const btn=document.getElementById('btn-fullscreen');
+  if(!btn)return;
+
+  // Detect iOS Safari (Fullscreen API not supported in-browser on iOS)
+  const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)&&!window.MSStream;
+  // Check if running as installed PWA (standalone) — already fullscreen on iOS
+  const isStandalone=window.navigator.standalone===true||
+    window.matchMedia('(display-mode: standalone)').matches;
+
+  function isFullscreen(){
+    return !!(document.fullscreenElement||document.webkitFullscreenElement);
+  }
+
+  function showToast(msg,ms=3500){
+    const t=document.getElementById('fs-toast');
+    if(!t)return;
+    t.textContent=msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),ms);
+  }
+
+  function updateBtn(){
+    btn.textContent=isFullscreen()?'✕':'⛶';
+    document.body.classList.toggle('fullscreen',isFullscreen());
+  }
+
+  function enterFullscreen(){
+    const el=document.documentElement;
+    const req=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;
+    if(req){
+      req.call(el).then(()=>{
+        // Try landscape lock — gracefully ignore if API unsupported
+        try{screen.orientation?.lock('landscape').catch(()=>{});}catch(_){}
+      }).catch(()=>showToast('Fullscreen blocked by browser.'));
+    } else if(isIOS&&!isStandalone){
+      showToast('Tap the share button ⬆ then "Add to Home Screen" for fullscreen mode on iOS.');
+    } else {
+      showToast('Fullscreen not supported in this browser.');
+    }
+  }
+
+  function exitFullscreen(){
+    const exit=document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen;
+    if(exit)exit.call(document).catch(()=>{});
+    try{screen.orientation?.unlock();}catch(_){}
+  }
+
+  btn.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(isFullscreen()) exitFullscreen(); else enterFullscreen();
+  },{passive:false});
+  // Fallback for non-touch (desktop testing)
+  btn.addEventListener('click',()=>{
+    if(isFullscreen()) exitFullscreen(); else enterFullscreen();
+  });
+
+  // Keep button in sync when fullscreen state changes externally (e.g. Esc key)
+  document.addEventListener('fullscreenchange',updateBtn);
+  document.addEventListener('webkitfullscreenchange',updateBtn);
+
+  // If already in standalone/PWA fullscreen, hide the button (not needed)
+  if(isStandalone)btn.style.display='none';
+})();
+
 // ── TAP-TO-MOVE: touch the game canvas to move toward that direction ───────────
 // Character's position on-screen: (G.x - G.camX, G.y - G.camY)
 // Touch direction relative to character → sets movement keys

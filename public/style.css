@@ -122,6 +122,15 @@ body.touch #mobile-act{display:flex}
   font-size:.65rem;letter-spacing:.03em;cursor:pointer;-webkit-tap-highlight-color:transparent;
   touch-action:none;color:#FFD700;font-weight:bold}
 .act-btn:active{background:#FFD70033}
+#btn-fullscreen{font-size:1.2rem;letter-spacing:0} /* bigger icon for the expand glyph */
+body.fullscreen #btn-fullscreen{color:#fff;border-color:#fff;background:#ffffff22}
+/* iOS "Add to Home Screen" toast */
+#fs-toast{display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:#111c;border:1px solid #FFD700;color:#FFD700;padding:8px 14px;
+  border-radius:8px;font-family:monospace;font-size:.78rem;text-align:center;
+  z-index:999;pointer-events:none;white-space:nowrap;max-width:92vw;
+  white-space:normal;line-height:1.4}
+#fs-toast.show{display:block;animation:fsToastIn .25s ease}
 
 /* ── PAUSE ── */
 #pause-overlay{display:none;position:fixed;inset:0;background:#000c;z-index:20;
@@ -208,4 +217,5 @@ body.touch #mobile-act{display:flex}
 .bank-pos{background:#111;border:1px solid #2a2a2a;border-radius:6px;padding:10px;margin:6px 0;font-size:.8rem}
 .bank-bar{background:#1a1a1a;border-radius:4px;height:7px;margin:6px 0}
 .bank-bar-fill{background:linear-gradient(90deg,#388E3C,#81C784);height:7px;border-radius:4px}
+@keyframes fsToastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>

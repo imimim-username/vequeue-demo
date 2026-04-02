@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<!-- PWA / home-screen fullscreen (iOS & Android) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Victory Quest">
+<meta name="theme-color" content="#000000">
 <title>Victory Quest</title>
-<link rel="stylesheet" href="/style.css?v=20260402g">
+<link rel="stylesheet" href="/style.css?v=20260402h">
 </head>
 <body>
 
@@ -137,7 +143,10 @@
     <div class="act-btn" id="btn-esc">ESC</div>
     <div class="act-btn" id="btn-map">MAP</div>
     <div class="act-btn" id="btn-mute-touch">🔊</div>
+    <div class="act-btn" id="btn-fullscreen" title="Fullscreen">⛶</div>
   </div>
+  <!-- iOS "Add to Home Screen" fullscreen toast -->
+  <div id="fs-toast"></div>
 </div>
 
 <!-- ═══════════════ PAUSE/INVENTORY ═══════════════ -->
@@ -294,10 +303,10 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/data.js?v=20260402g"></script>
-<script src="/js/maps.js?v=20260402g"></script>
-<script src="/js/render.js?v=20260402g"></script>
-<script src="/js/audio.js?v=20260402g"></script>
-<script src="/js/game.js?v=20260402g"></script>
+<script src="/js/data.js?v=20260402h"></script>
+<script src="/js/maps.js?v=20260402h"></script>
+<script src="/js/render.js?v=20260402h"></script>
+<script src="/js/audio.js?v=20260402h"></script>
+<script src="/js/game.js?v=20260402h"></script>
 </body>
 </html>
