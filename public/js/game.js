@@ -638,6 +638,7 @@ function handleQueueDoor(key,door){
     if(G.queueState.served){
       // Served — pass through
       socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type});
+      clearTimeout(G._queueServTimer);G._queueServExpiry=null;
       G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
       updateQueuePanel();
       changeZone(door.to,door.sx,door.sy);
@@ -684,7 +685,7 @@ function joinQueue(zone,type){
     G.lockedAlcx=lockAmt;
     G.queueState={zone,type,ticket:null,served:false};
     socket?.emit('queue_join',{zone,queueType:type,locked:lockAmt});
-    chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' ⚗'+lockAmt+' ALCX locked.':''}`, '#FFD700');
+    chatLog(`🎫 Joined ${zl} ${type} queue.${lockAmt>0?' ⚗'+lockAmt+' ALCX locked.':''} Roam freely — we'll notify you when your ticket is called!`, '#FFD700');
     updateQueuePanel();
   }
 
@@ -707,10 +708,11 @@ function joinQueue(zone,type){
   if(!G._shownQueueTip&&lockAmt>0){
     G._shownQueueTip=true;
     showGameInfo(7,'📖 Queue System',[
-      'You take a ticket and wait your turn — just like a real rate-limited protocol.',
-      '20% of your ALCX is locked as a commitment signal.\nYou get it all back when you enter or leave.',
-      'Build Seniority (⭐) by staying in the zone to earn bonus ALCX drip each cycle.',
-      'Bid ALCX to jump the line — your bid amount splits among the other waiters.',
+      'You take a ticket and wait your turn — just like a real rate-limited protocol. Everyone waits the same number of ticks. Whales can\'t skip ahead for free!',
+      '20% of your ALCX is locked as a commitment signal.\nYou get it all back when you enter or leave the zone.',
+      '🚶 You can roam freely while you wait! Farm, fight, or explore. You\'ll be notified when your ticket is called — then walk to the gate.',
+      '⭐ Seniority builds while you\'re INSIDE the zone. The longer you stay, the more ALCX yield you earn each cycle. Exit resets it.',
+      '⚡ Bid ALCX to jump the entry line — your bid splits among all other real waiters as a reward for their patience.',
     ],_confirmLock);
   } else { _confirmLock(); }
 }
@@ -763,10 +765,10 @@ function updateQueuePanel(){
   // Seniority badge
   let senEl=document.getElementById('queue-seniority');
   if(!senEl){senEl=document.createElement('div');senEl.id='queue-seniority';senEl.style.cssText='font-size:.7rem;color:#9C27B0;margin-top:2px';panel.insertBefore(senEl,document.getElementById('queue-enter-btn'));}
-  senEl.textContent=G.zoneSeniority>0?`⭐ Seniority: ${G.zoneSeniority} (drip ×${1+Math.floor(G.zoneSeniority/3)})`:'';
+  senEl.textContent=G.zoneSeniority>0?`⭐ Seniority: ${G.zoneSeniority} (yield ×${1+Math.floor(G.zoneSeniority/3)})`:'⭐ Seniority: 0 (stay inside to build)';
   senEl.title=G.zoneSeniority>0
-    ?`Seniority ${G.zoneSeniority}: +1 every 5 min inside this zone. Your ALCX drip multiplier is now ${1+Math.floor(G.zoneSeniority/3)}×. Longer commitment = more yield.`
-    :'Stay in this zone to build seniority and earn a bonus ALCX drip multiplier.';
+    ?`Seniority ${G.zoneSeniority}: earned by staying inside the zone. Your ALCX yield multiplier is now ${1+Math.floor(G.zoneSeniority/3)}×. Exiting resets it — longer commitment = more yield.`
+    :'Seniority builds while you are INSIDE the marketplace or treasury zone. Exit resets it to 0. Higher seniority = more ALCX yield per cycle.';
   // Auction / Donation bid row
   let aucEl=document.getElementById('queue-auction-row');
   if(!aucEl){
@@ -775,8 +777,36 @@ function updateQueuePanel(){
     aucEl.innerHTML=`<span style="color:#FFD700">⚡</span><input id="queue-bid-amt" type="number" min="1" step="1" value="5" style="width:50px;background:#111;border:1px solid #5A3A80;color:#eee;padding:2px 4px;font-family:monospace;border-radius:3px"><button onclick="doAuctionBid()" style="padding:2px 8px;background:#1A1A00;border:1px solid #FFD700;color:#FFD700;cursor:pointer;border-radius:3px;font-family:monospace;font-size:.7rem">Bid ALCX to Skip</button>`;
     panel.insertBefore(aucEl,document.getElementById('queue-enter-btn'));
   }
-  // Only show if waiting (not yet served)
-  aucEl.style.display=(!served)?'flex':'none';
+  // Only show auction bid if waiting (not yet served) in entry queue
+  aucEl.style.display=(!served&&type==='entry')?'flex':'none';
+
+  // ── Expiry countdown (shows when served — 2 min window to reach the gate) ──
+  let expEl=document.getElementById('queue-expiry-line');
+  if(!expEl){
+    expEl=document.createElement('div');expEl.id='queue-expiry-line';
+    expEl.style.cssText='font-size:.72rem;color:#FF5722;margin-top:4px;font-weight:bold;display:none';
+    panel.insertBefore(expEl,document.getElementById('queue-enter-btn'));
+  }
+  if(served&&G._queueServExpiry){
+    const secsLeft=Math.max(0,Math.round((G._queueServExpiry-Date.now())/1000));
+    expEl.textContent=`⏰ ${secsLeft}s to reach the gate!`;
+    expEl.style.display='block';
+    expEl.style.color=secsLeft<30?'#FF1744':'#FF5722';
+  }else{expEl.style.display='none';}
+
+  // ── Fast-exit button (exit queue only, while waiting) ──────────────────────
+  let fastExitEl=document.getElementById('queue-fast-exit');
+  if(!fastExitEl){
+    fastExitEl=document.createElement('div');fastExitEl.id='queue-fast-exit';
+    fastExitEl.style.cssText='margin-top:6px;display:none';
+    panel.insertBefore(fastExitEl,document.getElementById('queue-enter-btn'));
+  }
+  if(type==='exit'&&!served){
+    const fee=Math.max(1,Math.floor((G.alcx||0)*0.05));
+    fastExitEl.innerHTML=`<button onclick="doFastExit(${fee})" style="width:100%;padding:3px 0;background:#1A0A00;border:1px solid #FF8C00;color:#FF8C00;cursor:pointer;border-radius:3px;font-family:monospace;font-size:.7rem">⚡ Fast Exit (${fee} ALCX)</button><div style="font-size:.6rem;color:#555;text-align:center;margin-top:2px">Skip the exit queue — fee goes to treasury</div>`;
+    fastExitEl.style.display='block';
+  }else{fastExitEl.style.display='none';}
+
   const enterBtn=document.getElementById('queue-enter-btn');
   enterBtn.style.display=served?'block':'none';
   enterBtn.textContent=type==='entry'?'▶ ENTER NOW':'▶ LEAVE NOW';
@@ -2309,6 +2339,15 @@ function doAuctionBid(){
   renderHUD();
   socket?.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
   chatLog(`⚡ Bid ${amt} ALCX to jump the queue!`,'#FFD700');
+}
+
+function doFastExit(fee){
+  if(!G.queueState||G.queueState.type!=='exit'||G.queueState.served)return;
+  if((G.alcx||0)<fee){chatLog('Not enough ALCX for fast exit.','#FF5722');SFX.error();return;}
+  G.alcx=parseFloat((G.alcx-fee).toFixed(4));
+  renderHUD();
+  chatLog(`⚡ Fast exit: ${fee} ALCX paid — skipping the exit queue! Fee goes to treasury.`,'#FFD700');
+  socket?.emit('queue_fast_exit',{zone:G.queueState.zone,queueType:G.queueState.type});
 }
 
 function showHallOfFame(){
@@ -3948,15 +3987,21 @@ function gameLoop(ts){
     renderMinimap(ctxUI);
     // Governance Hall: treasury + live prices panel
     if(G.zone==='governance')renderGovernancePanel(ctxUI);
-    // ALCX queue drip
-    if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%300===0){
-      // Seniority accumulates while actively in the queue (not yet served)
-      if(!G.queueState.served)(G.zoneSeniority=(G.zoneSeniority||0)+1);
-      // ALCX drip scales with seniority (1 base + 1 per 3 seniority points)
-      const drip=1+Math.floor((G.zoneSeniority||0)/3);
+    // ── ALCX yield: seniority builds INSIDE the zone, drip while waiting ──────
+    // Seniority accumulates while physically inside an economic zone.
+    // This correctly models the protocol: longer commitment inside = more yield.
+    if((G.zone==='marketplace'||G.zone==='treasury')&&G.tick%300===0){
+      G.zoneSeniority=(G.zoneSeniority||0)+1;
+      const drip=1+Math.floor(G.zoneSeniority/3);
       G.alcx+=drip;
-      const bonusStr=drip>1?` (seniority bonus ×${drip})`:'';
-      chatLog(`⚗ Queue: +${drip} ALCX earned${bonusStr}`,'#9C27B0');
+      const bonusStr=drip>1?` (seniority ×${drip})`:'';
+      chatLog(`⚗ Zone Yield: +${drip} ALCX${bonusStr}`,'#9C27B0');
+      updateQueuePanel();
+    }
+    // Small base drip while waiting in queue (commitment signal earns too)
+    if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%600===0){
+      G.alcx+=1;
+      chatLog('⚗ Queue Yield: +1 ALCX (patience pays)','#9C27B0');
     }
     // Bank: local yield repayment (server handles earmarking/transmuter globally every 60s)
     if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
@@ -4213,8 +4258,26 @@ function initSocket(){
     if(qs&&qs.zone===data.zone&&qs.type===data.queueType){
       qs.served=data.ticket;
       if(qs.ticket===data.ticket){
-        chatLog(`🎫 You're up! Enter ${data.zone} now.`,'#00FF88');
+        const zoneName=data.zone[0].toUpperCase()+data.zone.slice(1);
+        chatLog(`🎫 YOUR TICKET IS CALLED! Walk to the ${zoneName} gate to enter. You have 2 minutes!`,'#00FF88');
+        chatLog('🎫 🎫 🎫 YOUR TURN — HEAD TO THE GATE! 🎫 🎫 🎫','#00FF88');
         document.getElementById('queue-enter-btn').style.display='block';
+        SFX.levelUp&&SFX.levelUp();
+        // Start 2-minute window: if they don't enter in time, ticket expires
+        clearTimeout(G._queueServTimer);
+        G._queueServExpiry=Date.now()+120000;
+        G._queueServTimer=setTimeout(()=>{
+          if(G.queueState&&G.queueState.served&&G.queueState.zone===data.zone){
+            chatLog('⏰ Queue ticket expired — you took too long to reach the gate! Rejoining...','#FF5722');
+            socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
+            G.alcx+=G.lockedAlcx;G.lockedAlcx=0;
+            // Auto-rejoin at back of queue
+            const z=G.queueState.zone,t=G.queueState.type;
+            G.queueState=null;G._queueServExpiry=null;
+            updateQueuePanel();
+            joinQueue(z,t);
+          }
+        },120000);
       }
       updateQueuePanel();
     }
@@ -4533,6 +4596,7 @@ document.getElementById('queue-enter-btn')?.addEventListener('click',()=>{
   if(!G.queueState?.served)return;
   const{zone,type}=G.queueState;
   socket?.emit('queue_leave',{zone,queueType:type});
+  clearTimeout(G._queueServTimer);G._queueServExpiry=null;
   G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
   updateQueuePanel();
   const key=type==='entry'?`world_${zone}`:`${zone}_exit`;
@@ -4542,10 +4606,15 @@ document.getElementById('queue-enter-btn')?.addEventListener('click',()=>{
 document.getElementById('queue-leave-btn')?.addEventListener('click',()=>{
   if(!G.queueState)return;
   socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
+  clearTimeout(G._queueServTimer);G._queueServExpiry=null;
   G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
   updateQueuePanel();
   chatLog('Left the queue.','#888');
 });
+
+// Live countdown ticker for served-ticket window
+window._queueCountdownInterval=window._queueCountdownInterval||
+  setInterval(()=>{if(G.queueState?.served)updateQueuePanel();},1000);
 
 // ── In-game confirm touch buttons ────────────────────────────────────────────
 document.getElementById('npc-btn-yes')?.addEventListener('click',()=>_dismissConfirm(true));

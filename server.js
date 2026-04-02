@@ -248,6 +248,31 @@ QUEUE_ZONES.forEach(z=>{
   };
 });
 
+// ── NPC Queue Bots ─────────────────────────────────────────────────────────────
+// Phantom participants keep the entry queue populated so real players always
+// experience a genuine wait and can see the rate-limiting mechanic in action.
+const NPC_BOT_NAMES=[
+  '🤖 DeFi Dave','🤖 Yield Farmer','🤖 Protocol Maxi',
+  '🤖 Governance Gary','🤖 ALCX Staker','🤖 Rate Limiter',
+  '🤖 vqShares Holder','🤖 Queue Regular','🤖 Patient Staker',
+  '🤖 Block Watcher','🤖 Fee Optimizer','🤖 Long-Term Holder',
+  '🤖 Liquidity Len','🤖 Token Tom','🤖 Validator Val',
+];
+function addNpcBot(zoneName,qt){
+  const side=queues[zoneName][qt];
+  const name=NPC_BOT_NAMES[Math.floor(Math.random()*NPC_BOT_NAMES.length)];
+  const ticket=side.nextTicket++;
+  side.entries.push({id:'_bot_'+ticket,nickname:name,ticket,locked:0,isBot:true});
+  broadcastQueueState(zoneName);
+}
+// Seed each entry queue with 4-7 NPC bots to simulate organic demand
+setTimeout(()=>{
+  QUEUE_ZONES.forEach(z=>{
+    const n=4+Math.floor(Math.random()*4);
+    for(let i=0;i<n;i++) addNpcBot(z,'entry');
+  });
+},500);
+
 function queueStateFor(zoneName){
   const q=queues[zoneName];
   return{
@@ -271,7 +296,18 @@ function serveNext(zoneName,qt){
   const next=side.entries.find(e=>e.ticket>side.serving);
   if(!next)return;
   side.serving=next.ticket;
-  io.to(next.id).emit('queue_served',{zone:zoneName,queueType:qt,ticket:next.ticket});
+  if(next.isBot){
+    // Bot served: remove it after a short "enter zone" delay, then replace with a fresh bot
+    setTimeout(()=>{
+      side.entries=side.entries.filter(e=>e.id!==next.id);
+      broadcastQueueState(zoneName);
+      // New bot rejoins after 1–3 ticks, keeping the queue alive
+      const rejoinDelay=QUEUE_TICK_MS*(1+Math.random()*2);
+      setTimeout(()=>addNpcBot(zoneName,qt),rejoinDelay);
+    },QUEUE_TICK_MS*(0.4+Math.random()*0.4));
+  } else {
+    io.to(next.id).emit('queue_served',{zone:zoneName,queueType:qt,ticket:next.ticket});
+  }
   broadcastQueueState(zoneName);
 }
 
@@ -562,11 +598,8 @@ io.on('connection',socket=>{
     const ticket=side.nextTicket++;
     side.entries.push({id:socket.id,nickname:p.nickname,ticket,locked:locked||0});
     socket.emit('queue_joined',{zone,queueType,ticket,serving:side.serving});
-    // If this player is first (or the only one unserved), serve immediately
-    if(side.entries.length===1||(side.entries.length>0&&side.serving===0)){
-      side.serving=ticket;
-      socket.emit('queue_served',{zone,queueType,ticket});
-    }
+    // Let the auto-advance tick serve the player at the normal rate.
+    // Entry queue always has NPC bots ahead; exit queue minimum wait is 1 tick (10s).
     broadcastQueueState(zone);
   });
 
@@ -850,13 +883,27 @@ io.on('connection',socket=>{
     side.serving=frontTicket;
     socket.emit('queue_served',{zone,queueType,ticket:frontTicket});
     // Distribute bid to other waiting players
-    const waiting=side.entries.filter(e=>e.id!==socket.id&&!e.id.startsWith('_whale_'));
+    const waiting=side.entries.filter(e=>e.id!==socket.id&&!e.id.startsWith('_whale_')&&!e.isBot);
     const share=waiting.length>0?parseFloat((bidAmt/waiting.length).toFixed(4)):0;
     waiting.forEach(e=>{io.to(e.id).emit('auction_payout',{zone,queueType,amount:share,bidderName:p.nickname,bidAmt});});
     socket.emit('auction_result',{ok:true,alcx:bidAmt,share,others:waiting.length});
     broadcastQueueState(zone);
     const label=queueType==='entry'?'entry':'exit';
     io.emit('chat',{nickname:'⚡ Auction',text:`${p.nickname} bid ${bidAmt} ALCX to jump the ${zone} ${label} queue! ${waiting.length} members each earn ${share} ALCX.`});
+  });
+
+  // Fast-exit: player pays a fee client-side, then gets served immediately in the exit queue.
+  socket.on('queue_fast_exit',data=>{
+    const p=players[socket.id];if(!p)return;
+    const{zone,queueType}=data;
+    if(!QUEUE_ZONES.includes(zone)||queueType!=='exit')return;
+    const side=queues[zone][queueType];
+    const entry=side.entries.find(e=>e.id===socket.id);
+    if(!entry)return;
+    side.serving=entry.ticket;
+    io.to(socket.id).emit('queue_served',{zone,queueType,ticket:entry.ticket,fastExit:true});
+    broadcastQueueState(zone);
+    io.emit('chat',{nickname:'⚡ Fast Exit',text:`${p.nickname} paid the fast-exit fee to bypass the ${zone} exit queue.`});
   });
 
   socket.on('disconnect',()=>{
