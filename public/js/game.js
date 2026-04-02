@@ -780,6 +780,8 @@ function checkLevelUp(){
     G.xp-=xpForLevel(G.level);
     G.level++;
     G.statPoints+=3;
+    // reset per-session spend tracker so the minus button knows what's refundable
+    if(!G.pendingStats)G.pendingStats={str:0,vit:0,agi:0,end:0,lck:0};
     G.maxHp++;
     G.hp=Math.min(G.maxHp,G.hp+2); // partial HP restore on level-up
     SFX.levelUp();
@@ -792,8 +794,20 @@ function checkLevelUp(){
 function spendStat(st){
   if(G.statPoints<=0)return;
   G.stats[st]++;
+  if(!G.pendingStats)G.pendingStats={str:0,vit:0,agi:0,end:0,lck:0};
+  G.pendingStats[st]=(G.pendingStats[st]||0)+1;
   G.statPoints--;
   if(st==='vit'){G.maxHp++;G.hp=Math.min(G.maxHp,G.hp+1);}
+  renderInventoryScreen();
+}
+
+// Refund one spent-this-session stat point back to the pool.
+function refundStat(st){
+  if(!G.pendingStats||(G.pendingStats[st]||0)<=0)return;
+  G.stats[st]--;
+  G.pendingStats[st]--;
+  G.statPoints++;
+  if(st==='vit'){G.maxHp--;G.hp=Math.min(G.maxHp,G.hp);}
   renderInventoryScreen();
 }
 
@@ -3078,16 +3092,23 @@ function renderInventoryScreen(){
   const armorDef=G.equippedArmor?.def||0;
   const endDef=Math.floor(s.end*0.5);
   const totalDef=endDef+shieldDef+armorDef;
-  const btnStyle=G.statPoints>0
+  const btnAdd=G.statPoints>0
     ?'cursor:pointer;background:#4CAF50;color:#fff;border:none;border-radius:3px;padding:0 5px;font-size:11px;margin-left:4px;'
     :'display:none';
+  const pd=G.pendingStats||{};
   const statRows=[
     ['str','STR (Attack)'],['vit','VIT (HP / Regen)'],['agi','AGI (Speed / Dodge)'],
     ['end','END (Defense)'],['lck','LCK (Crit / Drop)'],
-  ].map(([k,label])=>`
-    <div class="stat-line"><span>${label}</span><span>${s[k]}
-      <button style="${btnStyle}" onclick="spendStat('${k}')">+</button>
-    </span></div>`).join('');
+  ].map(([k,label])=>{
+    const canRefund=(pd[k]||0)>0;
+    const btnSub=canRefund
+      ?'cursor:pointer;background:#E53935;color:#fff;border:none;border-radius:3px;padding:0 5px;font-size:11px;margin-left:4px;'
+      :'display:none';
+    return `<div class="stat-line"><span>${label}</span><span>${s[k]}
+      <button style="${btnSub}"  onclick="refundStat('${k}')">−</button>
+      <button style="${btnAdd}"  onclick="spendStat('${k}')">+</button>
+    </span></div>`;
+  }).join('');
   const wpn=G.inventory[0];
   const wpnStr=wpn?`${wpn.icon} ${wpn.name} +${wpn.dmg}⚔ [${wpn.dmgType||'phys'}]`:'None';
   stats.innerHTML=`
@@ -3380,11 +3401,24 @@ function buildCreateScreen(){
         }
         bar.appendChild(pip);
       }
+      // ── [−] / [+] stepper buttons ──
+      const btnSub=document.createElement('button');
+      btnSub.textContent='−';
+      const canSub=alloc[s]>floorVal;
+      btnSub.style.cssText=`font-size:13px;width:22px;height:22px;line-height:1;border-radius:3px;border:none;margin-left:6px;cursor:${canSub?'pointer':'default'};background:${canSub?'#E53935':'#2a1a1a'};color:${canSub?'#fff':'#444'};`;
+      if(canSub)btnSub.addEventListener('click',()=>{alloc[s]--;rebuildStats();updatePreview();});
+
+      const btnAdd=document.createElement('button');
+      btnAdd.textContent='+';
+      const canAdd=ptsLeft()>0&&alloc[s]<cap;
+      btnAdd.style.cssText=`font-size:13px;width:22px;height:22px;line-height:1;border-radius:3px;border:none;margin-left:3px;cursor:${canAdd?'pointer':'default'};background:${canAdd?'#4CAF50':'#1a2a1a'};color:${canAdd?'#fff':'#444'};`;
+      if(canAdd)btnAdd.addEventListener('click',()=>{alloc[s]++;rebuildStats();updatePreview();});
+
       // labels: class floor lock + species cap
       const meta=document.createElement('span');
-      meta.style.cssText='font-size:.62rem;margin-left:5px;white-space:nowrap;color:#555';
+      meta.style.cssText='font-size:.62rem;margin-left:6px;white-space:nowrap;color:#555';
       meta.textContent=floorVal?`🔒${floorVal} cap${cap}`:`cap${cap}`;
-      row.appendChild(lbl);row.appendChild(bar);row.appendChild(meta);
+      row.appendChild(lbl);row.appendChild(bar);row.appendChild(btnSub);row.appendChild(btnAdd);row.appendChild(meta);
       sa.appendChild(row);
     });
     updatePreview();
