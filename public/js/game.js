@@ -2605,6 +2605,107 @@ function distributeTransmuterPool(sbAmount,ethAmount){
 // ── EXCHANGE ──────────────────────────────────────────────────────────────────
 // Exchange rates (relative to alUSD)
 const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
+
+// ── CHANGELOG ─────────────────────────────────────────────────────────────────
+// Add new entries at the TOP. Each entry has: version, date, sections[].
+// Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
+const CHANGELOG=[
+  {
+    version:'0.9.4', date:'Apr 2 2026',
+    sections:[
+      {title:'UX Polish',items:[
+        'Gear auto-equips on purchase if the slot is empty; otherwise prompts clearly.',
+        'Quest tracker strip always visible below XP bar — shows progress or "READY TO TURN IN".',
+        'FLEE button now shows live escape chance % based on your AGI vs enemy speed.',
+        'Potion picker in battle: multiple potion types show a chooser instead of auto-using the first.',
+        'Unspent stat points pulse orange on the HUD level display with a count.',
+        'Minimap shows NPC markers: 🛒 shop · ! quest available · ★ quest ready · ✓ done.',
+        'Death penalty (30% currency + bag items) explained once on first battle.',
+      ]},
+      {title:'Mobile',items:[
+        '⛶ fullscreen button added to mobile HUD — locks to landscape on Android.',
+        'iOS: PWA meta tags added; Add to Home Screen for true native fullscreen.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.3', date:'Apr 2 2026',
+    sections:[
+      {title:'Combat — Weapon Switching',items:[
+        'Removed clunky two-step SWITCH WPN overlay.',
+        'New persistent LOADOUT strip below action buttons shows all weapons at all times.',
+        'One click on any alternate weapon swaps it in (costs a turn).',
+        'W / Tab keyboard shortcut cycles through weapons.',
+        'Durability bars visible on each weapon card in the loadout.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.2', date:'Apr 2 2026',
+    sections:[
+      {title:'Balance Overhaul',items:[
+        'Enemy scaling fixed: weapon damage now has 0.85× weight in power formula (was 0.5×).',
+        'Depth-scaling drops: loot × (1 + min(2, depth/15)) — up to 3× at depth 30+.',
+        'Shop inflation: prices rise 12%/level above 1. Arbitrage opportunity for low-level players.',
+        'LCK shop discount: 1%/pt off prices (up to 10%) — makes LCK useful beyond crits.',
+        'Gear durability: weapons degrade per attack, shields/armor per hit. Repair in shop.',
+        'LCK rebalanced: crit cap 80%→40%, potion drop cap 60%→45%.',
+        'Deep-zone armor penetration: enemies at depth 30+ bypass up to 55% of flat DEF.',
+        'Quest rewards scale +8%/level above 1 — quests stay relevant throughout.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.1', date:'Apr 2 2026',
+    sections:[
+      {title:'Sprites — Hair & Color Fixes',items:[
+        'Female warrior, mage, rogue, paladin, elf, and orc: hair cascade now drawn before armor.',
+        'Changing hair color no longer recolors the entire character body.',
+        'Armor color changes now only affect armor elements as expected.',
+      ]},
+      {title:'Sprites — New Characters',items:[
+        'All species and classes now have fully procedural canvas sprites (no PNGs).',
+        'Human: warrior, mage, rogue, paladin — male and female variants.',
+        'Non-human: elf, dwarf, goblin, orc, robot — male and female variants.',
+        'drawPlayerSprite routing updated for all species/class combinations.',
+      ]},
+    ]
+  },
+];
+const LATEST_VERSION=CHANGELOG[0].version;
+const CL_KEY='vq_changelog_seen'; // localStorage key
+
+function openChangelog(){
+  localStorage.setItem(CL_KEY,LATEST_VERSION);
+  const badge=document.getElementById('hud-changelog-badge');
+  if(badge)badge.style.display='none';
+  const content=document.getElementById('changelog-content');
+  if(content){
+    content.innerHTML=CHANGELOG.map(entry=>`
+      <div class="cl-entry">
+        <div class="cl-version">v${entry.version}<span class="cl-date">${entry.date}</span></div>
+        ${entry.sections.map(sec=>`
+          <div class="cl-section">${sec.title}</div>
+          ${sec.items.map(it=>`<div class="cl-item">${it}</div>`).join('')}
+        `).join('')}
+      </div>
+    `).join('');
+  }
+  const overlay=document.getElementById('changelog-overlay');
+  if(overlay){overlay.style.display='flex';}
+}
+function closeChangelog(){
+  const overlay=document.getElementById('changelog-overlay');
+  if(overlay)overlay.style.display='none';
+}
+// Show NEW badge if player hasn't seen the latest version
+(function initChangelogBadge(){
+  const seen=localStorage.getItem(CL_KEY);
+  if(seen!==LATEST_VERSION){
+    const badge=document.getElementById('hud-changelog-badge');
+    if(badge){badge.style.display='inline';badge.textContent='NEW';}
+  }
+})();
 // Updated from server on price_update events
 function applyLivePrices(prices){
   if(prices.alETH)EXCHANGE_RATES.alETH=prices.alETH;

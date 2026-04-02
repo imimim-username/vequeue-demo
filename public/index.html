@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Victory Quest">
 <meta name="theme-color" content="#000000">
 <title>Victory Quest</title>
-<link rel="stylesheet" href="/style.css?v=20260402i">
+<link rel="stylesheet" href="/style.css?v=20260402j">
 </head>
 <body>
 
@@ -131,6 +131,7 @@
     <span id="hud-alcx" style="color:#9C27B0;margin-left:6px" title="ALCX">⚗0</span>
     <span id="hud-players">1 online</span>
     <button id="hud-mute" title="Toggle SFX" onclick="toggleMute()" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 2px;opacity:.8">🔊</button><button id="hud-mute-mus" title="Toggle music" onclick="toggleMuteMusic()" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 2px;opacity:.8">🎶</button>
+    <button id="hud-changelog" onclick="openChangelog()" title="What's New">📋<span id="hud-changelog-badge" style="display:none"></span></button>
   </div>
   <div id="hud-xp-bar"><div id="hud-xp-fill"></div></div>
   <div id="hud-quest"></div>
@@ -282,6 +283,17 @@
   <button id="queue-leave-btn">✕ Leave Queue</button>
 </div>
 
+<!-- ═══════════════ CHANGELOG OVERLAY ═══════════════ -->
+<div id="changelog-overlay" style="display:none;position:fixed;inset:0;background:#000a;z-index:300;align-items:center;justify-content:center">
+  <div id="changelog-box" style="background:#0A0A14;border:2px solid #FFD700;border-radius:8px;padding:18px;width:min(500px,94vw);max-height:82vh;display:flex;flex-direction:column;font-family:monospace;color:#DDD;box-shadow:0 0 40px rgba(255,215,0,0.18)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <b style="color:#FFD700;font-size:1rem">📋 WHAT'S NEW</b>
+      <button onclick="closeChangelog()" style="background:none;border:1px solid #555;color:#aaa;cursor:pointer;font-size:.9rem;padding:3px 9px;border-radius:4px;font-family:monospace">✕ CLOSE</button>
+    </div>
+    <div id="changelog-content" style="overflow-y:auto;flex:1;padding-right:4px"></div>
+  </div>
+</div>
+
 <!-- ═══════════════ MARKET UI ═══════════════ -->
 <div id="market-ui" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;background:#0A0A14;border:2px solid #5A3A80;border-radius:8px;padding:16px;min-width:340px;max-width:440px;width:90vw;max-height:80vh;overflow-y:auto;color:#DDD;font-family:monospace;font-size:.8rem;box-shadow:0 0 30px rgba(90,60,128,0.5)">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -304,10 +316,10 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/data.js?v=20260402i"></script>
-<script src="/js/maps.js?v=20260402i"></script>
-<script src="/js/render.js?v=20260402i"></script>
-<script src="/js/audio.js?v=20260402i"></script>
-<script src="/js/game.js?v=20260402i"></script>
+<script src="/js/data.js?v=20260402j"></script>
+<script src="/js/maps.js?v=20260402j"></script>
+<script src="/js/render.js?v=20260402j"></script>
+<script src="/js/audio.js?v=20260402j"></script>
+<script src="/js/game.js?v=20260402j"></script>
 </body>
 </html>

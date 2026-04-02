@@ -227,4 +227,18 @@ body.fullscreen #btn-fullscreen{color:#fff;border-color:#fff;background:#ffffff2
 .bank-bar{background:#1a1a1a;border-radius:4px;height:7px;margin:6px 0}
 .bank-bar-fill{background:linear-gradient(90deg,#388E3C,#81C784);height:7px;border-radius:4px}
 @keyframes fsToastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* Changelog HUD button */
+#hud-changelog{background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 3px;opacity:.8;position:relative;color:inherit}
+#hud-changelog:hover{opacity:1}
+#hud-changelog-badge{position:absolute;top:-3px;right:-2px;background:#FF4444;color:#fff;
+  font-size:6px;font-weight:bold;border-radius:4px;padding:1px 3px;letter-spacing:.02em;
+  animation:questPulse 1.2s infinite}
+/* Changelog content entries */
+.cl-entry{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #1E1E2E}
+.cl-entry:last-child{border-bottom:none;margin-bottom:0}
+.cl-version{color:#FFD700;font-size:.82rem;font-weight:bold;margin-bottom:4px}
+.cl-date{color:#666;font-size:.7rem;margin-left:8px}
+.cl-section{color:#87CEEB;font-size:.72rem;font-weight:bold;margin:7px 0 3px}
+.cl-item{color:#CCC;font-size:.72rem;margin:2px 0 2px 10px;line-height:1.4}
+.cl-item::before{content:"▸ ";color:#666}
 </style>
