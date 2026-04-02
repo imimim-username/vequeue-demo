@@ -1887,6 +1887,16 @@ function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   // ── Shadow ──
   ctx.fillStyle='#00000028';ctx.fillRect(ox+4,oy+43,16,3);
 
+  // ── Long flowing hair (back layer, drawn first so armor covers it) ──
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+2, oy-1,20,34);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+3, oy+0, 18,32);
+  ctx.fillStyle=hr.lo;ctx.fillRect(ox+4, oy+0, 16,28);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5,oy+0, 14,22);
+  ctx.fillStyle=hr.hi;ctx.fillRect(ox+6, oy+0, 10,5);
+  ctx.fillStyle=hr.hi;ctx.fillRect(ox+5, oy+5, 3, 8);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+16,oy+0, 3,22);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+4, oy+24,16,6);
+
   // ── Sword (right hip) ──
   if(dir!==1){
     ctx.fillStyle=OUT;  ctx.fillRect(ox+19,oy+16+bob,3,22);
@@ -1979,20 +1989,6 @@ function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.restore(); // end bob
 
   // ── Head ──
-  // Long flowing hair — cascades past shoulders, extends to y≈30
-  // Back layer (widest)
-  ctx.fillStyle=OUT;  ctx.fillRect(ox+2, oy-1,20,34);
-  ctx.fillStyle=hr.dk;ctx.fillRect(ox+3, oy+0, 18,32);
-  // Main hair body
-  ctx.fillStyle=hr.lo;ctx.fillRect(ox+4, oy+0, 16,28);
-  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5,oy+0, 14,22);
-  // Highlights on top and left flow
-  ctx.fillStyle=hr.hi;ctx.fillRect(ox+6, oy+0, 10,5);
-  ctx.fillStyle=hr.hi;ctx.fillRect(ox+5, oy+5, 3, 8);
-  // Inner shadow (away from light)
-  ctx.fillStyle=hr.dk;ctx.fillRect(ox+16,oy+0, 3,22);
-  ctx.fillStyle=hr.dk;ctx.fillRect(ox+4, oy+24,16,6);
-
   // Face (narrower and taller than male)
   ctx.fillStyle=OUT;   ctx.fillRect(ox+7, oy+2,10,11);
   ctx.fillStyle=sk.mid;ctx.fillRect(ox+8, oy+3,8, 10);
@@ -2222,6 +2218,14 @@ function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle='#00000025';
   ctx.fillRect(ox+4,oy+42,16,3);
 
+  // ── Hair back layer (drawn first so armor covers it) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+0,18,26);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4,oy+1,16,24);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5,oy+1,14,22);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6,oy+1,11,18);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7,oy+1,8,6);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+1,4,22); // shadow side
+
   // ── Staff (wooden, tall — always right-side in local coords; flip handles left-facing) ──
   // Shaft (behind body)
   ctx.fillStyle=OUT;      ctx.fillRect(ox+21,oy-12,4,56);
@@ -2316,14 +2320,6 @@ function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   }
 
   ctx.restore(); // end bob
-
-  // ── Head: hair back layer (long, flowing, parametric colour) ──
-  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+0,18,26);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4,oy+1,16,24);
-  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5,oy+1,14,22);
-  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6,oy+1,11,18);
-  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7,oy+1,8,6);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+1,4,22); // shadow side
 
   // ── Pointed mage hat (dusty purple, tall cone + wide brim) ──
   // Cone sections (pixel-step taper from 1px tip to full brim width)
@@ -2532,6 +2528,13 @@ function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle='#00000025';
   ctx.fillRect(ox+5,oy+42,14,3);
 
+  // Hair (back layer, drawn first so armor covers it)
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+3, oy+2,18,20);
+  ctx.fillStyle=hr.lo; ctx.fillRect(ox+4, oy+3,16,18);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5, oy+3,13,14);
+  ctx.fillStyle=hr.hi; ctx.fillRect(ox+6, oy+3,10,4);
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+15,oy+3,4,14);
+
   // Hip dagger (facing right)
   if(dir!==1){
     ctx.fillStyle=LEASH; ctx.fillRect(ox+18,oy+20+bob,3,14);
@@ -2609,13 +2612,6 @@ function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   }
 
   ctx.restore();
-
-  // Head — hair back (visible below hood sides)
-  ctx.fillStyle=hr.dk; ctx.fillRect(ox+3, oy+2,18,20);
-  ctx.fillStyle=hr.lo; ctx.fillRect(ox+4, oy+3,16,18);
-  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5, oy+3,13,14);
-  ctx.fillStyle=hr.hi; ctx.fillRect(ox+6, oy+3,10,4);
-  ctx.fillStyle=hr.dk; ctx.fillRect(ox+15,oy+3,4,14);
 
   // Hood (form-fitting, dark)
   ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+0,16,12);
@@ -2821,6 +2817,14 @@ function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle='#00000025';
   ctx.fillRect(ox+4,oy+42,16,3);
 
+  // Hair (back layer, drawn first so armor covers it)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy-1,18,28);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4, oy+0, 16,26);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy+0, 14,22);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy+0, 11,18);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7, oy+0, 9,5);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 3,18);
+
   // Divine aura
   ctx.fillStyle=GLOW; ctx.fillRect(ox-4,oy-4,32,50);
 
@@ -2913,14 +2917,6 @@ function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   }
 
   ctx.restore();
-
-  // Head — long elegant hair
-  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy-1,18,28);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4, oy+0, 16,26);
-  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy+0, 14,22);
-  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy+0, 11,18);
-  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7, oy+0, 9,5);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 3,18);
 
   // Face (noble, feminine)
   ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+2,10,12);
@@ -3118,6 +3114,14 @@ function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle='#00000025';
   ctx.fillRect(ox+5,oy+42,14,3);
 
+  // Hair (back layer, drawn first so armor covers it)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy-1,20,30);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+3, oy+0, 18,28);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+4, oy+0, 16,24);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5, oy+0, 13,20);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+6, oy+0, 10,5);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 4,20);
+
   // Boots (slender, forest)
   [5,14].forEach(bx=>{
     ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+32,7,12);
@@ -3175,14 +3179,6 @@ function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle=LEAHI;  ctx.fillRect(ox+10,oy+28,4,3); // gem clasp
 
   ctx.restore();
-
-  // Head — long hair (cascading, back layer)
-  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy-1,20,30);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+3, oy+0, 18,28);
-  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+4, oy+0, 16,24);
-  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5, oy+0, 13,20);
-  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+6, oy+0, 10,5);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 4,20);
 
   // Very prominent pointed ears
   ctx.fillStyle=OUT;    ctx.fillRect(ox-1,oy+5,5,10);
@@ -4003,6 +3999,17 @@ function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   ctx.fillStyle='#00000030';
   ctx.fillRect(ox+0,oy+42,26,3);
 
+  // Hair — battle braids (back layer, drawn first so armor covers it)
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+2, oy+0,4,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+3, oy+0,3,16);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+3, oy+0,2,14);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+19,oy+0,4,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+19,oy+0,3,16);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+20,oy+0,2,14);
+  // Braid rings
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+6,4,2);ctx.fillRect(ox+18,oy+6,4,2);
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+12,4,2);ctx.fillRect(ox+18,oy+12,4,2);
+
   // Axe
   if(dir!==1){
     ctx.fillStyle=AXHND; ctx.fillRect(ox+20,oy+12+bob,3,24);
@@ -4093,18 +4100,6 @@ function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   }
 
   ctx.restore();
-
-  // Head — battle braids (parametric hair)
-  // Braids
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+2, oy+0,4,18);
-  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+3, oy+0,3,16);
-  ctx.fillStyle=hr.mid; ctx.fillRect(ox+3, oy+0,2,14);
-  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+19,oy+0,4,18);
-  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+19,oy+0,3,16);
-  ctx.fillStyle=hr.mid; ctx.fillRect(ox+20,oy+0,2,14);
-  // Braid rings
-  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+6,4,2);ctx.fillRect(ox+18,oy+6,4,2);
-  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+12,4,2);ctx.fillRect(ox+18,oy+12,4,2);
 
   // Face
   ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+2,16,14);
