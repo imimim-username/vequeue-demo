@@ -964,6 +964,11 @@ function checkSubZoneBoss(){
 
 function triggerBattle(key,depth=0){
   const tmpl=ENEMIES[key];if(!tmpl)return;
+  // One-time death penalty reminder shown before the player's very first fight
+  if(!G._shownDeathWarning){
+    G._shownDeathWarning=true;
+    chatLog('⚠ Death penalty: lose 30% currency + unbound bag items. Bound/equipped gear is safe.','#FF8C00');
+  }
   // Snapshot all rendered layers into _snapCanvas
   _snapCtx.clearRect(0,0,W,H);
   ['cv-bg','cv-tiles','cv-sprites'].forEach(id=>{
@@ -1693,11 +1698,13 @@ function renderBattleScreen(){
   // ── Action buttons ──
   const cls=G.class_||'warrior';
   const specialLabel={warrior:'⚔  POWER STRIKE',mage:'🔮  ARCANE BOLT',rogue:'🗡  TWIN DAGGERS',paladin:'✨  HOLY LIGHT'}[cls]||'✦  SPECIAL';
+  // Flee chance shown on the button so the player can make an informed decision
+  const fleeChancePct=Math.round(Math.min(0.88,0.4+G.stats.agi*0.06-(bt.enemy.spd||1)*0.04)*100);
   const actions=[
     {id:'attack', label:'⚔  ATTACK',   bg:'#6B1818',hi:'#A02020'},
     {id:'special',label:specialLabel,  bg:'#183058',hi:'#2050A0'},
     {id:'potion', label:'🧪  POTION',  bg:'#183040',hi:'#204060'},
-    {id:'flee',   label:'💨  FLEE',    bg:'#183018',hi:'#286028'},
+    {id:'flee',   label:`💨  FLEE (${fleeChancePct}%)`,bg:'#183018',hi:'#286028'},
   ];
   const active=bt.phase==='player_turn'&&!bt.result;
   const bX=274,bW=175,bH=28,bGap=7,bStartY=pY+10;
@@ -1776,6 +1783,32 @@ function renderBattleScreen(){
       ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
       ctxUI.fillText('tap alt weapon to swap  (uses turn)',bX,hY);
     }
+  }
+
+  // ── Potion picker (shown when player has multiple potion types and tapped POTION) ──
+  if(bt._potionPick){
+    const potSlots=G.inventory.map((it,i)=>i>=2&&it?.type==='potion'?{pot:it,idx:i}:null).filter(Boolean);
+    const ppX=bX-4,ppW=bW+8,ppY=pY-10-potSlots.length*30-24;
+    ctxUI.fillStyle='rgba(0,0,0,0.92)';ctxUI.fillRect(ppX,ppY,ppW,potSlots.length*30+24);
+    ctxUI.strokeStyle='#44FF88';ctxUI.lineWidth=1;ctxUI.strokeRect(ppX,ppY,ppW,potSlots.length*30+24);
+    ctxUI.fillStyle='#44FF88';ctxUI.font='bold 10px monospace';
+    ctxUI.fillText('USE WHICH POTION?',ppX+6,ppY+13);
+    potSlots.forEach(({pot,idx},i)=>{
+      const py=ppY+18+i*30,ph=26;
+      BATTLE_BTNS[`pot_use_${idx}`]={x:ppX+2,y:py,w:ppW-4,h:ph};
+      ctxUI.fillStyle='#0E1A10';ctxUI.fillRect(ppX+2,py,ppW-4,ph);
+      ctxUI.strokeStyle='#44FF88';ctxUI.lineWidth=1;ctxUI.strokeRect(ppX+2,py,ppW-4,ph);
+      ctxUI.fillStyle='#fff';ctxUI.font='11px monospace';
+      ctxUI.fillText(`${pot.icon} ${pot.name}`,ppX+8,py+13);
+      ctxUI.fillStyle='#44FF88';ctxUI.font='9px monospace';
+      const healStr=pot.healFull?'Full HP restore':`+${pot.heal} HP`;
+      ctxUI.fillText(healStr,ppX+8,py+23);
+    });
+    const cancelY=ppY+18+potSlots.length*30;
+    BATTLE_BTNS['pot_cancel']={x:ppX+2,y:cancelY,w:ppW-4,h:18};
+    ctxUI.fillStyle='#200808';ctxUI.fillRect(ppX+2,cancelY,ppW-4,18);
+    ctxUI.strokeStyle='#604040';ctxUI.lineWidth=1;ctxUI.strokeRect(ppX+2,cancelY,ppW-4,18);
+    ctxUI.fillStyle='#888';ctxUI.font='9px monospace';ctxUI.fillText('✕ Cancel',ppX+8,cancelY+12);
   }
 
   // ── Player sprite (battle right side, facing left) ──
@@ -1913,21 +1946,46 @@ function doBattleAction(action){
   if(!bt||bt.phase!=='player_turn'||bt.result)return;
 
   if(action==='potion'){
-    const slot=G.inventory.findIndex((s,i)=>i>=2&&s&&s.type==='potion');
-    if(slot===-1){bt.log.push('No potions in inventory!');bt.phase='player_turn';SFX.error();return;}
-    const pot=G.inventory[slot];
+    // Find all potions; if more than one kind exists, open picker instead of auto-using
+    const potSlots=G.inventory.map((it,i)=>i>=2&&it?.type==='potion'?{pot:it,idx:i}:null).filter(Boolean);
+    if(potSlots.length===0){bt.log.push('No potions in inventory!');bt.phase='player_turn';SFX.error();return;}
+    if(potSlots.length===1||!bt._potionPick){
+      // Auto-use first (or only) potion when there's no ambiguity
+      const {pot,idx}=potSlots[0];
+      const before=G.hp;
+      if(pot.healFull)G.hp=G.maxHp;
+      else G.hp=Math.min(G.maxHp,G.hp+(pot.heal||5));
+      const gained=G.hp-before;
+      G.inventory[idx]=null;
+      bt.log.push(`Used ${pot.name}! +${gained} HP.`);
+      SFX.potion();
+      btAnim('float_dmg',{val:'+'+gained,x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#44FF88',big:true});
+      btAnim('screen_flash',{color:'rgba(0,200,80,0.12)'});
+      bt.phase='enemy_turn';bt.animTimer=75;
+    } else {
+      // Multiple potion types — open picker (handled in renderBattleUI)
+      bt._potionPick=true;
+    }
+    return;
+  }
+  if(action.startsWith('pot_use_')){
+    const idx=parseInt(action.slice(8));
+    const pot=G.inventory[idx];
+    if(!pot||pot.type!=='potion'){bt._potionPick=false;bt.phase='player_turn';return;}
     const before=G.hp;
     if(pot.healFull)G.hp=G.maxHp;
     else G.hp=Math.min(G.maxHp,G.hp+(pot.heal||5));
     const gained=G.hp-before;
-    G.inventory[slot]=null;
+    G.inventory[idx]=null;
     bt.log.push(`Used ${pot.name}! +${gained} HP.`);
+    bt._potionPick=false;
     SFX.potion();
     btAnim('float_dmg',{val:'+'+gained,x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#44FF88',big:true});
     btAnim('screen_flash',{color:'rgba(0,200,80,0.12)'});
     bt.phase='enemy_turn';bt.animTimer=75;
     return;
   }
+  if(action==='pot_cancel'){bt._potionPick=false;return;}
   if(action==='flee'){
     const chance=Math.min(0.88,0.4+G.stats.agi*0.06-bt.enemy.spd*0.04);
     if(Math.random()<chance){
@@ -2792,8 +2850,16 @@ function buyItem(vendorId,idx){
   if(isGear){
     const statStr=item.type==='weapon'?`+${item.dmg} DMG [${(item.dmgType||'physical')}]`:
                   `+${item.def} DEF`;
-    const rarCol=RARITY_COLOR[item.rarity||'common'];
-    chatLog(`Bought ${item.name}! (${statStr}) — open inventory to equip`,'#4CAF50');
+    // Auto-equip if the relevant slot is empty; otherwise prompt via confirm
+    const slotEmpty=(item.type==='weapon'&&!G.inventory[0])||
+                    (item.type==='shield'&&!G.inventory[1])||
+                    (item.type==='armor' &&!G.equippedArmor);
+    if(slotEmpty){
+      equipFromBag(slot);
+      chatLog(`Bought & equipped ${item.name}! (${statStr})`,'#4CAF50');
+    } else {
+      chatLog(`Bought ${item.name}! (${statStr}) — press P → click item to equip`,'#4CAF50');
+    }
   } else {
     chatLog(`Bought ${item.name}!`,'#4CAF50');
   }
@@ -2905,11 +2971,45 @@ function renderMinimap(ctx){
   ctx.imageSmoothingEnabled=true;
   // Border
   ctx.strokeStyle='#4a90d9';ctx.lineWidth=2;ctx.strokeRect(ox,oy,dw,dh);
-  // Player dot
+
+  // ── NPC / shop markers ──
+  const mmNpcs=NPCS[G.zone]||[];
+  ctx.save();ctx.font='8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  mmNpcs.forEach(npc=>{
+    const mx=ox+Math.round(npc.x*scale);
+    const my=oy+Math.round(npc.y*scale);
+    // Icon: 🛒 for shops, ★ for quest givers with active/ready quest, ◈ for other NPCs
+    let icon='·';let col='#AAA';
+    if(npc.shop){icon='🛒';col='#FFD700';}
+    else if(npc.questId){
+      const qs=G.quests[npc.questId];
+      if(qs?.status==='ready'){icon='★';col='#FFD700';}
+      else if(!qs||qs.status==='active'){icon='!';col='#FF8C00';}
+      else{icon='✓';col='#4CAF50';}
+    } else {icon='●';col='#88BBFF';}
+    // Draw dot
+    ctx.fillStyle=col;
+    if(icon==='🛒'){ctx.font='7px sans-serif';ctx.fillText(icon,mx,my);}
+    else{
+      ctx.fillStyle=col;ctx.fillRect(mx-2,my-2,5,5);
+      if(icon!=='●'){ctx.fillStyle='#000';ctx.font='bold 6px monospace';ctx.fillText(icon,mx,my);}
+    }
+  });
+  ctx.restore();
+
+  // Player dot (drawn last so always on top)
   const px=Math.floor(G.x/TS),py=Math.floor(G.y/TS);
   const dx=ox+Math.round(px*scale),dy=oy+Math.round(py*scale);
   ctx.fillStyle='#FF4444';ctx.fillRect(dx-2,dy-2,5,5);
   ctx.fillStyle='#FFAAAA';ctx.fillRect(dx-1,dy-1,3,3);
+
+  // Legend
+  ctx.font='7px monospace';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(ox,oy+dh+2,dw,13);
+  ctx.fillStyle='#FFD700';ctx.fillText('🛒 shop',ox+4,oy+dh+11);
+  ctx.fillStyle='#FF8C00';ctx.fillText('! quest',ox+56,oy+dh+11);
+  ctx.fillStyle='#FF4444';ctx.fillText('♥ you',ox+110,oy+dh+11);
+  ctx.fillStyle='#4CAF50';ctx.fillText('✓ done',ox+152,oy+dh+11);
 }
 
 // ── SPRITE LAYER ──────────────────────────────────────────────────────────────
@@ -3098,11 +3198,35 @@ function renderHUD(){
   document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
   const alcxTxt = G.lockedAlcx>0 ? `⚗${G.alcx} 🔒${G.lockedAlcx}` : `⚗${G.alcx}`;
   document.getElementById('hud-alcx').textContent = alcxTxt;
-  document.getElementById('hud-level').textContent=`Lv.${G.level}`;
-  // Quest-ready badge
+  // Level display — badge for unspent stat points or ready quests
   const hasReady=Object.values(G.quests).some(q=>q.status==='ready');
-  document.getElementById('hud-level').style.color=hasReady?'#FFD700':'#8BC34A';
-  document.getElementById('hud-level').title=hasReady?'Quest ready to turn in!':'';
+  const hasStatPts=(G.statPoints||0)>0;
+  const lvlEl=document.getElementById('hud-level');
+  lvlEl.textContent=`Lv.${G.level}`+(hasStatPts?` ✦${G.statPoints}`:'');
+  lvlEl.style.color=hasReady?'#FFD700':hasStatPts?'#FF8C00':'#8BC34A';
+  lvlEl.title=hasReady?'Quest ready to turn in!':hasStatPts?`${G.statPoints} unspent stat point${G.statPoints>1?'s':''} — press P`:'';
+  lvlEl.style.animation=hasStatPts&&!hasReady?'questPulse 1.2s infinite':'';
+  // ── Persistent quest tracker strip ──
+  const questEl=document.getElementById('hud-quest');
+  if(questEl){
+    const activeQuests=Object.entries(G.quests)
+      .filter(([,qs])=>qs.status==='active'||qs.status==='ready')
+      .map(([qid,qs])=>({qid,qs,def:QUEST_DEFS[qid]}))
+      .filter(x=>x.def);
+    if(activeQuests.length===0){
+      questEl.innerHTML='';
+    } else {
+      // Show at most 2 quests to keep the strip compact
+      questEl.innerHTML=activeQuests.slice(0,2).map(({qs,def})=>{
+        if(qs.status==='ready'){
+          return `<span class="q-ready">★ ${def.title}: READY TO TURN IN</span>`;
+        }
+        const goal=def.goal?.count||1;
+        const prog=Math.min(qs.progress||0,goal);
+        return `<span class="q-label">◈ ${def.title}:</span><span class="q-progress">${prog}/${goal}</span>`;
+      }).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+    }
+  }
   const xpPct=Math.min(1,G.xp/xpForLevel(G.level))*100;
   document.getElementById('hud-xp-fill').style.width=xpPct+'%';
   {
