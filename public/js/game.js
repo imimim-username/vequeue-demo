@@ -1661,7 +1661,7 @@ function renderBattleScreen(){
     ctxUI.save();
     ctxUI.translate(bpX+phX+playerLungeX,bpY);
     ctxUI.scale(btS,btS);
-    drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone);
+    drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone,G.class_);
     ctxUI.restore();
   }
 
@@ -2736,7 +2736,7 @@ function renderSpriteLayer(ctx){
     const footY=p.y-G.camY+4;
     if(footX<-SW||footX>W+SW||footY<-SH||footY>H+40)continue;
     scaledSprite(ctx,footX,footY,(ox,oy)=>
-      drawPlayerSprite(ctx,ox,oy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null,p.gender||'male',p.skinTone??2));
+      drawPlayerSprite(ctx,ox,oy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null,p.gender||'male',p.skinTone??2,p.class_||'warrior'));
     // name label above
     const topY=footY-SH;
     const nl=p.nickname||'';
@@ -2748,7 +2748,7 @@ function renderSpriteLayer(ctx){
   // ── Local player ──
   const footX=G.x-G.camX,footY=G.y-G.camY+4;
   scaledSprite(ctx,footX,footY,(ox,oy)=>
-    drawPlayerSprite(ctx,ox,oy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone));
+    drawPlayerSprite(ctx,ox,oy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone,G.class_));
 
   // Draw world loot piles
   if(G.worldLoot){
@@ -3203,7 +3203,7 @@ function buildCreateScreen(){
     const scale=2.5;
     previewCtx.save();
     previewCtx.scale(scale,scale);
-    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor,G.accessory,G.gender,G.skinTone);
+    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor,G.accessory,G.gender,G.skinTone,G.class_);
     previewCtx.restore();
     const sp2=SPECIES[G.species||'human'];const cl=CLASSES[G.class_||'warrior'];
     const finalHp=sp2.baseHp+Math.floor((alloc.vit-2)*0.5);

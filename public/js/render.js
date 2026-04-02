@@ -1308,13 +1308,18 @@ function drawVillageBG(ctx,W,H,tick){
 
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware.
-// gender + skinToneIdx route human characters to the procedural warrior sprite.
-function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx){
+// gender + skinToneIdx + class_ route human characters to the correct procedural sprite.
+function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx,class_){
   const sp=species||'human';
 
-  // ── Procedural warrior sprites for human characters ───────────────────────
+  // ── Human characters: class determines sprite archetype ──────────────────
   if(sp==='human'){
-    drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
+    const cls=class_||'warrior';
+    if(cls==='mage'){
+      drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
+    } else {
+      drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
+    }
     return;
   }
 
@@ -2012,6 +2017,359 @@ function drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,ha
     ctx.restore();
   } else {
     const fn = (gender==='female') ? _drawFemaleWarrior : _drawMaleWarrior;
+    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HUMAN MAGE SPRITES — fully procedural canvas drawing
+// ─────────────────────────────────────────────────────────────────────────────
+// Male:   stocky sage — deep teal robe+hood, large orange pauldrons, white
+//         beard, red forehead gem, gold rune buckle, orange cape, arcane artifact
+// Female: elegant spellcaster — pointed purple hat, long flowing hair, wide
+//         purple cape, warm rose inner robe, wooden staff with cross topper
+//
+// Both share the same walk tables, skin palette, and hair palette as warriors.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── MALE MAGE ────────────────────────────────────────────────────────────────
+// Inspiration: elderly stocky mage, teal/cyan robe, huge orange pauldrons,
+// silver beard, red third-eye gem, gold rune belt, artifact held in right hand.
+function _drawMaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080818';
+  const TEAL='#1E7272',TEAHI='#2E9898',TEASH='#124646',TEADK='#0A2E2E',TEALI='#36A8A8';
+  const CAPE='#A83C10',CAPEHI='#C85020',CAPESH='#6E2408';
+  const PAUL='#C04818',PAULHI='#DC6828',PAULSH='#7C2E10';
+  const GOLD='#C4A028',GOLHI='#E0BC40',GOLSH='#8A7018';
+  const BEARD='#DCDCDC',BEAHI='#F4F4F4',BEASH='#ABABAB',BEADK='#707070';
+  const GEM='#EE1010',GEMHI='#FF7060';
+  const BOOT='#4A2808',BOOTHI='#6A3C14';
+  const ART='#8040C8',ARTHI='#A868E8';
+
+  // ── Shadow ──
+  ctx.fillStyle='#00000028';
+  ctx.fillRect(ox+2,oy+42,22,3);
+
+  // ── Cape (orange-rust, visible on both sides behind body) ──
+  ctx.fillStyle=CAPESH; ctx.fillRect(ox-3,oy+1,5,38);
+  ctx.fillStyle=CAPE;   ctx.fillRect(ox-2,oy+1,4,36);
+  ctx.fillStyle=CAPEHI; ctx.fillRect(ox-2,oy+3,2,20);
+  ctx.fillStyle=CAPESH; ctx.fillRect(ox+22,oy+1,5,38);
+  ctx.fillStyle=CAPE;   ctx.fillRect(ox+22,oy+1,4,36);
+  ctx.fillStyle=CAPEHI; ctx.fillRect(ox+24,oy+3,1,20);
+
+  // ── Boots (just toe tips below robe) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+38,8,5);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+4,oy+39,7,4);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+4,oy+39,6,1);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+13,oy+38,8,5);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+14,oy+39,7,4);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+14,oy+39,6,1);
+
+  // ── Robe lower (teal, A-line flare toward hem) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+1,oy+25,22,14);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+2,oy+26,20,13);
+  ctx.fillStyle=TEAL;   ctx.fillRect(ox+3,oy+26,16,13);
+  ctx.fillStyle=TEALI;  ctx.fillRect(ox+3,oy+26,9,5);
+  ctx.fillStyle=TEADK;  ctx.fillRect(ox+18,oy+26,4,13);
+
+  // ── Belt (gold, ornate) + rune buckle ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+24,16,3);
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+5,oy+25,14,2);
+  ctx.fillStyle=GOLHI;  ctx.fillRect(ox+5,oy+25,14,1);
+  // Buckle plate
+  ctx.fillStyle=GOLSH;  ctx.fillRect(ox+9,oy+23,6,5);
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+10,oy+24,4,3);
+  ctx.fillStyle=GOLHI;  ctx.fillRect(ox+10,oy+24,3,1);
+  // Rune symbol (arrow / sigil)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+11,oy+24,2,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+10,oy+25,4,1);
+
+  // ── Torso group (bob animation) ──
+  ctx.save();
+  ctx.translate(0,bob);
+
+  // Left sleeve (wide teal)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-1,oy+13,7,13);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+0,oy+14,6,12);
+  ctx.fillStyle=TEAL;   ctx.fillRect(ox+1,oy+14,5,11);
+  ctx.fillStyle=TEALI;  ctx.fillRect(ox+1,oy+14,3,5);
+  ctx.fillStyle=TEADK;  ctx.fillRect(ox+4,oy+20,2,5);
+
+  // Right sleeve (artifact hand)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+18,oy+13,7,13);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+18,oy+14,6,12);
+  ctx.fillStyle=TEAL;   ctx.fillRect(ox+19,oy+14,5,11);
+  ctx.fillStyle=TEALI;  ctx.fillRect(ox+21,oy+14,3,5);
+  ctx.fillStyle=TEADK;  ctx.fillRect(ox+20,oy+20,3,5);
+
+  // Chest robe body
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+13,16,13);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+5,oy+14,14,12);
+  ctx.fillStyle=TEAL;   ctx.fillRect(ox+6,oy+14,11,12);
+  ctx.fillStyle=TEALI;  ctx.fillRect(ox+6,oy+14,8,5);
+  ctx.fillStyle=TEADK;  ctx.fillRect(ox+16,oy+14,3,12);
+
+  // Left pauldron (large, round, orange)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-2,oy+10,12,9);
+  ctx.fillStyle=PAULSH; ctx.fillRect(ox-1,oy+11,11,8);
+  ctx.fillStyle=PAUL;   ctx.fillRect(ox+0,oy+12,10,7);
+  ctx.fillStyle=PAULHI; ctx.fillRect(ox+0,oy+12,8,3);
+  ctx.fillStyle=PAULSH; ctx.fillRect(ox+7,oy+16,3,3);
+
+  // Right pauldron
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+14,oy+10,12,9);
+  ctx.fillStyle=PAULSH; ctx.fillRect(ox+14,oy+11,11,8);
+  ctx.fillStyle=PAUL;   ctx.fillRect(ox+14,oy+12,10,7);
+  ctx.fillStyle=PAULHI; ctx.fillRect(ox+14,oy+12,8,3);
+  ctx.fillStyle=PAULSH; ctx.fillRect(ox+14,oy+16,3,3);
+
+  // Glowing arcane artifact (right hand)
+  ctx.fillStyle='rgba(128,64,200,0.22)';
+  ctx.fillRect(ox+22,oy+19,10,10);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+24,oy+21,7,7);
+  ctx.fillStyle='#5A30A0';ctx.fillRect(ox+25,oy+22,6,6);
+  ctx.fillStyle=ART;    ctx.fillRect(ox+25,oy+22,5,5);
+  ctx.fillStyle=ARTHI;  ctx.fillRect(ox+25,oy+22,4,3);
+  ctx.fillStyle=ART;    ctx.fillRect(ox+27,oy+25,2,2);
+  ctx.fillStyle=ARTHI;  ctx.fillRect(ox+27,oy+25,1,1);
+
+  ctx.restore(); // end bob
+
+  // ── Hood (large, deep teal, drooping forward) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+1,oy-5,22,20);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+2,oy-4,20,19);
+  ctx.fillStyle=TEAL;   ctx.fillRect(ox+3,oy-4,17,18);
+  ctx.fillStyle=TEALI;  ctx.fillRect(ox+3,oy-4,12,4); // top highlight
+  // Hood droop (inner shadow)
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+6,oy+1,12,11);
+  ctx.fillStyle=TEADK;  ctx.fillRect(ox+8,oy+2,8,10);
+  // Side flaps
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+2,oy+5,3,8);
+  ctx.fillStyle=TEASH;  ctx.fillRect(ox+19,oy+5,3,8);
+
+  // ── Face (partially visible below hood) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6,oy+3,12,12);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+7,oy+4,10,11);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+7,oy+4,8,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+7,oy+11,10,4);
+  ctx.fillStyle=sk.dk;  ctx.fillRect(ox+7,oy+13,10,2);
+
+  // Eyes (dark-rimmed, reddish — wise/ancient look)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+7,oy+6,3,2); ctx.fillRect(ox+14,oy+6,3,2);
+  ctx.fillStyle='#501010'; ctx.fillRect(ox+8,oy+6,2,2); ctx.fillRect(ox+15,oy+6,2,2);
+  ctx.fillStyle='#C04040'; ctx.fillRect(ox+8,oy+6,1,1); ctx.fillRect(ox+15,oy+6,1,1);
+
+  // Nose (aged, prominent)
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+11,oy+8,2,3);
+  ctx.fillStyle=sk.dk; ctx.fillRect(ox+12,oy+9,2,2);
+
+  // ── Forehead gem (red arcane mark, peeking at hood edge) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+10,oy+3,5,4);
+  ctx.fillStyle=GEM;    ctx.fillRect(ox+11,oy+4,3,2);
+  ctx.fillStyle=GEMHI;  ctx.fillRect(ox+11,oy+4,2,1);
+
+  // ── Beard (silver-white, wide, hangs over chest) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+12,14,17);
+  ctx.fillStyle=BEADK;  ctx.fillRect(ox+6,oy+13,12,16);
+  ctx.fillStyle=BEASH;  ctx.fillRect(ox+7,oy+13,10,15);
+  ctx.fillStyle=BEARD;  ctx.fillRect(ox+8,oy+13,8,14);
+  ctx.fillStyle=BEAHI;  ctx.fillRect(ox+9,oy+13,5,8);
+  // Strand detail lines
+  ctx.fillStyle=BEASH;  ctx.fillRect(ox+8,oy+16,8,1);
+  ctx.fillStyle=BEASH;  ctx.fillRect(ox+9,oy+19,6,1);
+  ctx.fillStyle=BEASH;  ctx.fillRect(ox+8,oy+22,8,1);
+  ctx.fillStyle=BEADK;  ctx.fillRect(ox+8,oy+25,8,1);
+}
+
+// ── FEMALE MAGE ───────────────────────────────────────────────────────────────
+// Inspiration: tall elegant spellcaster, pointed dusty-purple hat, long flowing
+// hair (from hr param), large dramatic purple cape, warm rose inner robe,
+// tall wooden staff with cross topper, dark burgundy boots.
+function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080C18';
+  const PURP='#44287A',PURPHI='#6644A8',PURPSH='#2A1850',PURPDK='#160E30';
+  const CAPE='#38206A',CAPEHI='#502E90',CAPESH='#1E1040';
+  const HAT='#5A4088',HATHI='#7A58B0',HATSH='#3A286A';
+  const ROSE='#AA6848',ROSEHI='#C87A58',ROSESH='#784830';
+  const STAFF='#7A4820',STAFFHI='#A06030',STAFFSH='#4A2C10';
+  const STAFFCAP='#C09040',STAFFCAP2='#E0C060';
+  const BOOT='#5A2424',BOOTHI='#7A3434';
+  const BELT='#8A6820',BELTHI='#B08C30';
+
+  // ── Shadow ──
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+4,oy+42,16,3);
+
+  // ── Staff (wooden, tall — always right-side in local coords; flip handles left-facing) ──
+  // Shaft (behind body)
+  ctx.fillStyle=OUT;      ctx.fillRect(ox+21,oy-12,4,56);
+  ctx.fillStyle=STAFFSH;  ctx.fillRect(ox+22,oy-11,3,54);
+  ctx.fillStyle=STAFF;    ctx.fillRect(ox+22,oy-11,2,54);
+  ctx.fillStyle=STAFFHI;  ctx.fillRect(ox+22,oy-8,1,44);
+  // Topper (cross / fleur-de-lis shape)
+  ctx.fillStyle=OUT;      ctx.fillRect(ox+19,oy-14,8,5);
+  ctx.fillStyle=STAFFCAP; ctx.fillRect(ox+20,oy-13,6,4);
+  ctx.fillStyle=STAFFCAP2;ctx.fillRect(ox+20,oy-13,5,2);
+  // Cross arm
+  ctx.fillStyle=OUT;      ctx.fillRect(ox+18,oy-11,10,3);
+  ctx.fillStyle=STAFFCAP; ctx.fillRect(ox+19,oy-10,8,2);
+  ctx.fillStyle=STAFFCAP2;ctx.fillRect(ox+19,oy-10,6,1);
+
+  // ── Cape (large, wide, deep purple — dominant silhouette element) ──
+  // Left wing
+  ctx.fillStyle=CAPESH; ctx.fillRect(ox-5,oy+8,8,34);
+  ctx.fillStyle=CAPE;   ctx.fillRect(ox-4,oy+8,7,32);
+  ctx.fillStyle=CAPEHI; ctx.fillRect(ox-4,oy+10,4,22);
+  // Right wing
+  ctx.fillStyle=CAPESH; ctx.fillRect(ox+21,oy+8,8,34);
+  ctx.fillStyle=CAPE;   ctx.fillRect(ox+21,oy+8,7,32);
+  ctx.fillStyle=CAPEHI; ctx.fillRect(ox+25,oy+10,1,22);
+  // Cape center back
+  ctx.fillStyle=PURPSH; ctx.fillRect(ox+1,oy+10,22,30);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+2,oy+10,20,29);
+
+  // ── Boots (dark burgundy, barely visible at hem) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+38,7,5);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+5,oy+39,6,4);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+5,oy+39,5,1);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+13,oy+38,7,5);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+14,oy+39,6,4);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+14,oy+39,5,1);
+
+  // ── Inner robe (rose/salmon, visible in torso centre) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+24,16,14);
+  ctx.fillStyle=ROSESH; ctx.fillRect(ox+5,oy+25,14,13);
+  ctx.fillStyle=ROSE;   ctx.fillRect(ox+6,oy+25,11,13);
+  ctx.fillStyle=ROSEHI; ctx.fillRect(ox+6,oy+25,7,5);
+  // Diamond pattern on skirt
+  ctx.fillStyle=ROSESH;
+  [[7,29],[11,31],[15,29],[9,33],[13,33]].forEach(([rx,ry])=>ctx.fillRect(ox+rx,oy+ry,2,2));
+
+  // ── Torso group (bob animation) ──
+  ctx.save();
+  ctx.translate(0,bob);
+
+  // Long hair behind back (blue, parametric)
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+2,oy+14,4,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+3,oy+14,3,16);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+17,oy+14,3,18);
+
+  // Left arm (slender, purple sleeve)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+14,4,14);
+  ctx.fillStyle=PURPSH; ctx.fillRect(ox+4,oy+15,3,13);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+4,oy+15,2,12);
+  ctx.fillStyle=PURPHI; ctx.fillRect(ox+4,oy+15,2,4);
+
+  // Right arm (gesturing / spellcasting)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+17,oy+14,4,11);
+  ctx.fillStyle=PURPSH; ctx.fillRect(ox+17,oy+15,3,10);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+18,oy+15,2,9);
+  ctx.fillStyle=PURPHI; ctx.fillRect(ox+18,oy+15,2,4);
+  // Open hand (skin, extended forward)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+16,oy+23,6,5);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+17,oy+24,5,4);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+17,oy+24,4,2);
+
+  // Chest / torso (cape interior visible)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+13,14,12);
+  ctx.fillStyle=PURPSH; ctx.fillRect(ox+6,oy+14,12,11);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+7,oy+14,9,11);
+  ctx.fillStyle=PURPHI; ctx.fillRect(ox+7,oy+14,6,4);
+  ctx.fillStyle=PURPDK; ctx.fillRect(ox+15,oy+14,3,11);
+
+  // Collar clasp (gold detail)
+  ctx.fillStyle=OUT;     ctx.fillRect(ox+8,oy+11,8,5);
+  ctx.fillStyle=PURPHI;  ctx.fillRect(ox+9,oy+12,6,4);
+  ctx.fillStyle='#B09040';ctx.fillRect(ox+10,oy+12,4,3);
+  ctx.fillStyle='#D8B050';ctx.fillRect(ox+11,oy+12,2,2);
+
+  // Waist belt / chain ornament
+  ctx.fillStyle=PURPDK;  ctx.fillRect(ox+5,oy+23,14,3);
+  ctx.fillStyle=BELT;    ctx.fillRect(ox+6,oy+24,12,2);
+  ctx.fillStyle=BELTHI;  ctx.fillRect(ox+6,oy+24,12,1);
+  // Hanging chain links
+  for(let i=0;i<5;i++){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+7+i*2,oy+26,2,3);
+    ctx.fillStyle=BELT;  ctx.fillRect(ox+7+i*2,oy+27,1,2);
+  }
+
+  ctx.restore(); // end bob
+
+  // ── Head: hair back layer (long, flowing, parametric colour) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+0,18,26);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4,oy+1,16,24);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5,oy+1,14,22);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6,oy+1,11,18);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7,oy+1,8,6);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+1,4,22); // shadow side
+
+  // ── Pointed mage hat (dusty purple, tall cone + wide brim) ──
+  // Cone sections (pixel-step taper from 1px tip to full brim width)
+  const hatData=[
+    [oy-12,11,2],[oy-10,10,4],[oy-8,9,6],[oy-6,8,8],[oy-4,7,10],[oy-2,6,12],
+  ];
+  hatData.forEach(([hy,hx,hw])=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+hx-1,hy,hw+2,2);
+    ctx.fillStyle=HAT;   ctx.fillRect(ox+hx,  hy,hw,  2);
+  });
+  ctx.fillStyle=HATHI; ctx.fillRect(ox+10,oy-12,3,1); // tip highlight
+  ctx.fillStyle=HATHI; ctx.fillRect(ox+8,oy-8, 5,1);  // mid highlight
+  ctx.fillStyle=HATHI; ctx.fillRect(ox+7,oy-4, 7,1);  // lower highlight
+  // Hat brim (wide flat)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2,oy+0, 20,3);
+  ctx.fillStyle=HATSH;  ctx.fillRect(ox+3,oy+1, 18,2);
+  ctx.fillStyle=HAT;    ctx.fillRect(ox+4,oy+1, 14,2);
+  ctx.fillStyle=HATHI;  ctx.fillRect(ox+4,oy+1, 10,1);
+  // Hat band (gold trim)
+  ctx.fillStyle='#C0A040'; ctx.fillRect(ox+5,oy+0,14,2);
+  ctx.fillStyle='#E0C050'; ctx.fillRect(ox+5,oy+0,14,1);
+
+  // ── Face (soft, young adult female) ──
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7,oy+2,10,12);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+8,oy+3,8,11);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+8,oy+3,7,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+8,oy+11,8,4);
+  ctx.fillStyle=sk.dk;  ctx.fillRect(ox+8,oy+13,8,1);
+
+  // Eyes
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+8,oy+5,3,3);  ctx.fillRect(ox+13,oy+5,3,3);
+  ctx.fillStyle='#2A3065'; ctx.fillRect(ox+9,oy+5,2,2);  ctx.fillRect(ox+14,oy+5,2,2);
+  ctx.fillStyle='#4A60A8'; ctx.fillRect(ox+9,oy+5,1,1);  ctx.fillRect(ox+14,oy+5,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+9,oy+5,1,1);  ctx.fillRect(ox+14,oy+5,1,1);
+
+  // Nose (delicate)
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+11,oy+8,2,1);
+
+  // Lips
+  ctx.fillStyle='#B05868'; ctx.fillRect(ox+9,oy+10,6,2);
+  ctx.fillStyle='#D07888'; ctx.fillRect(ox+9,oy+10,6,1);
+
+  // ── Hair bangs / fringe over forehead ──
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+7,oy+3,2,4);   // left bang
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+15,oy+3,2,4);  // right bang
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7,oy+3,1,2);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+10,oy+2,4,4);  // centre fringe
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+10,oy+2,4,1);
+}
+
+// ── Dispatcher: pick male or female mage, handle direction flip ───────────────
+function drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f    = moving ? (Math.floor(frame/4)%6) : 0;
+  const swing= moving ? _WK_SWING[f] : 0;
+  const bob  = moving ? _WK_BOB[f]   : 0;
+  const sk   = _skinPal(skinToneIdx??2);
+  const hr   = _hairPal(hairHex||HAIR_COLORS[1]);
+
+  if(dir===1){ // facing left → mirror entire sprite
+    ctx.save();
+    ctx.translate(ox+24,oy);
+    ctx.scale(-1,1);
+    const fn = (gender==='female') ? _drawFemaleMage : _drawMaleMage;
+    fn(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    const fn = (gender==='female') ? _drawFemaleMage : _drawMaleMage;
     fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
   }
 }
