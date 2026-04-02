@@ -334,11 +334,19 @@ function handleQuestDialogClose(npc){
     G.quests[qid]={progress:0,status:'active'};
     chatLog(`★ Quest accepted: "${qdef.title}" — ${qdef.inProgressLine}`,'#FFD700');
   } else if(qs.status==='ready'){
-    // Turn in the quest
-    if(qdef.reward.alUSD)G.alUSD=parseFloat((G.alUSD+qdef.reward.alUSD).toFixed(2));
-    if(qdef.reward.alETH)G.alETH=parseFloat((G.alETH+qdef.reward.alETH).toFixed(4));
+    // Turn in the quest — rewards scale 8% per level above 1 so quests stay worth doing.
+    const qScaleMult=1+(G.level-1)*0.08;
+    if(qdef.reward.alUSD){
+      const scaled=parseFloat((qdef.reward.alUSD*qScaleMult).toFixed(2));
+      G.alUSD=parseFloat((G.alUSD+scaled).toFixed(2));
+      chatLog(`Quest reward: +${scaled} alUSD (×${qScaleMult.toFixed(2)} level bonus)`,'#FFD700');
+    }
+    if(qdef.reward.alETH){
+      const scaled=parseFloat((qdef.reward.alETH*qScaleMult).toFixed(4));
+      G.alETH=parseFloat((G.alETH+scaled).toFixed(4));
+    }
     if(qdef.reward.alcx)G.alcx=parseFloat((G.alcx+qdef.reward.alcx).toFixed(4));
-    G.xp+=qdef.reward.xp;
+    G.xp+=Math.round(qdef.reward.xp*qScaleMult);
     checkLevelUp();
     // Item reward — place in first free inventory slot (2-7)
     if(qdef.reward.item){
@@ -747,7 +755,9 @@ function playerPowerLevel(){
   const s=G.stats;
   const avg=(s.str+s.vit+s.agi+s.end+s.lck)/5; // 2.0 at start; rises as you invest points
   const wdmg=G.inventory[0]?.dmg||2;
-  return avg+wdmg*0.5; // ~4.0 for a fresh warrior with Iron Sword
+  // Weight weapon damage at 0.85 (was 0.5) so buying better gear properly pushes
+  // enemy scaling to match the real attack increase, closing the gear-power gap.
+  return avg+wdmg*0.85;
 }
 
 // Build a scaled enemy: HP / ATK / DEF are calculated from player power.
@@ -895,6 +905,7 @@ function triggerBattle(key,depth=0){
   });
   G.battle={
     enemy:makeScaledEnemy(key,depth),
+    depth,           // stored so drop scaling and armor penetration can reference it
     phase:'transition_in',
     animTimer:0,
     hitShake:0,
@@ -1830,14 +1841,15 @@ function doBattleAction(action){
   // ── Helper: compute weapon damage with type/weakness system ─────────────────
   function calcWeaponDmg(weapon, enemy, strMult=0.9, defMult=0.55, extraCritBonus=0){
     const dt=weapon?.dmgType||'physical';
-    const base=(weapon?.dmg||2)+Math.floor(G.stats.str*strMult);
+    const base=itemEffDmg(weapon)+Math.floor(G.stats.str*strMult);
     // Weakness multiplier: physWeakness, magicWeakness, holyWeakness (default 1.0)
     const weak=dt==='magic'?(enemy.magicWeakness||1.0):
                 dt==='holy' ?(enemy.holyWeakness ||1.0):
                               (enemy.physWeakness ||1.0);
     // Magic/holy bypasses most armor; physical is fully blocked
     const defReduction=dt==='magic'?enemy.def*0.15:dt==='holy'?enemy.def*0.20:enemy.def*defMult;
-    const critChance=Math.min(0.80, G.stats.lck*0.045+(weapon?.critBonus||0)+extraCritBonus);
+    // Crit cap lowered 80%→40%; remaining LCK value shifted to shop discount + potion luck.
+    const critChance=Math.min(0.40, G.stats.lck*0.035+(weapon?.critBonus||0)+extraCritBonus);
     const crit=Math.random()<critChance;
     const raw=Math.max(0.5,(base-defReduction)*weak);
     const dmg=Math.max(1,Math.floor(raw*(crit?1.6:1)+(Math.random()*2-1)));
@@ -1848,6 +1860,9 @@ function doBattleAction(action){
     const weapon=G.inventory[0];
     const{dmg,crit,dt,weak}=calcWeaponDmg(weapon,bt.enemy);
     bt.enemy.currentHp-=dmg;bt.hitShake=10;
+    // Each attack degrades the weapon by 1 durability point
+    degradeItem(weapon);
+    if(weapon&&weapon.durability===0)chatLog(`⚠ ${weapon.name} is broken! (repair at shop)`,'#FF8800');
     SFX.swing();setTimeout(()=>SFX.hitEnemy(),120);
     const weakStr=weak>1.2?'⚡ WEAK! ':weak<0.6?'🛡 RESIST ':'' ;
     bt.log.push(crit?`${weakStr}Critical hit! ${dmg} damage! [${dt}]`:`${weakStr}You attack for ${dmg} damage. [${dt}]`);
@@ -1945,8 +1960,11 @@ function doBattleAction(action){
     const drops = bt.enemy.drops || {};
     const lootMult=(G.worldEvent?.type==='treasure_surge')?1.5:1;
     const moonMult=(G.worldEvent?.type==='blood_moon')?2:1;
-    bt.spacebucksGained = Math.round((drops.spacebucks || 0)*lootMult);
-    bt.schmecklesGained = Math.round((drops.schmeckles || 0)*lootMult*moonMult);
+    // Depth bonus: +6.7% per depth unit, capped at 3× at depth 30+.
+    // Rewards players who push into dangerous territory over safe-zone farming.
+    const depthMult=1+Math.min(2.0,(bt.depth||0)/15);
+    bt.spacebucksGained = Math.round((drops.spacebucks || 0)*lootMult*depthMult);
+    bt.schmecklesGained = Math.round((drops.schmeckles || 0)*lootMult*moonMult*depthMult);
     G.spacebucks += bt.spacebucksGained;
     G.schmeckles += bt.schmecklesGained;
     G.xp+=bt.xpGained;
@@ -1969,8 +1987,9 @@ function doBattleAction(action){
     const killHeal=Math.max(1,Math.round(G.maxHp*0.05));
     G.hp=Math.min(G.maxHp,G.hp+killHeal);
 
-    // ── Potion drop: 30% base + 3% per LCK above 1, capped at 60% ──────────
-    const potionChance=Math.min(0.60,0.30+(G.stats.lck-1)*0.03);
+    // ── Potion drop: 25% base + 2% per LCK above 1, capped at 45% ──────────
+    // Cap reduced so LCK doesn't trivialise HP management; extra value moved to shop discount.
+    const potionChance=Math.min(0.45,0.25+(G.stats.lck-1)*0.02);
     bt.potionDrop=false;
     if(Math.random()<potionChance){
       const freeSlot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
@@ -2002,11 +2021,21 @@ function doEnemyTurn(){
     btAnim('float_dmg',{val:'DODGE',x:Math.floor(W*0.72),y:Math.floor(H*0.46),color:'#80FFAA'});
   } else {
     // Total player defense: END stat + equipped shield DEF + equipped armor DEF
+    // Use effective DEF (0 if item is broken); degrade shield and armor on each hit.
     const endArmor   = Math.floor(G.stats.end*0.5);
-    const shieldDef  = G.inventory[1]?.def||0;
-    const armorDef   = G.equippedArmor?.def||0;
+    const shieldDef  = itemEffDef(G.inventory[1]);
+    const armorDef   = itemEffDef(G.equippedArmor);
     const totalDef   = endArmor+shieldDef+armorDef;
-    const dmg=Math.max(1,e.atk-totalDef+(((Math.random()*3)|0)-1));
+    if(G.inventory[1])degradeItem(G.inventory[1]);
+    if(G.equippedArmor)degradeItem(G.equippedArmor);
+    if(G.inventory[1]?.durability===0)chatLog(`⚠ ${G.inventory[1].name} is broken! (repair at shop)`,'#FF8800');
+    if(G.equippedArmor?.durability===0)chatLog(`⚠ ${G.equippedArmor.name} is broken! (repair at shop)`,'#FF8800');
+    // Deep-zone armor penetration: enemies at depth 30+ ignore an increasing fraction
+    // of flat DEF, preventing gear from reaching true invincibility at high levels.
+    // Max 55% penetration at depth 60+.
+    const armorPen=Math.min(0.55,(bt.depth||0)/110);
+    const effectiveDef=Math.floor(totalDef*(1-armorPen));
+    const dmg=Math.max(1,e.atk-effectiveDef+(((Math.random()*3)|0)-1));
     G.hp=Math.max(0,G.hp-dmg);
     bt.playerHitShake=8;
     SFX.hitPlayer();
@@ -2484,6 +2513,70 @@ function renderExchangeUI(){
 }
 
 // ── SHOP ──────────────────────────────────────────────────────────────────────
+// ── Gear durability system ────────────────────────────────────────────────────
+// Max durability by rarity; starting (untagged) gear gets 40.
+const MAX_DUR={common:60,rare:80,epic:100};
+function itemMaxDur(item){return MAX_DUR[item?.rarity||'common']||40;}
+// Call when an item enters the player's possession (buy or loot) to stamp durability.
+function stampDurability(item){
+  if(!item||item.type==='potion'||item.durability!=null)return item;
+  item.maxDurability=itemMaxDur(item);
+  item.durability=item.maxDurability;
+  return item;
+}
+// Reduce durability by amt, floor at 0.
+function degradeItem(item,amt=1){
+  if(!item||item.type==='potion')return;
+  if(item.durability==null){stampDurability(item);}
+  item.durability=Math.max(0,item.durability-amt);
+}
+// Effective DEF/DMG from an item — 0 when completely broken.
+function itemEffDef(item){
+  if(!item||item.durability==null)return item?.def||0;
+  if(item.durability<=0)return 0;
+  return item.def||0;
+}
+function itemEffDmg(item){
+  if(!item||item.durability==null)return item?.dmg||2;
+  if(item.durability<=0)return 1; // fists-only when weapon broken
+  return item.dmg||2;
+}
+// Repair all equipped gear; cost is 35% of (base item cost × wear fraction).
+function repairAllGear(){
+  const pieces=[G.inventory[0],G.inventory[1],G.equippedArmor].filter(Boolean);
+  let totalCost=0;
+  pieces.forEach(it=>{
+    if(it.durability==null)stampDurability(it);
+    const maxD=it.maxDurability||itemMaxDur(it);
+    const wear=1-(it.durability/maxD);
+    totalCost+=Math.ceil((it.cost||0)*wear*0.35);
+  });
+  if(totalCost<=0){chatLog('All gear is in perfect condition!','#80FFAA');return;}
+  if(G.alUSD<totalCost){SFX.error();chatLog(`Need ${totalCost} alUSD to repair all gear.`,'#FF4444');return;}
+  G.alUSD=parseFloat((G.alUSD-totalCost).toFixed(2));
+  pieces.forEach(it=>{it.durability=it.maxDurability||itemMaxDur(it);});
+  SFX.buy();
+  chatLog(`Gear repaired for ${totalCost} alUSD. Everything restored!`,'#4CAF50');
+  renderShop();renderInventoryScreen();
+}
+
+// ── Dynamic shop pricing helpers ──────────────────────────────────────────────
+// Prices rise 12% per level above 1 (inflation), creating arbitrage: low-level
+// players buy cheap and can sell to higher-level players via P2P market.
+// LCK gives a 1% discount per point (up to 10% off), rewarding stat investment.
+function shopInflationMult(){
+  return Math.max(1, 1+(G.level-1)*0.12);
+}
+function shopLckDiscount(){
+  return Math.max(0.90, 1-(G.stats.lck||1)*0.01);
+}
+// Final price for an item: base × inflation × LCK-discount × convoy-event
+function shopEffectiveCost(item){
+  const convoyDisc=G.worldEvent?.type==='merchant_convoy'?0.80:1.0;
+  const raw=item.cost*shopInflationMult()*shopLckDiscount()*convoyDisc;
+  return item.currency==='alETH'?parseFloat(raw.toFixed(4)):parseFloat(raw.toFixed(2));
+}
+
 function openShop(vendorId){
   G.shop={vendorId};
   G.paused=true;
@@ -2503,15 +2596,41 @@ function renderShop(){
   const title=v==='zelda'?'VENDOR ZELDA — Weapons & Potions':'ARMORER FLINT — Shields';
   document.getElementById('shop-title').textContent=title;
   document.getElementById('shop-gold-display').textContent=`💵 ${G.alUSD.toFixed(0)} alUSD  ·  ⟠ ${G.alETH.toFixed(3)} alETH`;
+  // ── Repair section ──
+  const repairEl=document.getElementById('shop-repair-section');
+  if(repairEl){
+    const gearPieces=[G.inventory[0],G.inventory[1],G.equippedArmor].filter(Boolean);
+    let repairLines='';let repairCost=0;
+    gearPieces.forEach(it=>{
+      if(it.durability==null)stampDurability(it);
+      const maxD=it.maxDurability||itemMaxDur(it);
+      const pct=Math.round(it.durability/maxD*100);
+      const col=pct>60?'#4CAF50':pct>25?'#FFD700':'#FF4444';
+      const wear=1-(it.durability/maxD);
+      const cost=Math.ceil((it.cost||0)*wear*0.35);
+      repairCost+=cost;
+      repairLines+=`<span style="color:${col}">${it.icon||'🗡'} ${it.name}: ${pct}% dur</span>  `;
+    });
+    if(repairCost>0){
+      repairEl.innerHTML=`<div style="margin-top:8px;padding:6px;background:#1a1020;border:1px solid #5A3A80;border-radius:4px;font-size:.72rem">`+
+        `🔧 <b style="color:#FFD700">Gear Condition</b>: ${repairLines||'nothing equipped'}<br>`+
+        `<button onclick="repairAllGear()" style="margin-top:4px;padding:3px 10px;background:#4CAF50;color:#fff;border:none;border-radius:3px;cursor:pointer;font-family:monospace;font-size:.72rem">Repair All — ${repairCost} alUSD</button></div>`;
+    } else {
+      repairEl.innerHTML='';
+    }
+  }
   const list=document.getElementById('shop-items-list');
   list.innerHTML='';
+  const inflMult=shopInflationMult();
+  const lckDisc=shopLckDiscount();
   items.forEach((item,i)=>{
     const itemCurrency=item.currency||'alUSD';
+    const effCost=shopEffectiveCost(item);
     const balance=itemCurrency==='alETH'?G.alETH:G.alUSD;
-    const canAfford=balance>=item.cost;
+    const canAfford=balance>=effCost;
     const altCurrency2=itemCurrency==='alETH'?'alUSD':'alETH';
     const altRate2=(EXCHANGE_RATES[itemCurrency]||1)/(EXCHANGE_RATES[altCurrency2]||1);
-    const altCost2=altCurrency2==='alETH'?parseFloat((item.cost*altRate2*1.003).toFixed(4)):parseFloat((item.cost*altRate2*1.003).toFixed(2));
+    const altCost2=altCurrency2==='alETH'?parseFloat((effCost*altRate2*1.003).toFixed(4)):parseFloat((effCost*altRate2*1.003).toFixed(2));
     const altBalance2=altCurrency2==='alETH'?G.alETH:G.alUSD;
     const canAffordAlt=!canAfford&&altBalance2>=altCost2;
     const meetsLvl=G.level>=item.lvl;
@@ -2522,7 +2641,9 @@ function renderShop(){
     else if(item.healFull)statStr='Full HP restore';
     else statStr=`+${item.heal} HP`;
     const currencySymbol=itemCurrency==='alETH'?'⟠':'$';
-    const priceStr=itemCurrency==='alETH'?`${item.cost} alETH`:`${item.cost} alUSD`;
+    const priceStr=itemCurrency==='alETH'?`${effCost} alETH`:`${effCost} alUSD`;
+    // Show base price as reference if inflation is active
+    const baseNote=inflMult>1.01?`<span style="color:#555;font-size:.65rem;text-decoration:line-through">${item.cost}</span> `:'' ;
     const row=document.createElement('div');
     row.className='shop-row';
     row.innerHTML=`
@@ -2533,7 +2654,7 @@ function renderShop(){
         <div class="shop-row-req" style="color:${meetsLvl?'#556':'#FF6600'}">Requires Lv.${item.lvl}</div>
       </div>
       <div class="shop-row-right">
-        <div class="shop-row-price">${currencySymbol}${priceStr}</div>
+        <div class="shop-row-price">${baseNote}${currencySymbol}${priceStr}</div>
         <button class="shop-buy-btn" onclick="buyItem('${v}',${i})" ${canBuy||canAffordAlt?'':'disabled'} style="${canAffordAlt?'background:#1A2A50;color:#8090FF;border-color:#4060C0':''}">
           ${canBuy?'BUY':canAffordAlt?`~${altCost2} ${altCurrency2}`:'BUY'}
         </button>
@@ -2545,13 +2666,14 @@ function renderShop(){
 function buyItem(vendorId,idx){
   const item=SHOP_CATALOG[vendorId]?.[idx];
   if(!item)return;
-  const convoyDisc=G.worldEvent?.type==='merchant_convoy'?0.80:1.0;
+  // Use effective (inflated) cost — already includes convoy disc and LCK discount
+  const effCost=shopEffectiveCost(item);
   let currency=item.currency||'alUSD';
   const balance=currency==='alETH'?G.alETH:G.alUSD;
-  if(balance<item.cost){
+  if(balance<effCost){
     const altCur=currency==='alETH'?'alUSD':'alETH';
     const altRate=(EXCHANGE_RATES[currency]||1)/(EXCHANGE_RATES[altCur]||1);
-    const altCost=altCur==='alETH'?parseFloat((item.cost*altRate*1.003).toFixed(4)):parseFloat((item.cost*altRate*1.003).toFixed(2));
+    const altCost=altCur==='alETH'?parseFloat((effCost*altRate*1.003).toFixed(4)):parseFloat((effCost*altRate*1.003).toFixed(2));
     const altBal=altCur==='alETH'?G.alETH:G.alUSD;
     if(altBal>=altCost){
       if(altCur==='alETH')G.alETH=parseFloat((G.alETH-altCost).toFixed(4));
@@ -2561,8 +2683,8 @@ function buyItem(vendorId,idx){
     }else{SFX.error();chatLog(`Not enough ${currency} (or ${altCur} to convert).`,'#FF4444');return;}
   }
   if(G.level<item.lvl){SFX.error();chatLog(`Requires level ${item.lvl}!`,'#FF8800');return;}
-  if(currency==='alETH')G.alETH=parseFloat((G.alETH-item.cost*convoyDisc).toFixed(4));
-  else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-item.cost*convoyDisc).toFixed(2));
+  if(currency==='alETH')G.alETH=parseFloat((G.alETH-effCost).toFixed(4));
+  else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD-effCost).toFixed(2));
   // if currency==='_converted', already deducted above
   // Gear (weapons/shields/armor) goes to general inventory — player equips manually
   // Potions and consumables also go to general slots
@@ -2570,11 +2692,11 @@ function buyItem(vendorId,idx){
   const slot=G.inventory.findIndex((s,i)=>i>=2&&s===null);
   if(slot===-1){
     // Refund on full inventory
-    if(currency==='alETH')G.alETH=parseFloat((G.alETH+item.cost*(currency==='_converted'?0:convoyDisc)).toFixed(4));
-    else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD+item.cost*convoyDisc).toFixed(2));
+    if(currency==='alETH')G.alETH=parseFloat((G.alETH+(currency==='_converted'?0:effCost)).toFixed(4));
+    else if(currency==='alUSD')G.alUSD=parseFloat((G.alUSD+(currency==='_converted'?0:effCost)).toFixed(2));
     SFX.error();chatLog('Inventory full! Make room before buying.','#FF4444');return;
   }
-  G.inventory[slot]={...item};
+  G.inventory[slot]=stampDurability({...item});
   SFX.buy();
   if(isGear){
     const statStr=item.type==='weapon'?`+${item.dmg} DMG [${(item.dmgType||'physical')}]`:
