@@ -49,6 +49,17 @@ function darken(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.max(0,r-a)},${Ma
 const HAIR_COLORS  = ['#1A0A00','#3A2010','#7A5020','#C8A040','#E8E0C0','#E04030','#4080D0','#20A060'];
 const HAIR_NAMES   = ['Black','Brown','Auburn','Blonde','Silver','Red','Blue','Green'];
 
+// ── SKIN TONES ────────────────────────────────────────────────────────────────
+// base = [R,G,B] midtone used for palette-swap reference
+const SKIN_TONES = [
+  {label:'I',   base:[242,210,178]},  // very light / porcelain
+  {label:'II',  base:[218,176,130]},  // light / fair
+  {label:'III', base:[192,140, 95]},  // medium-light / warm tan
+  {label:'IV',  base:[158,105, 62]},  // medium / golden brown
+  {label:'V',   base:[116, 72, 38]},  // medium-dark / brown
+  {label:'VI',  base:[ 74, 42, 20]},  // dark / deep brown
+];
+
 // ── SPECIES ───────────────────────────────────────────────────────────────────
 const SPECIES = {
   human: {

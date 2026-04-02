@@ -25,6 +25,8 @@ const G = {
   nickname:'Hero',
   color:PLAYER_COLORS[0],
   hairColor:HAIR_COLORS[1],
+  gender:'male',     // 'male' | 'female' — selects warrior sprite
+  skinTone:2,        // index into SKIN_TONES (0=lightest, 5=darkest)
   species:'human',
   class_:'warrior',
   persist:true,
@@ -1659,7 +1661,7 @@ function renderBattleScreen(){
     ctxUI.save();
     ctxUI.translate(bpX+phX+playerLungeX,bpY);
     ctxUI.scale(btS,btS);
-    drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory);
+    drawPlayerSprite(ctxUI,-12,-44,3,G.color,G.frame,false,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone);
     ctxUI.restore();
   }
 
@@ -2734,7 +2736,7 @@ function renderSpriteLayer(ctx){
     const footY=p.y-G.camY+4;
     if(footX<-SW||footX>W+SW||footY<-SH||footY>H+40)continue;
     scaledSprite(ctx,footX,footY,(ox,oy)=>
-      drawPlayerSprite(ctx,ox,oy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null));
+      drawPlayerSprite(ctx,ox,oy,p.dir||2,p.color,p.frame||0,p.moving||false,false,p.species||'human',p.hairColor||HAIR_COLORS[1],p.accessory||null,p.gender||'male',p.skinTone??2));
     // name label above
     const topY=footY-SH;
     const nl=p.nickname||'';
@@ -2746,7 +2748,7 @@ function renderSpriteLayer(ctx){
   // ── Local player ──
   const footX=G.x-G.camX,footY=G.y-G.camY+4;
   scaledSprite(ctx,footX,footY,(ox,oy)=>
-    drawPlayerSprite(ctx,ox,oy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory));
+    drawPlayerSprite(ctx,ox,oy,G.dir,G.color,G.frame,G.moving,G.godMode,G.species,G.hairColor,G.accessory,G.gender,G.skinTone));
 
   // Draw world loot piles
   if(G.worldLoot){
@@ -3201,7 +3203,7 @@ function buildCreateScreen(){
     const scale=2.5;
     previewCtx.save();
     previewCtx.scale(scale,scale);
-    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor,G.accessory);
+    drawPlayerSprite(previewCtx,60/scale-12,40/scale,2,G.color,0,false,false,G.species,G.hairColor,G.accessory,G.gender,G.skinTone);
     previewCtx.restore();
     const sp2=SPECIES[G.species||'human'];const cl=CLASSES[G.class_||'warrior'];
     const finalHp=sp2.baseHp+Math.floor((alloc.vit-2)*0.5);
@@ -3218,6 +3220,41 @@ function buildCreateScreen(){
 
   // ── Name input ──
   document.getElementById('inp-name').value=G.nickname||'Hero';
+
+  // ── Gender picker ──
+  const gp=document.getElementById('gender-picker');
+  gp.innerHTML='';
+  [{key:'male',icon:'♂',label:'Male'},{key:'female',icon:'♀',label:'Female'}].forEach(({key,icon,label})=>{
+    const b=document.createElement('button');
+    b.className='species-btn'+(G.gender===key?' selected':'');
+    b.style.fontSize='.75rem';b.style.padding='4px 12px';
+    b.textContent=`${icon} ${label}`;
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#gender-picker button').forEach(x=>x.classList.remove('selected'));
+      b.classList.add('selected');G.gender=key;
+      // Invalidate sprite cache for this gender so new variants are built
+      Object.keys(_SPRITE_CACHE).forEach(k=>{if(k.startsWith(key+'_'))delete _SPRITE_CACHE[k];});
+      updatePreview();
+    });
+    gp.appendChild(b);
+  });
+
+  // ── Skin tone picker ──
+  const skp=document.getElementById('skin-picker');
+  skp.innerHTML='';
+  const SKIN_HEX=['#F2D2B2','#DAB082','#C08C5F','#9E693E','#743F26','#4A2A14'];
+  SKIN_TONES.forEach((st,i)=>{
+    const b=document.createElement('div');
+    b.className='color-btn'+(i===G.skinTone?' selected':'');
+    b.style.background=SKIN_HEX[i];
+    b.style.border='2px solid '+(i===G.skinTone?'#FFD700':'#333');
+    b.title=`Skin ${st.label}`;
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#skin-picker .color-btn').forEach(x=>x.style.border='2px solid #333');
+      b.style.border='2px solid #FFD700';G.skinTone=i;updatePreview();
+    });
+    skp.appendChild(b);
+  });
 
   // ── Species picker ──
   const sp=document.getElementById('species-picker');
@@ -3539,6 +3576,7 @@ function saveState(){
   const s={
     _accountId:G_accountId||'',  // tag state with account so cross-user bleed is detectable
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+    gender:G.gender,skinTone:G.skinTone,
     species:G.species,class_:G.class_,
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
@@ -3560,6 +3598,8 @@ function loadState(){
     G.nickname=s.nickname||G.nickname;
     G.color=s.color||G.color;
     G.hairColor=s.hairColor||G.hairColor;
+    if(s.gender==='male'||s.gender==='female')G.gender=s.gender;
+    if(s.skinTone!=null&&s.skinTone>=0&&s.skinTone<=5)G.skinTone=s.skinTone;
     G.species=s.species||G.species;
     G.class_=s.class_||G.class_;
     if(s.spacebucks!=null) G.spacebucks=s.spacebucks;
@@ -3913,6 +3953,7 @@ function joinGameServer(){
   const doJoin=()=>{
     socket.emit('join',{
       nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+      gender:G.gender,skinTone:G.skinTone,
       species:G.species,class_:G.class_,zone:G.zone,x:G.x,y:G.y,
       accessory:G.accessory,maxInvSlots:G.maxInvSlots,
     });
@@ -3964,6 +4005,7 @@ function saveToServer(){
   if(!socket||!G_accountId)return;
   socket.emit('save_character',{
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
+    gender:G.gender,skinTone:G.skinTone,
     species:G.species,class_:G.class_,
     spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
     alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,

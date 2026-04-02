@@ -1307,10 +1307,19 @@ function drawVillageBG(ctx,W,H,tick){
 // (drawInteriorBG is defined above, near ceiling helpers)
 
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
-// species-aware, hair-color-aware, direction+animation aware
-function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory){
-  // ── Mega Man X–style armored hero sprite ─────────────────────────────────
+// species-aware, hair-color-aware, direction+animation aware.
+// gender + skinToneIdx route human characters to the PNG warrior sprites.
+function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx){
   const sp=species||'human';
+
+  // ── PNG warrior sprites for human characters ──────────────────────────────
+  if(sp==='human'&&WARRIOR_IMGS[(gender||'male')]){
+    // Offset so the sprite's feet land at roughly the same y as the procedural one
+    drawWarriorSprite(ctx,ox-11,oy-6,dir,frame,moving,skinToneIdx??2,hairColor||HAIR_COLORS[1],gender||'male');
+    return;
+  }
+
+  // ── Procedural sprite for non-human species ───────────────────────────────
   const f=moving?(Math.floor(frame/4)%6):0;
   const c=color||'#2255DD';
 
@@ -1662,4 +1671,114 @@ function drawNPCSprite(ctx,ox,oy,type,face=2){
     ctx.fillStyle='#CCC4AA';ctx.fillRect(px+7,py+16,10,2);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WARRIOR SPRITE SYSTEM
+// Loads warrior_male.png / warrior_female.png, applies palette swaps for skin
+// tone and hair colour, caches results, and provides drawWarriorSprite().
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WARRIOR_IMGS   = {male:null, female:null};
+const _SPRITE_CACHE  = {};  // key: "gender_skinIdx_hairHex" → canvas
+
+// ── HSL helpers ──────────────────────────────────────────────────────────────
+function _rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+  let h=0,s=0,l=(mx+mn)/2;
+  if(mx!==mn){
+    const d=mx-mn;
+    s=l>.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r)h=((g-b)/d+(g<b?6:0))/6;
+    else if(mx===g)h=((b-r)/d+2)/6;
+    else h=((r-g)/d+4)/6;
+  }
+  return [h*360,s,l];
+}
+function _hslToRgb(h,s,l){
+  h/=360;
+  if(s===0){const v=Math.round(l*255);return[v,v,v];}
+  const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+  function f(t){t=((t%1)+1)%1;
+    if(t<1/6)return p+(q-p)*6*t;if(t<.5)return q;
+    if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+  return[Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)];
+}
+
+// ── Per-variant builder ───────────────────────────────────────────────────────
+// Skin:  warm hue (10-44 deg), moderate sat, lightness >= 0.40
+// Hair:  warm hue  (6-42 deg), moderate sat, lightness  <  0.42
+function _buildSpriteVariant(img, skinBase, hairHex){
+  const tmp=document.createElement('canvas');
+  tmp.width=img.width; tmp.height=img.height;
+  const tc=tmp.getContext('2d');
+  tc.drawImage(img,0,0);
+  const id=tc.getImageData(0,0,tmp.width,tmp.height);
+  const d=id.data;
+  const [sk_h,sk_s,sk_l]=_rgbToHsl(skinBase[0],skinBase[1],skinBase[2]);
+  const hr2=parseInt(hairHex.slice(1,3),16),
+        hg2=parseInt(hairHex.slice(3,5),16),
+        hb2=parseInt(hairHex.slice(5,7),16);
+  const [ha_h,ha_s,ha_l]=_rgbToHsl(hr2,hg2,hb2);
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
+    if(a<64)continue;
+    if(Math.max(r,g,b)-Math.min(r,g,b)<22)continue; // near-neutral: skip
+    const [ph,ps,pl]=_rgbToHsl(r,g,b);
+    if(ph>=10&&ph<=44&&ps>=0.22&&ps<=0.84&&pl>=0.40&&pl<=0.93){
+      // skin pixel
+      const newL=Math.min(0.96,Math.max(0.04,sk_l*(pl/0.62)));
+      const [nr,ng,nb]=_hslToRgb(sk_h,sk_s,newL);
+      d[i]=nr;d[i+1]=ng;d[i+2]=nb;
+    } else if(ph>=6&&ph<=42&&ps>=0.22&&ps<=0.96&&pl>=0.06&&pl<=0.40){
+      // hair pixel
+      const newL=Math.min(0.88,Math.max(0.04,ha_l*(pl/0.24)));
+      const [nr,ng,nb]=_hslToRgb(ha_h,ha_s,newL);
+      d[i]=nr;d[i+1]=ng;d[i+2]=nb;
+    }
+  }
+  tc.putImageData(id,0,0);
+  return tmp;
+}
+
+// ── Public: get (or build+cache) a sprite canvas ─────────────────────────────
+function getWarriorSprite(gender, skinToneIdx, hairHex){
+  const g=gender||'male';
+  const img=WARRIOR_IMGS[g];
+  if(!img)return null;
+  const key=`${g}_${skinToneIdx}_${hairHex}`;
+  if(!_SPRITE_CACHE[key]){
+    const st=(typeof SKIN_TONES!=='undefined'&&SKIN_TONES[skinToneIdx])||{base:[192,140,95]};
+    _SPRITE_CACHE[key]=_buildSpriteVariant(img,st.base,hairHex);
+  }
+  return _SPRITE_CACHE[key];
+}
+
+// ── Public: draw the warrior sprite at (ox,oy) ───────────────────────────────
+const WARRIOR_W=46, WARRIOR_H=46;
+function drawWarriorSprite(ctx,ox,oy,dir,frame,moving,skinToneIdx,hairHex,gender){
+  const spr=getWarriorSprite(gender||'male', skinToneIdx??2, hairHex||(typeof HAIR_COLORS!=='undefined'?HAIR_COLORS[1]:'#3A2010'));
+  if(!spr)return;
+  const bobY=moving?((Math.floor(frame/6)%2)*-2):0;
+  ctx.save();
+  if(dir===1){
+    ctx.translate(ox+WARRIOR_W,oy+bobY);
+    ctx.scale(-1,1);
+    ctx.drawImage(spr,0,0,WARRIOR_W,WARRIOR_H);
+  } else {
+    ctx.drawImage(spr,ox,oy+bobY,WARRIOR_W,WARRIOR_H);
+  }
+  ctx.restore();
+}
+
+// ── Load both images at startup ───────────────────────────────────────────────
+function _loadWarriorSprites(){
+  ['male','female'].forEach(g=>{
+    const img=new Image();
+    img.onload=()=>{ WARRIOR_IMGS[g]=img; };
+    img.onerror=()=>console.warn(`[warrior] failed to load warrior_${g}.png`);
+    img.src=`/warrior_${g}.png?v=20260402`;
+  });
+}
+_loadWarriorSprites();
 
