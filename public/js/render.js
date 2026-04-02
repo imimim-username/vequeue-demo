@@ -1316,19 +1316,19 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
   // ── Human characters: class determines sprite archetype ──────────────────
   if(sp==='human'){
     const cls=class_||'warrior';
-    if     (cls==='mage')    drawHumanMageSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
-    else if(cls==='rogue')   drawHumanRogueSprite  (ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
-    else if(cls==='paladin') drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
-    else                     drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
+    if     (cls==='mage')    drawHumanMageSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color);
+    else if(cls==='rogue')   drawHumanRogueSprite  (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color);
+    else if(cls==='paladin') drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color);
+    else                     drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color);
     return;
   }
 
   // ── Non-human species: dedicated procedural sprites ───────────────────────
-  if(sp==='elf')   { drawElfSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
-  if(sp==='dwarf') { drawDwarfSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
-  if(sp==='goblin'){ drawGoblinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
-  if(sp==='orc')   { drawOrcSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
-  if(sp==='robot') { drawRobotSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
+  if(sp==='elf')   { drawElfSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color); return; }
+  if(sp==='dwarf') { drawDwarfSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color); return; }
+  if(sp==='goblin'){ drawGoblinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color); return; }
+  if(sp==='orc')   { drawOrcSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color); return; }
+  if(sp==='robot') { drawRobotSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr,color); return; }
 
   // ── Legacy generic fallback (safety net for unknown species) ──────────────
   const f=moving?(Math.floor(frame/4)%6):0;
@@ -1725,14 +1725,28 @@ function _hairPal(hex){
   };
 }
 
+// Derive armor palette from hex string (same structure as _hairPal)
+function _armorPal(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+  const rgb=(r,g,b)=>`rgb(${r},${g},${b})`;
+  return {
+    mid : hex,
+    hi  : rgb(clamp(r+40,0,255),clamp(g+34,0,255),clamp(b+28,0,255)),
+    lo  : rgb(clamp(r-30,0,255),clamp(g-26,0,255),clamp(b-22,0,255)),
+    dk  : rgb(clamp(r-55,0,255),clamp(g-48,0,255),clamp(b-40,0,255)),
+  };
+}
+
 // ── MALE BARBARIAN WARRIOR ────────────────────────────────────────────────────
 // Inspiration: stocky build, wild brown hair with spiky top, gold left pauldron,
 // partial leather chest showing V-neck skin, thick leather legs, heavy dark boots,
 // sword at right hip, shield-arm muscles visible.
-function _drawMaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
-  const OUT='#100800', LEATH='#7A5028', LEATH2='#4E3010', GOLD='#C8A030',
+function _drawMaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
+  const OUT='#100800', GOLD='#C8A030',
         GOLHI='#E8C048', BOOT='#1E0C04', BOOTHI='#3C1C08', SIL='#C0C4CC',
         SILHI='#E0E4F0', BELT='#3A2010';
+  const LEATH=ar.lo, LEATH2=ar.dk;
 
   // ── Shadow ──
   ctx.fillStyle='#00000030';ctx.fillRect(ox+2,oy+43,20,3);
@@ -1865,10 +1879,10 @@ function _drawMaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
 // ── FEMALE DARK ROGUE WARRIOR ─────────────────────────────────────────────────
 // Inspiration: slender build, long flowing auburn hair (the signature feature),
 // dark charcoal plate armour, split skirt, knee-high laced boots, longsword.
-function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
-  const OUT='#0C0814', PLATE='#28263A', PLATE2='#1A182A', PLHI='#3E3C54',
-        PLAC='#5A4880', BOOT='#160E20', BOOTHI='#2C1E38', BOOTLC='#3A2A4A',
+function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
+  const OUT='#0C0814', BOOT='#160E20', BOOTHI='#2C1E38', BOOTLC='#3A2A4A',
         SIL='#C0C4CC', SILHI='#E0E4F0', BELT='#3A2848';
+  const PLATE=ar.lo, PLATE2=ar.dk, PLHI=ar.hi, PLAC=ar.mid;
 
   // ── Shadow ──
   ctx.fillStyle='#00000028';ctx.fillRect(ox+4,oy+43,16,3);
@@ -2008,23 +2022,24 @@ function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
 }
 
 // ── Dispatcher: pick male or female, handle direction flip ────────────────────
-function drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f    = moving ? (Math.floor(frame/4)%6) : 0;
   const swing= moving ? _WK_SWING[f] : 0;
   const bob  = moving ? _WK_BOB[f]   : 0;
   const sk   = _skinPal(skinToneIdx??2);
   const hr   = _hairPal(hairHex||HAIR_COLORS[1]);
+  const ar   = _armorPal(armorHex||'#2255DD');
 
   if(dir===1){ // facing left → mirror entire sprite
     ctx.save();
     ctx.translate(ox+24,oy);
     ctx.scale(-1,1);
     const fn = (gender==='female') ? _drawFemaleWarrior : _drawMaleWarrior;
-    fn(ctx,0,0,dir,f,swing,bob,sk,hr);
+    fn(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
     const fn = (gender==='female') ? _drawFemaleWarrior : _drawMaleWarrior;
-    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -2042,16 +2057,15 @@ function drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,ha
 // ── MALE MAGE ────────────────────────────────────────────────────────────────
 // Inspiration: elderly stocky mage, teal/cyan robe, huge orange pauldrons,
 // silver beard, red third-eye gem, gold rune belt, artifact held in right hand.
-function _drawMaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080818';
-  const TEAL='#1E7272',TEAHI='#2E9898',TEASH='#124646',TEADK='#0A2E2E',TEALI='#36A8A8';
   const CAPE='#A83C10',CAPEHI='#C85020',CAPESH='#6E2408';
   const PAUL='#C04818',PAULHI='#DC6828',PAULSH='#7C2E10';
   const GOLD='#C4A028',GOLHI='#E0BC40',GOLSH='#8A7018';
-  const BEARD='#DCDCDC',BEAHI='#F4F4F4',BEASH='#ABABAB',BEADK='#707070';
   const GEM='#EE1010',GEMHI='#FF7060';
   const BOOT='#4A2808',BOOTHI='#6A3C14';
   const ART='#8040C8',ARTHI='#A868E8';
+  const TEAL=ar.mid,TEAHI=ar.hi,TEASH=ar.lo,TEADK=ar.dk,TEALI=ar.hi;
 
   // ── Shadow ──
   ctx.fillStyle='#00000028';
@@ -2176,26 +2190,25 @@ function _drawMaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=GEM;    ctx.fillRect(ox+11,oy+4,3,2);
   ctx.fillStyle=GEMHI;  ctx.fillRect(ox+11,oy+4,2,1);
 
-  // ── Beard (silver-white, wide, hangs over chest) ──
+  // ── Beard (hair-colored, wide, hangs over chest) ──
   ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+12,14,17);
-  ctx.fillStyle=BEADK;  ctx.fillRect(ox+6,oy+13,12,16);
-  ctx.fillStyle=BEASH;  ctx.fillRect(ox+7,oy+13,10,15);
-  ctx.fillStyle=BEARD;  ctx.fillRect(ox+8,oy+13,8,14);
-  ctx.fillStyle=BEAHI;  ctx.fillRect(ox+9,oy+13,5,8);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+6,oy+13,12,16);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+7,oy+13,10,15);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+8,oy+13,8,14);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+9,oy+13,5,8);
   // Strand detail lines
-  ctx.fillStyle=BEASH;  ctx.fillRect(ox+8,oy+16,8,1);
-  ctx.fillStyle=BEASH;  ctx.fillRect(ox+9,oy+19,6,1);
-  ctx.fillStyle=BEASH;  ctx.fillRect(ox+8,oy+22,8,1);
-  ctx.fillStyle=BEADK;  ctx.fillRect(ox+8,oy+25,8,1);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+8,oy+16,8,1);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+9,oy+19,6,1);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+8,oy+22,8,1);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+8,oy+25,8,1);
 }
 
 // ── FEMALE MAGE ───────────────────────────────────────────────────────────────
 // Inspiration: tall elegant spellcaster, pointed dusty-purple hat, long flowing
 // hair (from hr param), large dramatic purple cape, warm rose inner robe,
 // tall wooden staff with cross topper, dark burgundy boots.
-function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080C18';
-  const PURP='#44287A',PURPHI='#6644A8',PURPSH='#2A1850',PURPDK='#160E30';
   const CAPE='#38206A',CAPEHI='#502E90',CAPESH='#1E1040';
   const HAT='#5A4088',HATHI='#7A58B0',HATSH='#3A286A';
   const ROSE='#AA6848',ROSEHI='#C87A58',ROSESH='#784830';
@@ -2203,6 +2216,7 @@ function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   const STAFFCAP='#C09040',STAFFCAP2='#E0C060';
   const BOOT='#5A2424',BOOTHI='#7A3434';
   const BELT='#8A6820',BELTHI='#B08C30';
+  const PURP=ar.mid,PURPHI=ar.hi,PURPSH=ar.lo,PURPDK=ar.dk;
 
   // ── Shadow ──
   ctx.fillStyle='#00000025';
@@ -2361,23 +2375,24 @@ function _drawFemaleMage(ctx,ox,oy,dir,f,swing,bob,sk,hr){
 }
 
 // ── Dispatcher: pick male or female mage, handle direction flip ───────────────
-function drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f    = moving ? (Math.floor(frame/4)%6) : 0;
   const swing= moving ? _WK_SWING[f] : 0;
   const bob  = moving ? _WK_BOB[f]   : 0;
   const sk   = _skinPal(skinToneIdx??2);
   const hr   = _hairPal(hairHex||HAIR_COLORS[1]);
+  const ar   = _armorPal(armorHex||'#2255DD');
 
   if(dir===1){ // facing left → mirror entire sprite
     ctx.save();
     ctx.translate(ox+24,oy);
     ctx.scale(-1,1);
     const fn = (gender==='female') ? _drawFemaleMage : _drawMaleMage;
-    fn(ctx,0,0,dir,f,swing,bob,sk,hr);
+    fn(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
     const fn = (gender==='female') ? _drawFemaleMage : _drawMaleMage;
-    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -2390,15 +2405,15 @@ function drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairH
 // Female: narrower silhouette, midriff skin strip, single visible hip dagger.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#050508';
   const HOOD='#181620',HOODHI='#282440',HOODSH='#0E0C14';
-  const LEATH='#2A1E0E',LEATHI='#3E2E18',LEASH='#1A1008';
   const STRAP='#4A3820',STRAPH='#6A5438';
   const BOOT='#181012',BOOTHI='#2C1E28',BOOTST='#302840';
   const BLD='#B8C0CA',BLDHI='#D8E0EA';
   const BELT='#3A2810',BELTH='#5A4020';
   const WRAP='#1C1A24';
+  const LEATH=ar.mid,LEATHI=ar.hi,LEASH=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000028';
@@ -2503,15 +2518,15 @@ function _drawMaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=HOODSH; ctx.fillRect(ox+6,oy+12,12,3);
 }
 
-function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#050508';
   const HOOD='#181620',HOODHI='#282440',HOODSH='#0E0C14';
-  const LEATH='#2A1E0E',LEATHI='#3E2E18',LEASH='#1A1008';
   const STRAP='#4A3820',STRAPH='#6A5438';
   const BOOT='#181012',BOOTHI='#2C1E28',BOOTST='#302840';
   const BLD='#B8C0CA',BLDHI='#D8E0EA';
   const BELT='#3A2810',BELTH='#5A4020';
   const WRAP='#1C1A24';
+  const LEATH=ar.mid,LEATHI=ar.hi,LEASH=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000025';
@@ -2626,18 +2641,19 @@ function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=HOODSH; ctx.fillRect(ox+7,oy+11,10,3);
 }
 
-function drawHumanRogueSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawHumanRogueSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk=_skinPal(skinToneIdx??2);
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
-    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -2650,15 +2666,15 @@ function drawHumanRogueSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hair
 // Female: elegant plate, flowing white cape-mantle, holy light on sword hand.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#10101C';
-  const PL='#C4C8D4',PLHI='#E4E8F4',PLSH='#8088A0',PLDK='#505870';
   const GOLD='#D4A820',GOLHI='#F0CC40',GOLSH='#8A7010';
   const TAB='#F0F0E8',TABSH='#C8C8C0';
   const BOOT='#3A3C4C',BOOTHI='#5A5C70';
   const HOLY='#FFE860';
   const SIL='#C0C8D0',SILHI='#E0E8F0';
   const GLOW='rgba(255,220,80,0.15)';
+  const PL=ar.mid,PLHI=ar.hi,PLSH=ar.lo,PLDK=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000028';
@@ -2790,9 +2806,8 @@ function _drawMalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=GOLHI; ctx.fillRect(ox+6,oy-3,12,1);
 }
 
-function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#10101C';
-  const PL='#C4C8D4',PLHI='#E4E8F4',PLSH='#8088A0',PLDK='#505870';
   const GOLD='#D4A820',GOLHI='#F0CC40',GOLSH='#8A7010';
   const TAB='#F0F0E8',TABSH='#C8C8C0';
   const BOOT='#3A3C4C',BOOTHI='#5A5C70';
@@ -2800,6 +2815,7 @@ function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   const SIL='#C0C8D0',SILHI='#E0E8F0';
   const GLOW='rgba(255,220,80,0.15)';
   const MANTLE='#E8E8E0',MANTSH='#C0C0B8';
+  const PL=ar.mid,PLHI=ar.hi,PLSH=ar.lo,PLDK=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000025';
@@ -2935,18 +2951,19 @@ function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=GOLHI; ctx.fillRect(ox+7,oy-2,10,1);
 }
 
-function drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk=_skinPal(skinToneIdx??2);
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
-    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -2960,14 +2977,14 @@ function drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,ha
 // Skin is parametric (can be pale, dusky, etc). Hair fully parametric.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080C0A';
-  const LEAF='#286030',LEAHI='#3E9048',LEASH='#184020',LEADK='#0E2818';
   const SIL='#9AAAB8',SILHI='#C0D0DC',SILSH='#607080';
   const WOOD='#6A4420',WOODHI='#9A6830';
   const BOOT='#1A2810',BOOTHI='#304820';
   const BOW='#7A5020',BOWHI='#A07030';
   const SING='#C0C080'; // bowstring color
+  const LEAF=ar.mid,LEAHI=ar.hi,LEASH=ar.lo,LEADK=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000025';
@@ -3091,11 +3108,11 @@ function _drawMaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=LEAHI;  ctx.fillRect(ox+10,oy+1,4,2); // emerald gem
 }
 
-function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080C0A';
-  const LEAF='#286030',LEAHI='#3E9048',LEASH='#184020',LEADK='#0E2818';
   const SIL='#9AAAB8',SILHI='#C0D0DC',SILSH='#607080';
   const BOOT='#1A2810',BOOTHI='#304820';
+  const LEAF=ar.mid,LEAHI=ar.hi,LEASH=ar.lo,LEADK=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000025';
@@ -3210,18 +3227,19 @@ function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle='#90F890';ctx.fillRect(ox+11,oy+1,2,1);
 }
 
-function drawElfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawElfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk=_skinPal(skinToneIdx??2);
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
-    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -3235,13 +3253,13 @@ function drawElfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
 // Female: twin long braids, smaller visor helm, same heavy armour, war axe.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#0A0808';
-  const PLATE='#545264',PLHI='#747288',PLSH='#343048',PLDK='#201E30';
   const GOLD='#C8A028',GOLHI='#E8C040',GOLSH='#887018';
   const BOOT='#2A1808',BOOTHI='#4A2C18';
   const AXE='#6A6870',AXEHI='#9A98A8',AXSH='#3A3848';
   const AXHND='#5A3010',AXHHI='#8A5020';
+  const PLATE=ar.mid,PLHI=ar.hi,PLSH=ar.lo,PLDK=ar.dk;
 
   // Shadow (wide)
   ctx.fillStyle='#00000030';
@@ -3372,13 +3390,13 @@ function _drawMaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=GOLHI;ctx.fillRect(ox+9,oy+26,12,1);
 }
 
-function _drawFemaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#0A0808';
-  const PLATE='#545264',PLHI='#747288',PLSH='#343048',PLDK='#201E30';
   const GOLD='#C8A028',GOLHI='#E8C040',GOLSH='#887018';
   const BOOT='#2A1808',BOOTHI='#4A2C18';
   const AXE='#6A6870',AXEHI='#9A98A8',AXSH='#3A3848';
   const AXHND='#5A3010',AXHHI='#8A5020';
+  const PLATE=ar.mid,PLHI=ar.hi,PLSH=ar.lo,PLDK=ar.dk;
 
   // Shadow
   ctx.fillStyle='#00000028';
@@ -3507,18 +3525,19 @@ function _drawFemaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=GOLD; ctx.fillRect(ox+4,oy+25,4,2); ctx.fillRect(ox+16,oy+25,4,2);
 }
 
-function drawDwarfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawDwarfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk=_skinPal(skinToneIdx??2);
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+26,oy);ctx.scale(-1,1); // wider flip for dwarf
-    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -3532,16 +3551,16 @@ function drawDwarfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
 // Female: slightly different ear/face, simpler rag outfit, staff or club.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   // Species-fixed green skin
   const SKNG='#7AAA30',SKNHI='#9ACC44',SKNSH='#507820',SKNDK='#345010';
   const OUT='#080C04';
   const LEATH='#3A2818',LEATHI='#5A4028',LEASH='#201408';
-  const PATCH='#5A4830',PATHI='#7A6848',PATSH='#3A2A18'; // patchwork cloth
   const IRON='#5A585E',IRONHI='#7A7880',IRONSH='#3A3840'; // crude iron bits
   const BOOT='#2A2010',BOOTHI='#3E3018';
   const CLUB='#6A4420',CLUBHI='#8A6030';
   const YEL='#CCCC00',YELHI='#FFFF40'; // yellow eyes
+  const PATCH=ar.mid,PATHI=ar.hi,PATSH=ar.lo;
 
   // Shadow (small)
   ctx.fillStyle='#00000025';
@@ -3679,14 +3698,14 @@ function _drawMaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=SKNDK;  ctx.fillRect(ox+9, oy+14,2,1); ctx.fillRect(ox+12,oy+14,2,1); // gaps
 }
 
-function _drawFemaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const SKNG='#7AAA30',SKNHI='#9ACC44',SKNSH='#507820',SKNDK='#345010';
   const OUT='#080C04';
   const LEATH='#3A2818',LEATHI='#5A4028',LEASH='#201408';
-  const PATCH='#6A4860',PATHI='#8A6880',PATSH='#4A2840'; // different color cloth (purple-ish)
   const BOOT='#2A2010',BOOTHI='#3E3018';
   const STAFF='#6A4420',STAFFHI='#8A6030';
   const YEL='#CCCC00',YELHI='#FFFF40';
+  const PATCH=ar.mid,PATHI=ar.hi,PATSH=ar.lo;
 
   // Shadow
   ctx.fillStyle='#00000022';
@@ -3788,18 +3807,19 @@ function _drawFemaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle='#EEE'; ctx.fillRect(ox+11,oy+14,2,3);
 }
 
-function drawGoblinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawGoblinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk={}; // not used — goblins have fixed green skin
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
-    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -3812,17 +3832,17 @@ function drawGoblinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex)
 // Female: war-painted, battle-braids, armoured but showing more muscle.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const SKIN='#5A7840',SKINHI='#748C50',SKINSH='#3C5428',SKINDK='#283C1C';
   const OUT='#080C04';
   const FUR='#4A3020',FURHI='#6A5030',FURSH='#2A1808';
-  const PLATE='#4A4858',PLHI='#6A6878',PLSH='#2A2838';
   const BONE='#C8B890',BONEHI='#E0D0A8';
   const BOOT='#2A1808',BOOTHI='#4A3018';
   const AXE='#6A6870',AXEHI='#9A98A8';
   const AXHND='#4A3010',AXHHI='#7A5020';
   const MARK='#CC3018'; // war-paint red
   const TUSK='#E8D898',TUSKHI='#FFF0C0'; // tusk color
+  const PLATE=ar.mid,PLHI=ar.hi,PLSH=ar.lo;
 
   // Shadow (very wide)
   ctx.fillStyle='#00000030';
@@ -3967,17 +3987,17 @@ function _drawMaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=OUT;    ctx.fillRect(ox+10,oy+13,6,1);
 }
 
-function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const SKIN='#5A7840',SKINHI='#748C50',SKINSH='#3C5428',SKINDK='#283C1C';
   const OUT='#080C04';
   const FUR='#4A3020',FURHI='#6A5030',FURSH='#2A1808';
-  const PLATE='#4A4858',PLHI='#6A6878',PLSH='#2A2838';
   const BONE='#C8B890',BONEHI='#E0D0A8';
   const BOOT='#2A1808',BOOTHI='#4A3018';
   const AXE='#6A6870',AXEHI='#9A98A8';
   const AXHND='#4A3010',AXHHI='#7A5020';
   const MARK='#CC3018';
   const TUSK='#E8D898',TUSKHI='#FFF0C0';
+  const PLATE=ar.mid,PLHI=ar.hi,PLSH=ar.lo;
 
   // Shadow
   ctx.fillStyle='#00000030';
@@ -4115,18 +4135,19 @@ function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=SKINDK; ctx.fillRect(ox+9, oy+12,8,2); // mouth
 }
 
-function drawOrcSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawOrcSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk={};
   const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+28,oy);ctx.scale(-1,1); // widest flip for orc
-    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
@@ -4140,13 +4161,13 @@ function drawOrcSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
 // Female: tapered chassis, twin antennae, more curved panel shaping.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function _drawMaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawMaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080810';
-  const MTAL='#3A4050',MTHI='#5A6070',MTSH='#222830',MTDK='#161C22';
   const CYAN='#20CCDD',CYANHI='#60F0FF',CYSH='#108899';
   const LITE='rgba(32,204,221,0.20)'; // energy glow
   const JOINT='#2A3038',JOIHI='#4A5060';
   const GUN='#2A2C34',GUNHI='#4A4C58';
+  const MTAL=ar.mid,MTHI=ar.hi,MTSH=ar.lo,MTDK=ar.dk;
 
   // Glow pulse (faint energy field)
   ctx.fillStyle=LITE; ctx.fillRect(ox+2,oy+0,20,44);
@@ -4282,13 +4303,13 @@ function _drawMaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   for(let i=0;i<4;i++) ctx.fillRect(ox+8+i*2,oy+9,1,3); // grille slits in MTSH
 }
 
-function _drawFemaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+function _drawFemaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar){
   const OUT='#080810';
-  const MTAL='#3A3850',MTHI='#5A5878',MTSH='#222030',MTDK='#161428'; // slightly purple tint
   const CYAN='#20CCDD',CYANHI='#60F0FF',CYSH='#108899';
   const LITE='rgba(32,204,221,0.18)';
   const JOINT='#2A2838',JOIHI='#4A4860';
   const PURP='#8040C8',PURPHI='#A868E8'; // accent color (purple instead of gunmetal)
+  const MTAL=ar.mid,MTHI=ar.hi,MTSH=ar.lo,MTDK=ar.dk;
 
   // Glow
   ctx.fillStyle=LITE; ctx.fillRect(ox+3,oy+0,18,44);
@@ -4393,18 +4414,19 @@ function _drawFemaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
   ctx.fillStyle=PURP;   ctx.fillRect(ox+6, oy+6,2,1); ctx.fillRect(ox+16,oy+6,2,1);
 }
 
-function drawRobotSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+function drawRobotSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex,armorHex){
   const f=moving?(Math.floor(frame/4)%6):0;
   const swing=moving?_WK_SWING[f]:0;
   const bob=moving?_WK_BOB[f]:0;
   const sk={}; // unused for robot
   const hr={}; // unused for robot
+  const ar=_armorPal(armorHex||'#2255DD');
   if(dir===1){
     ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
-    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,0,0,dir,f,swing,bob,sk,hr,ar);
     ctx.restore();
   } else {
-    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,ox,oy,dir,f,swing,bob,sk,hr,ar);
   }
 }
 
