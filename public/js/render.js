@@ -1308,14 +1308,13 @@ function drawVillageBG(ctx,W,H,tick){
 
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware.
-// gender + skinToneIdx route human characters to the PNG warrior sprites.
+// gender + skinToneIdx route human characters to the procedural warrior sprite.
 function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx){
   const sp=species||'human';
 
-  // ── PNG warrior sprites for human characters ──────────────────────────────
-  if(sp==='human'&&WARRIOR_IMGS[(gender||'male')]){
-    // Offset so the sprite's feet land at roughly the same y as the procedural one
-    drawWarriorSprite(ctx,ox-11,oy-6,dir,frame,moving,skinToneIdx??2,hairColor||HAIR_COLORS[1],gender||'male');
+  // ── Procedural warrior sprites for human characters ───────────────────────
+  if(sp==='human'){
+    drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
     return;
   }
 
@@ -1673,112 +1672,347 @@ function drawNPCSprite(ctx,ox,oy,type,face=2){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WARRIOR SPRITE SYSTEM
-// Loads warrior_male.png / warrior_female.png, applies palette swaps for skin
-// tone and hair colour, caches results, and provides drawWarriorSprite().
+// HUMAN WARRIOR SPRITES — fully procedural, drawn from scratch with canvas
+//
+// Male:   stocky barbarian — wild hair, bare arms, leather chest, gold pauldron,
+//         sword at right hip, heavy boots
+// Female: slender dark rogue — long flowing hair, charcoal plate, split skirt,
+//         longsword, knee-high laced boots
+//
+// Both support: 6-frame walk cycle, left/right direction flip, skin tone index,
+//               hair colour hex, accessories
 // ─────────────────────────────────────────────────────────────────────────────
 
-const WARRIOR_IMGS   = {male:null, female:null};
-const _SPRITE_CACHE  = {};  // key: "gender_skinIdx_hairHex" → canvas
+// Shared walk-cycle tables (6 frames)
+const _WK_SWING = [0,-3,-5, 0, 3, 5]; // leg/arm Y offset
+const _WK_BOB   = [0, 0, 1, 0, 0, 1]; // torso dip on foot-plant
 
-// ── HSL helpers ──────────────────────────────────────────────────────────────
-function _rgbToHsl(r,g,b){
-  r/=255;g/=255;b/=255;
-  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
-  let h=0,s=0,l=(mx+mn)/2;
-  if(mx!==mn){
-    const d=mx-mn;
-    s=l>.5?d/(2-mx-mn):d/(mx+mn);
-    if(mx===r)h=((g-b)/d+(g<b?6:0))/6;
-    else if(mx===g)h=((b-r)/d+2)/6;
-    else h=((r-g)/d+4)/6;
+// Derive skin palette from SKIN_TONES[idx].base
+function _skinPal(idx){
+  const b=(SKIN_TONES[idx]||SKIN_TONES[2]).base;
+  const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+  const rgb=(r,g,bb)=>`rgb(${r},${g},${bb})`;
+  return {
+    mid : rgb(b[0],b[1],b[2]),
+    hi  : rgb(clamp(b[0]+28,0,255),clamp(b[1]+22,0,255),clamp(b[2]+18,0,255)),
+    lo  : rgb(clamp(b[0]-32,0,255),clamp(b[1]-28,0,255),clamp(b[2]-24,0,255)),
+    dk  : rgb(clamp(b[0]-55,0,255),clamp(b[1]-50,0,255),clamp(b[2]-44,0,255)),
+  };
+}
+
+// Derive hair palette from hex string
+function _hairPal(hex){
+  const hr=parseInt(hex.slice(1,3),16),hg=parseInt(hex.slice(3,5),16),hb=parseInt(hex.slice(5,7),16);
+  const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+  const rgb=(r,g,b)=>`rgb(${r},${g},${b})`;
+  return {
+    mid : hex,
+    hi  : rgb(clamp(hr+40,0,255),clamp(hg+32,0,255),clamp(hb+24,0,255)),
+    lo  : rgb(clamp(hr-28,0,255),clamp(hg-24,0,255),clamp(hb-20,0,255)),
+    dk  : rgb(clamp(hr-50,0,255),clamp(hg-44,0,255),clamp(hb-38,0,255)),
+  };
+}
+
+// ── MALE BARBARIAN WARRIOR ────────────────────────────────────────────────────
+// Inspiration: stocky build, wild brown hair with spiky top, gold left pauldron,
+// partial leather chest showing V-neck skin, thick leather legs, heavy dark boots,
+// sword at right hip, shield-arm muscles visible.
+function _drawMaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#100800', LEATH='#7A5028', LEATH2='#4E3010', GOLD='#C8A030',
+        GOLHI='#E8C048', BOOT='#1E0C04', BOOTHI='#3C1C08', SIL='#C0C4CC',
+        SILHI='#E0E4F0', BELT='#3A2010';
+
+  // ── Shadow ──
+  ctx.fillStyle='#00000030';ctx.fillRect(ox+2,oy+43,20,3);
+
+  // ── Sword (right hip, behind body when facing right) ──
+  if(dir!==1){
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+20,oy+18+bob,3,20);
+    ctx.fillStyle=SIL;  ctx.fillRect(ox+21,oy+20+bob,2,18);
+    ctx.fillStyle=SILHI;ctx.fillRect(ox+21,oy+20+bob,1,10);
+    ctx.fillStyle=GOLD; ctx.fillRect(ox+18,oy+22+bob,7,2); // crossguard
+    ctx.fillStyle=GOLHI;ctx.fillRect(ox+18,oy+22+bob,7,1);
+    ctx.fillStyle=LEATH;ctx.fillRect(ox+19,oy+18+bob,3,4); // hilt
   }
-  return [h*360,s,l];
-}
-function _hslToRgb(h,s,l){
-  h/=360;
-  if(s===0){const v=Math.round(l*255);return[v,v,v];}
-  const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
-  function f(t){t=((t%1)+1)%1;
-    if(t<1/6)return p+(q-p)*6*t;if(t<.5)return q;
-    if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
-  return[Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)];
-}
 
-// ── Per-variant builder ───────────────────────────────────────────────────────
-// Skin:  warm hue (10-44 deg), moderate sat, lightness >= 0.40
-// Hair:  warm hue  (6-42 deg), moderate sat, lightness  <  0.42
-function _buildSpriteVariant(img, skinBase, hairHex){
-  const tmp=document.createElement('canvas');
-  tmp.width=img.width; tmp.height=img.height;
-  const tc=tmp.getContext('2d');
-  tc.drawImage(img,0,0);
-  const id=tc.getImageData(0,0,tmp.width,tmp.height);
-  const d=id.data;
-  const [sk_h,sk_s,sk_l]=_rgbToHsl(skinBase[0],skinBase[1],skinBase[2]);
-  const hr2=parseInt(hairHex.slice(1,3),16),
-        hg2=parseInt(hairHex.slice(3,5),16),
-        hb2=parseInt(hairHex.slice(5,7),16);
-  const [ha_h,ha_s,ha_l]=_rgbToHsl(hr2,hg2,hb2);
-  for(let i=0;i<d.length;i+=4){
-    const r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
-    if(a<64)continue;
-    if(Math.max(r,g,b)-Math.min(r,g,b)<22)continue; // near-neutral: skip
-    const [ph,ps,pl]=_rgbToHsl(r,g,b);
-    if(ph>=10&&ph<=44&&ps>=0.22&&ps<=0.84&&pl>=0.40&&pl<=0.93){
-      // skin pixel
-      const newL=Math.min(0.96,Math.max(0.04,sk_l*(pl/0.62)));
-      const [nr,ng,nb]=_hslToRgb(sk_h,sk_s,newL);
-      d[i]=nr;d[i+1]=ng;d[i+2]=nb;
-    } else if(ph>=6&&ph<=42&&ps>=0.22&&ps<=0.96&&pl>=0.06&&pl<=0.40){
-      // hair pixel
-      const newL=Math.min(0.88,Math.max(0.04,ha_l*(pl/0.24)));
-      const [nr,ng,nb]=_hslToRgb(ha_h,ha_s,newL);
-      d[i]=nr;d[i+1]=ng;d[i+2]=nb;
-    }
-  }
-  tc.putImageData(id,0,0);
-  return tmp;
-}
-
-// ── Public: get (or build+cache) a sprite canvas ─────────────────────────────
-function getWarriorSprite(gender, skinToneIdx, hairHex){
-  const g=gender||'male';
-  const img=WARRIOR_IMGS[g];
-  if(!img)return null;
-  const key=`${g}_${skinToneIdx}_${hairHex}`;
-  if(!_SPRITE_CACHE[key]){
-    const st=(typeof SKIN_TONES!=='undefined'&&SKIN_TONES[skinToneIdx])||{base:[192,140,95]};
-    _SPRITE_CACHE[key]=_buildSpriteVariant(img,st.base,hairHex);
-  }
-  return _SPRITE_CACHE[key];
-}
-
-// ── Public: draw the warrior sprite at (ox,oy) ───────────────────────────────
-const WARRIOR_W=46, WARRIOR_H=46;
-function drawWarriorSprite(ctx,ox,oy,dir,frame,moving,skinToneIdx,hairHex,gender){
-  const spr=getWarriorSprite(gender||'male', skinToneIdx??2, hairHex||(typeof HAIR_COLORS!=='undefined'?HAIR_COLORS[1]:'#3A2010'));
-  if(!spr)return;
-  const bobY=moving?((Math.floor(frame/6)%2)*-2):0;
-  ctx.save();
-  if(dir===1){
-    ctx.translate(ox+WARRIOR_W,oy+bobY);
-    ctx.scale(-1,1);
-    ctx.drawImage(spr,0,0,WARRIOR_W,WARRIOR_H);
-  } else {
-    ctx.drawImage(spr,ox,oy+bobY,WARRIOR_W,WARRIOR_H);
-  }
-  ctx.restore();
-}
-
-// ── Load both images at startup ───────────────────────────────────────────────
-function _loadWarriorSprites(){
-  ['male','female'].forEach(g=>{
-    const img=new Image();
-    img.onload=()=>{ WARRIOR_IMGS[g]=img; };
-    img.onerror=()=>console.warn(`[warrior] failed to load warrior_${g}.png`);
-    img.src=`/warrior_${g}.png?v=20260402`;
+  // ── Boots ──
+  const bY=36;
+  [4,13].forEach((bx,i)=>{
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+bx-1,oy+bY-1,9,9);
+    ctx.fillStyle=BOOT; ctx.fillRect(ox+bx,  oy+bY,  8,8);
+    ctx.fillStyle=BOOTHI;ctx.fillRect(ox+bx, oy+bY,  8,2);
+    // toe cap
+    ctx.fillStyle=BOOTHI;ctx.fillRect(ox+bx+(i?0:0),oy+bY+6,8,1);
   });
+
+  // ── Legs (leather) ──
+  const lY=27;
+  // left leg (swings forward on walk)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+3, oy+lY+swing-1,9,11);
+  ctx.fillStyle=LEATH;ctx.fillRect(ox+4, oy+lY+swing,  8,10);
+  ctx.fillStyle=GOLHI;ctx.fillRect(ox+4, oy+lY+swing,  8,2);  // knee pad highlight
+  ctx.fillStyle=LEATH2;ctx.fillRect(ox+9,oy+lY+swing,  3,10); // shadow side
+  // right leg (swings back)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+12,oy+lY-swing-1,9,11);
+  ctx.fillStyle=LEATH;ctx.fillRect(ox+13,oy+lY-swing,  8,10);
+  ctx.fillStyle=GOLHI;ctx.fillRect(ox+13,oy+lY-swing,  8,2);
+  ctx.fillStyle=LEATH2;ctx.fillRect(ox+18,oy+lY-swing, 3,10);
+
+  // ── Torso (with body bob) ──
+  ctx.save();ctx.translate(0,bob);
+
+  // left arm (skin, bare)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+0,oy+14,5,14);
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+1,oy+15,4,13);
+  ctx.fillStyle=sk.mid;ctx.fillRect(ox+1,oy+15,3,13);
+  ctx.fillStyle=sk.hi;ctx.fillRect(ox+1,oy+15,2,5);
+
+  // right arm (skin, bare)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+19,oy+14,5,14);
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+20,oy+15,4,13);
+  ctx.fillStyle=sk.mid;ctx.fillRect(ox+20,oy+15,3,13);
+  ctx.fillStyle=sk.hi;ctx.fillRect(ox+20,oy+15,2,5);
+
+  // chest leather base
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+4, oy+13,16,15);
+  ctx.fillStyle=LEATH;ctx.fillRect(ox+5, oy+14,14,14);
+  ctx.fillStyle=LEATH2;ctx.fillRect(ox+16,oy+14, 3,14); // shadow side
+
+  // V-neck skin opening
+  ctx.fillStyle=sk.mid;ctx.fillRect(ox+9,oy+14,6,7);
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+12,oy+14,3,7);
+  ctx.fillStyle=sk.hi; ctx.fillRect(ox+9,oy+14,3,3);
+
+  // chest cross-strap
+  ctx.fillStyle=BELT;ctx.fillRect(ox+5,oy+20,14,2);
+  ctx.fillStyle=BELT;
+  ctx.fillRect(ox+5,oy+14,2,14);   // left diagonal strap
+  ctx.fillRect(ox+17,oy+14,2,14);  // right
+
+  // gold left shoulder pauldron (always left even when flipped — mirrored by ctx.scale)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+0, oy+11,9, 6);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+1, oy+12,8, 5);
+  ctx.fillStyle=GOLHI;ctx.fillRect(ox+1, oy+12,8, 2);
+  ctx.fillStyle=LEATH;ctx.fillRect(ox+1, oy+16,8, 1); // lower trim
+
+  // sword hilt (left-facing: show sword on other side)
+  if(dir===1){
+    ctx.fillStyle=OUT;  ctx.fillRect(ox-1,oy+18,3,20);
+    ctx.fillStyle=SIL;  ctx.fillRect(ox+0, oy+20,2,18);
+    ctx.fillStyle=SILHI;ctx.fillRect(ox+0, oy+20,1,10);
+    ctx.fillStyle=GOLD; ctx.fillRect(ox-3,oy+22,7,2);
+    ctx.fillStyle=GOLHI;ctx.fillRect(ox-3,oy+22,7,1);
+    ctx.fillStyle=LEATH;ctx.fillRect(ox+0, oy+18,2,4);
+  }
+
+  ctx.restore(); // end bob
+
+  // ── Head ──
+  // Hair back layer (wider than head, wild)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+2, oy-3,20,15);
+  ctx.fillStyle=hr.lo;ctx.fillRect(ox+3, oy-2,18,13);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+4,oy-1,16,11);
+  ctx.fillStyle=hr.hi;ctx.fillRect(ox+4,oy-1,12, 4);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+17,oy-2, 4,13); // shadow side
+
+  // Hair top spikes
+  ctx.fillStyle=hr.mid;
+  ctx.fillRect(ox+5, oy-5,3,5);
+  ctx.fillRect(ox+9, oy-6,4,6);
+  ctx.fillRect(ox+14,oy-5,3,5);
+  ctx.fillRect(ox+18,oy-4,3,4);
+  ctx.fillStyle=hr.hi;
+  ctx.fillRect(ox+9,oy-6,2,3);
+  ctx.fillRect(ox+5,oy-5,1,2);
+
+  // Face
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+5, oy+2,14,12);
+  ctx.fillStyle=sk.mid;ctx.fillRect(ox+6,oy+3,12,11);
+  ctx.fillStyle=sk.hi;ctx.fillRect(ox+6, oy+3,10, 4);
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+6, oy+11,12, 3);
+  ctx.fillStyle=sk.dk;ctx.fillRect(ox+6, oy+12,12, 2); // chin shadow
+
+  // Brow ridge
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+6,oy+5,12,1);
+
+  // Eyes
+  ctx.fillStyle=OUT; ctx.fillRect(ox+7, oy+6,3,2);ctx.fillRect(ox+14,oy+6,3,2);
+  ctx.fillStyle='#4A2A0A';ctx.fillRect(ox+8,oy+6,2,2);ctx.fillRect(ox+15,oy+6,2,2);
+  ctx.fillStyle='#FFF';ctx.fillRect(ox+8,oy+6,1,1);ctx.fillRect(ox+15,oy+6,1,1);
+
+  // Nose
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+11,oy+9,2,2);
+
+  // Hair framing face (side locks)
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+4, oy+3,2,9);  // left lock
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+18,oy+3,2,9);  // right lock
+  ctx.fillStyle=hr.lo;ctx.fillRect(ox+4,oy+9,2,3);
+  ctx.fillStyle=hr.lo;ctx.fillRect(ox+18,oy+9,2,3);
 }
-_loadWarriorSprites();
+
+// ── FEMALE DARK ROGUE WARRIOR ─────────────────────────────────────────────────
+// Inspiration: slender build, long flowing auburn hair (the signature feature),
+// dark charcoal plate armour, split skirt, knee-high laced boots, longsword.
+function _drawFemaleWarrior(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#0C0814', PLATE='#28263A', PLATE2='#1A182A', PLHI='#3E3C54',
+        PLAC='#5A4880', BOOT='#160E20', BOOTHI='#2C1E38', BOOTLC='#3A2A4A',
+        SIL='#C0C4CC', SILHI='#E0E4F0', BELT='#3A2848';
+
+  // ── Shadow ──
+  ctx.fillStyle='#00000028';ctx.fillRect(ox+4,oy+43,16,3);
+
+  // ── Sword (right hip) ──
+  if(dir!==1){
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+19,oy+16+bob,3,22);
+    ctx.fillStyle=SIL;  ctx.fillRect(ox+20,oy+18+bob,2,20);
+    ctx.fillStyle=SILHI;ctx.fillRect(ox+20,oy+18+bob,1,12);
+    ctx.fillStyle=PLAC; ctx.fillRect(ox+17,oy+20+bob,7,2); // crossguard
+    ctx.fillStyle=PLHI; ctx.fillRect(ox+17,oy+20+bob,7,1);
+    ctx.fillStyle=PLATE;ctx.fillRect(ox+18,oy+16+bob,3,4); // hilt wrap
+  }
+
+  // ── Knee-high boots (tall, laced) ──
+  // Boots start higher than male (y=30) for knee-high look
+  [5,14].forEach((bx,i)=>{
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+bx-1,oy+28,7,16);
+    ctx.fillStyle=BOOT; ctx.fillRect(ox+bx,  oy+29,6,15);
+    ctx.fillStyle=BOOTHI;ctx.fillRect(ox+bx, oy+29,6,3);
+    // lacing detail
+    ctx.fillStyle=BOOTLC;
+    ctx.fillRect(ox+bx+2,oy+32,2,1);
+    ctx.fillRect(ox+bx+2,oy+35,2,1);
+    ctx.fillRect(ox+bx+2,oy+38,2,1);
+    ctx.fillRect(ox+bx+2,oy+41,2,1);
+  });
+
+  // ── Legs / dark leggings (above boots, under skirt) ──
+  const lY=24;
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+4, oy+lY+swing-1,7,7);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+5,oy+lY+swing,  6,6);
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+13,oy+lY-swing-1,7,7);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+14,oy+lY-swing, 6,6);
+
+  // ── Torso bob ──
+  ctx.save();ctx.translate(0,bob);
+
+  // Flowing hair behind body (left side)
+  ctx.fillStyle=hr.lo; ctx.fillRect(ox+1, oy+14,4,18);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+2, oy+14,3,16);
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+1, oy+26,4,6);
+
+  // Slim dark arms with plate gauntlets
+  // left arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+14,4,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+3, oy+15,3,10);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+3, oy+15,3,3);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+4, oy+23,3,4); // gauntlet cuff
+  // right arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+18,oy+14,4,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+19,oy+15,3,10);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+19,oy+15,3,3);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+18,oy+23,3,4);
+
+  // Armoured split skirt
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+4, oy+22,16,10);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+5, oy+23,14,9);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+5, oy+23,14,2);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+5, oy+29,14,3); // lower shadow
+  // centre split
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+11,oy+24,2,8);
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+11,oy+25,2,6);
+
+  // Chest plate
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+13,14,12);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+6, oy+14,12,11);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+6, oy+14,12,3);
+  ctx.fillStyle=PLAC;  ctx.fillRect(ox+6, oy+14,12,1); // accent stripe
+  ctx.fillStyle=PLATE2;ctx.fillRect(ox+15,oy+14,3,11); // shadow side
+
+  // Collar / gorget
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+7, oy+11,10,4);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+8, oy+12,8, 3);
+  ctx.fillStyle=PLAC;  ctx.fillRect(ox+8, oy+12,8, 1);
+
+  // Shoulder pauldrons (smaller than male)
+  [4,16].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px-1,oy+12,6,5);
+    ctx.fillStyle=PLATE; ctx.fillRect(ox+px,  oy+13,5,4);
+    ctx.fillStyle=PLHI;  ctx.fillRect(ox+px,  oy+13,5,2);
+  });
+
+  // Sword (left-facing: opposite side)
+  if(dir===1){
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+2, oy+16+bob,3,22);
+    ctx.fillStyle=SIL;  ctx.fillRect(ox+3, oy+18+bob,2,20);
+    ctx.fillStyle=SILHI;ctx.fillRect(ox+3, oy+18+bob,1,12);
+    ctx.fillStyle=PLAC; ctx.fillRect(ox+0, oy+20+bob,7,2);
+    ctx.fillStyle=PLHI; ctx.fillRect(ox+0, oy+20+bob,7,1);
+    ctx.fillStyle=PLATE;ctx.fillRect(ox+3, oy+16+bob,3,4);
+  }
+
+  ctx.restore(); // end bob
+
+  // ── Head ──
+  // Long flowing hair — cascades past shoulders, extends to y≈30
+  // Back layer (widest)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+2, oy-1,20,34);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+3, oy+0, 18,32);
+  // Main hair body
+  ctx.fillStyle=hr.lo;ctx.fillRect(ox+4, oy+0, 16,28);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5,oy+0, 14,22);
+  // Highlights on top and left flow
+  ctx.fillStyle=hr.hi;ctx.fillRect(ox+6, oy+0, 10,5);
+  ctx.fillStyle=hr.hi;ctx.fillRect(ox+5, oy+5, 3, 8);
+  // Inner shadow (away from light)
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+16,oy+0, 3,22);
+  ctx.fillStyle=hr.dk;ctx.fillRect(ox+4, oy+24,16,6);
+
+  // Face (narrower and taller than male)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+7, oy+2,10,11);
+  ctx.fillStyle=sk.mid;ctx.fillRect(ox+8, oy+3,8, 10);
+  ctx.fillStyle=sk.hi; ctx.fillRect(ox+8, oy+3,7, 3);
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+8, oy+10,8, 3);
+  ctx.fillStyle=sk.dk; ctx.fillRect(ox+8, oy+12,8, 1); // chin shadow
+
+  // Eyes (slightly larger, more prominent)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+8, oy+5,3,3);ctx.fillRect(ox+13,oy+5,3,3);
+  ctx.fillStyle='#3A2060';ctx.fillRect(ox+9,oy+5,2,2);ctx.fillRect(ox+14,oy+5,2,2);
+  ctx.fillStyle='#6A40A0';ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+  ctx.fillStyle='#FFF';ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+
+  // Nose (delicate)
+  ctx.fillStyle=sk.lo;ctx.fillRect(ox+11,oy+8,2,1);
+
+  // Lips
+  ctx.fillStyle='#C06070';ctx.fillRect(ox+9,oy+10,6,2);
+  ctx.fillStyle='#E08090';ctx.fillRect(ox+9,oy+10,6,1);
+
+  // Hair over forehead (bangs)
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+7,oy+2,2,3);   // left bang
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+15,oy+2,2,3);  // right bang
+  ctx.fillStyle=hr.hi; ctx.fillRect(ox+7,oy+2,2,1);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+10,oy+1,4,3);  // centre fringe
+  ctx.fillStyle=hr.hi; ctx.fillRect(ox+10,oy+1,4,1);
+}
+
+// ── Dispatcher: pick male or female, handle direction flip ────────────────────
+function drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f    = moving ? (Math.floor(frame/4)%6) : 0;
+  const swing= moving ? _WK_SWING[f] : 0;
+  const bob  = moving ? _WK_BOB[f]   : 0;
+  const sk   = _skinPal(skinToneIdx??2);
+  const hr   = _hairPal(hairHex||HAIR_COLORS[1]);
+
+  if(dir===1){ // facing left → mirror entire sprite
+    ctx.save();
+    ctx.translate(ox+24,oy);
+    ctx.scale(-1,1);
+    const fn = (gender==='female') ? _drawFemaleWarrior : _drawMaleWarrior;
+    fn(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    const fn = (gender==='female') ? _drawFemaleWarrior : _drawMaleWarrior;
+    fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
 
