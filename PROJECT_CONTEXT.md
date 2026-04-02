@@ -1,6 +1,32 @@
 # Governance Town / veQueue Demo — Project Context
 
-_Last updated: 2026-03-29_
+_Last updated: 2026-04-02_
+
+---
+
+## ⚡ Deploy (One Command)
+
+```bash
+ssh -i /workspace/group/.ssh/droplet_deploy -o StrictHostKeyChecking=no root@24.199.98.242 \
+  "cd /root/vequeue-demo && git pull origin main && pm2 restart governance-town"
+```
+
+| Detail | Value |
+|--------|-------|
+| Droplet IP | `24.199.98.242` |
+| SSH user | `root` |
+| SSH key | `/workspace/group/.ssh/droplet_deploy` |
+| Game directory | `/root/vequeue-demo` |
+| PM2 process | `governance-town` |
+| GitHub push key | `/workspace/extra/github-keys/github_deploy` |
+| Live URL | `https://vequeue.imimim.info` |
+
+**Full deploy flow:**
+1. Make changes
+2. Bump asset version in `public/index.html` (`v=YYYYMMDDX`)
+3. `git add … && git commit -m "…"`
+4. `GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" git push origin main`
+5. Run the one-liner above to pull + restart on the droplet
 
 ---
 
