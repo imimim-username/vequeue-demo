@@ -1627,16 +1627,13 @@ function renderBattleScreen(){
   // ── Action buttons ──
   const cls=G.class_||'warrior';
   const specialLabel={warrior:'⚔  POWER STRIKE',mage:'🔮  ARCANE BOLT',rogue:'🗡  TWIN DAGGERS',paladin:'✨  HOLY LIGHT'}[cls]||'✦  SPECIAL';
-  // Show SWITCH only if player has another weapon in bag
-  const bagWeapons=G.inventory.slice(2).map((it,i)=>it?.type==='weapon'?{item:it,idx:i+2}:null).filter(Boolean);
   const actions=[
     {id:'attack', label:'⚔  ATTACK',   bg:'#6B1818',hi:'#A02020'},
     {id:'special',label:specialLabel,  bg:'#183058',hi:'#2050A0'},
     {id:'potion', label:'🧪  POTION',  bg:'#183040',hi:'#204060'},
     {id:'flee',   label:'💨  FLEE',    bg:'#183018',hi:'#286028'},
-    ...(bagWeapons.length?[{id:'switch',label:'↔  SWITCH WPN',bg:'#2A1A08',hi:'#5A3A10'}]:[]),
   ];
-  const active=bt.phase==='player_turn'&&!bt.result&&!bt._switching;
+  const active=bt.phase==='player_turn'&&!bt.result;
   const bX=274,bW=175,bH=28,bGap=7,bStartY=pY+10;
   actions.forEach((a,i)=>{
     const bx=bX,by=bStartY+i*(bH+bGap);
@@ -1649,31 +1646,70 @@ function renderBattleScreen(){
     ctxUI.fillText(a.label,bx+8,by+18);
   });
 
-  // ── Weapon switch overlay ────────────────────────────────────────────────────
-  if(bt._switching&&bagWeapons.length){
-    const ox=260,oy=pY-5,ow=200;
-    ctxUI.fillStyle='rgba(0,0,0,0.88)';ctxUI.fillRect(ox,oy,ow,16+bagWeapons.length*34+4);
-    ctxUI.strokeStyle='#FFD080';ctxUI.lineWidth=1;ctxUI.strokeRect(ox,oy,ow,16+bagWeapons.length*34+4);
-    ctxUI.fillStyle='#FFD080';ctxUI.font='bold 10px monospace';
-    ctxUI.fillText('SWITCH TO:',ox+6,oy+12);
-    bagWeapons.forEach(({item,idx},i)=>{
-      const wx=ox+4,wy=oy+16+i*34,ww=ow-8,wh=30;
-      const rarCol=RARITY_COLOR[item.rarity||'common'];
-      BATTLE_BTNS[`sw_${idx}`]={x:wx,y:wy,w:ww,h:wh};
-      ctxUI.fillStyle='#1a1208';ctxUI.fillRect(wx,wy,ww,wh);
-      ctxUI.strokeStyle=rarCol;ctxUI.lineWidth=1;ctxUI.strokeRect(wx,wy,ww,wh);
-      const dtCol={physical:'#aaa',magic:'#9B59B6',holy:'#F1C40F'}[item.dmgType||'physical']||'#aaa';
-      ctxUI.fillStyle='#fff';ctxUI.font='11px monospace';
-      ctxUI.fillText(`${item.icon} ${item.name}`,wx+4,wy+12);
-      ctxUI.fillStyle=dtCol;ctxUI.font='10px monospace';
-      ctxUI.fillText(`+${item.dmg} dmg [${item.dmgType||'phys'}]  crit+${Math.round((item.critBonus||0)*100)}%`,wx+4,wy+24);
+  // ── Weapon loadout strip (always visible; one-click switch, costs a turn) ────
+  // Collect equipped weapon + any weapons in bag slots
+  const loadoutWeapons=[
+    ...(G.inventory[0]?[{item:G.inventory[0],idx:0}]:[]),
+    ...G.inventory.slice(2)
+      .map((it,i)=>it?.type==='weapon'?{item:it,idx:i+2}:null)
+      .filter(Boolean),
+  ];
+  if(loadoutWeapons.length>0){
+    const lwY=bStartY+actions.length*(bH+bGap)+2;
+    // Divider + section label
+    ctxUI.fillStyle='#3A2A10';ctxUI.fillRect(bX,lwY,bW,1);
+    ctxUI.fillStyle='#7A6040';ctxUI.font='bold 9px monospace';
+    ctxUI.fillText('LOADOUT',bX+1,lwY+9);
+    if(loadoutWeapons.length>1){
+      ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
+      ctxUI.fillText('[W] cycle',bX+bW-55,lwY+9);
+    }
+    const wH=22,wGap=2;
+    loadoutWeapons.forEach(({item,idx},i)=>{
+      const isEquipped=idx===0;
+      const wy=lwY+12+i*(wH+wGap);
+      // Background
+      ctxUI.fillStyle=isEquipped?'#2A1A08':'#0E0A04';
+      ctxUI.fillRect(bX,wy,bW,wH);
+      // Border
+      ctxUI.strokeStyle=isEquipped?'#FFD080':active?RARITY_COLOR[item.rarity||'common']:'#2A2A2A';
+      ctxUI.lineWidth=1;ctxUI.strokeRect(bX,wy,bW,wH);
+      // Equipped arrow
+      ctxUI.fillStyle='#FFD080';ctxUI.font='9px monospace';
+      ctxUI.fillText(isEquipped?'▶':' ',bX+2,wy+13);
+      // Name
+      ctxUI.fillStyle=isEquipped?'#FFE090':active?'#AA9966':'#555544';
+      ctxUI.font=(isEquipped?'bold ':'')+'10px monospace';
+      ctxUI.fillText(`${item.icon} ${item.name}`,bX+11,wy+12);
+      // Damage + type
+      const dtCol={physical:'#999',magic:'#B080FF',holy:'#FFE566'}[item.dmgType||'physical']||'#999';
+      ctxUI.fillStyle=active?dtCol:'#444';ctxUI.font='9px monospace';
+      const effDmg=itemEffDmg(item);
+      ctxUI.fillText(`+${effDmg} [${(item.dmgType||'phys').slice(0,4)}]`,bX+11,wy+21);
+      // Durability bar (right side)
+      if(item.durability!=null){
+        const maxD=item.maxDurability||itemMaxDur(item);
+        const pct=item.durability/maxD;
+        const barW=28,barH=4,barX=bX+bW-barW-3,barY=wy+4;
+        ctxUI.fillStyle='#111';ctxUI.fillRect(barX,barY,barW,barH);
+        ctxUI.fillStyle=active?(pct>0.6?'#4CAF50':pct>0.25?'#FFD700':'#FF4444'):'#333';
+        ctxUI.fillRect(barX,barY,Math.round(barW*pct),barH);
+        ctxUI.strokeStyle='#2A2A2A';ctxUI.lineWidth=1;ctxUI.strokeRect(barX,barY,barW,barH);
+        // % text
+        ctxUI.fillStyle=active?'#776655':'#333';ctxUI.font='8px monospace';
+        ctxUI.fillText(`${Math.round(pct*100)}%`,barX,barY+13);
+      }
+      // Register click target for non-equipped weapons (only when player's turn)
+      if(!isEquipped){
+        BATTLE_BTNS[`ws_${idx}`]={x:bX,y:wy,w:bW,h:wH};
+      }
     });
-    // Cancel button
-    const cx=ox+4,cy=oy+16+bagWeapons.length*34,cw=ow-8,ch=18;
-    BATTLE_BTNS['sw_cancel']={x:cx,y:cy,w:cw,h:ch};
-    ctxUI.fillStyle='#200808';ctxUI.fillRect(cx,cy,cw,ch);
-    ctxUI.strokeStyle='#604040';ctxUI.lineWidth=1;ctxUI.strokeRect(cx,cy,cw,ch);
-    ctxUI.fillStyle='#888';ctxUI.font='10px monospace';ctxUI.fillText('✕ Cancel',cx+6,cy+13);
+    // "costs a turn" hint shown only when alternates exist
+    if(loadoutWeapons.length>1&&active){
+      const hY=lwY+12+loadoutWeapons.length*(wH+wGap)+1;
+      ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
+      ctxUI.fillText('tap alt weapon to swap  (uses turn)',bX,hY);
+    }
   }
 
   // ── Player sprite (battle right side, facing left) ──
@@ -1875,18 +1911,7 @@ function doBattleAction(action){
   }
 
   // ── Weapon switch (costs player turn) ──────────────────────────────────────
-  if(action==='switch_weapon'){
-    const idx=bt._switchTarget;
-    if(idx!=null&&G.inventory[idx]?.type==='weapon'){
-      const old=G.inventory[0];
-      G.inventory[0]=G.inventory[idx];
-      G.inventory[idx]=old;
-      bt.log.push(`Swapped to ${G.inventory[0].name}!`);
-    }
-    bt._switchTarget=null;bt._switching=false;
-    bt.phase='enemy_turn';bt.animTimer=75;
-    return;
-  }
+  // switch_weapon is now handled directly in the click/keyboard handlers
 
   if(action==='special'){
     let dmg=0,healAmt=0;
@@ -4251,13 +4276,19 @@ document.getElementById('cv-ui').addEventListener('click',e=>{
   const my=(e.clientY-rect.top)*scale;
   for(const[action,btn] of Object.entries(BATTLE_BTNS)){
     if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){
-      // Weapon switch flow
-      if(action==='switch'){bt._switching=true;return;}
-      if(action==='sw_cancel'){bt._switching=false;return;}
-      if(action.startsWith('sw_')){
+      // One-click weapon swap from loadout strip
+      if(action.startsWith('ws_')){
+        if(bt.phase!=='player_turn'||bt.result)return;
         const idx=parseInt(action.slice(3));
-        bt._switchTarget=idx;
-        doBattleAction('switch_weapon');return;
+        const weapon=G.inventory[idx];
+        if(weapon?.type==='weapon'){
+          const old=G.inventory[0];
+          G.inventory[0]=weapon;G.inventory[idx]=old;
+          bt.log.push(`⚔ Swapped to ${G.inventory[0].name}!`);
+          SFX.swing();
+          bt.phase='enemy_turn';bt.animTimer=75;
+        }
+        return;
       }
       doBattleAction(action);return;
     }
@@ -4278,6 +4309,22 @@ window.addEventListener('keydown',e=>{
   if(e.key==='1')doBattleAction('attack');
   if(e.key==='2')doBattleAction('special');
   if(e.key==='3')doBattleAction('flee');
+  // W or Tab cycles through weapons in the loadout (one-click equivalent)
+  if(e.key==='w'||e.key==='W'||e.key==='Tab'){
+    e.preventDefault();
+    // Build ordered list: slot 0 first, then bag weapons in order
+    const wpnSlots=[0,...G.inventory.slice(2).map((_,i)=>i+2)]
+      .filter(i=>G.inventory[i]?.type==='weapon');
+    if(wpnSlots.length<2)return; // nothing to swap to
+    // Rotate: move equipped to tail, promote next weapon to slot 0
+    const nextIdx=wpnSlots[1];
+    const old=G.inventory[0];
+    G.inventory[0]=G.inventory[nextIdx];
+    G.inventory[nextIdx]=old;
+    bt.log.push(`⚔ Swapped to ${G.inventory[0].name}!`);
+    SFX.swing();
+    bt.phase='enemy_turn';bt.animTimer=75;
+  }
 },{capture:false});
 
 // ── LOGIN HANDLERS ────────────────────────────────────────────────────────────
