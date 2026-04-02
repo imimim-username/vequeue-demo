@@ -3232,8 +3232,6 @@ function buildCreateScreen(){
     b.addEventListener('click',()=>{
       document.querySelectorAll('#gender-picker button').forEach(x=>x.classList.remove('selected'));
       b.classList.add('selected');G.gender=key;
-      // Invalidate sprite cache for this gender so new variants are built
-      Object.keys(_SPRITE_CACHE).forEach(k=>{if(k.startsWith(key+'_'))delete _SPRITE_CACHE[k];});
       updatePreview();
     });
     gp.appendChild(b);
