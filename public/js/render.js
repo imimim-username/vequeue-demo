@@ -1315,15 +1315,23 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
   // ── Human characters: class determines sprite archetype ──────────────────
   if(sp==='human'){
     const cls=class_||'warrior';
-    if(cls==='mage'){
-      drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
-    } else {
-      drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,gender||'male',skinToneIdx??2,hairColor||HAIR_COLORS[1]);
-    }
+    const g=gender||'male', sk=skinToneIdx??2, hr=hairColor||HAIR_COLORS[1];
+    if     (cls==='mage')    drawHumanMageSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr);
+    else if(cls==='rogue')   drawHumanRogueSprite  (ctx,ox,oy,dir,frame,moving,g,sk,hr);
+    else if(cls==='paladin') drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr);
+    else                     drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr);
     return;
   }
 
-  // ── Procedural sprite for non-human species ───────────────────────────────
+  // ── Non-human species: dedicated procedural sprites ───────────────────────
+  const g=gender||'male', sk=skinToneIdx??2, hr=hairColor||HAIR_COLORS[1];
+  if(sp==='elf')   { drawElfSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+  if(sp==='dwarf') { drawDwarfSprite (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+  if(sp==='goblin'){ drawGoblinSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+  if(sp==='orc')   { drawOrcSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+  if(sp==='robot') { drawRobotSprite (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+
+  // ── Legacy generic fallback (safety net for unknown species) ──────────────
   const f=moving?(Math.floor(frame/4)%6):0;
   const c=color||'#2255DD';
 
@@ -2371,6 +2379,2033 @@ function drawHumanMageSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairH
   } else {
     const fn = (gender==='female') ? _drawFemaleMage : _drawMaleMage;
     fn(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HUMAN ROGUE SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Lean hooded assassin. Dark leather vest with diagonal bandolier strap,
+// face wrap concealing everything below the eyes, twin daggers, close boots.
+// Male: slight swagger, belt pouch, amber eyes.
+// Female: narrower silhouette, midriff skin strip, single visible hip dagger.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#050508';
+  const HOOD='#181620',HOODHI='#282440',HOODSH='#0E0C14';
+  const LEATH='#2A1E0E',LEATHI='#3E2E18',LEASH='#1A1008';
+  const STRAP='#4A3820',STRAPH='#6A5438';
+  const BOOT='#181012',BOOTHI='#2C1E28',BOOTST='#302840';
+  const BLD='#B8C0CA',BLDHI='#D8E0EA';
+  const BELT='#3A2810',BELTH='#5A4020';
+  const WRAP='#1C1A24';
+
+  // Shadow
+  ctx.fillStyle='#00000028';
+  ctx.fillRect(ox+4,oy+42,16,3);
+
+  // Right dagger behind body (facing right)
+  if(dir!==1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+19,oy+20+bob,3,15);
+    ctx.fillStyle=BLD;   ctx.fillRect(ox+20,oy+22+bob,2,13);
+    ctx.fillStyle=BLDHI; ctx.fillRect(ox+20,oy+22+bob,1,7);
+    ctx.fillStyle=BELT;  ctx.fillRect(ox+18,oy+24+bob,5,2);
+    ctx.fillStyle=BELTH; ctx.fillRect(ox+18,oy+24+bob,4,1);
+  }
+
+  // Boots (dark close-fit, straps)
+  [4,13].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+34,8,10);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx,  oy+35,7,9);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx,  oy+35,7,2);
+    ctx.fillStyle=BOOTST; ctx.fillRect(ox+bx+1,oy+38,5,1);
+    ctx.fillStyle=BOOTST; ctx.fillRect(ox+bx+1,oy+41,5,1);
+  });
+
+  // Legs (tight leather, walk swing)
+  const lY=26;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+4, oy+lY+swing-1,8,10);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+5, oy+lY+swing,  7,9);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+lY-swing-1,8,10);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+13,oy+lY-swing,  7,9);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+17,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Left arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+1, oy+14,5,13);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+2, oy+15,4,12);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+2, oy+15,3,5);
+
+  // Right arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+18,oy+14,5,13);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+19,oy+15,4,12);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+19,oy+15,3,5);
+
+  // Chest vest
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+13,14,14);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+6, oy+14,12,13);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+6, oy+14,8,5);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+15,oy+14,3,13);
+
+  // Diagonal bandolier strap
+  for(let i=0;i<8;i++){
+    ctx.fillStyle=i<4?STRAPH:STRAP;
+    ctx.fillRect(ox+6+i,oy+14+i,2,1);
+  }
+  // Chest strap
+  ctx.fillStyle=STRAP;  ctx.fillRect(ox+6,oy+20,12,2);
+  ctx.fillStyle=STRAPH; ctx.fillRect(ox+6,oy+20,12,1);
+
+  // Belt + pouch
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+24,16,3);
+  ctx.fillStyle=BELT;   ctx.fillRect(ox+5,oy+25,14,2);
+  ctx.fillStyle=BELTH;  ctx.fillRect(ox+5,oy+25,14,1);
+  ctx.fillStyle=LEASH;  ctx.fillRect(ox+5,oy+25,4,5);
+  ctx.fillStyle=LEATH;  ctx.fillRect(ox+6,oy+26,3,4);
+
+  // Left dagger (facing left)
+  if(dir===1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+2,oy+20,3,15);
+    ctx.fillStyle=BLD;   ctx.fillRect(ox+3,oy+22,2,13);
+    ctx.fillStyle=BLDHI; ctx.fillRect(ox+3,oy+22,1,7);
+    ctx.fillStyle=BELT;  ctx.fillRect(ox+1,oy+24,5,2);
+    ctx.fillStyle=BELTH; ctx.fillRect(ox+1,oy+24,4,1);
+  }
+
+  ctx.restore();
+
+  // Hood (dark, pulled very low)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3,oy+0,18,14);
+  ctx.fillStyle=HOODSH; ctx.fillRect(ox+4,oy+1,16,13);
+  ctx.fillStyle=HOOD;   ctx.fillRect(ox+5,oy+1,14,12);
+  ctx.fillStyle=HOODHI; ctx.fillRect(ox+5,oy+1,10,3);
+  // Low brim shadow
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+9,16,3);
+  ctx.fillStyle=HOODSH; ctx.fillRect(ox+5,oy+9,14,2);
+
+  // Face — skin above the wrap
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6,oy+5,12,9);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+7,oy+6,10,4);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+7,oy+6,8,2);
+
+  // Eyes (sharp amber)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+7,oy+7,3,2);ctx.fillRect(ox+14,oy+7,3,2);
+  ctx.fillStyle='#4A2808'; ctx.fillRect(ox+8,oy+7,2,2);ctx.fillRect(ox+15,oy+7,2,2);
+  ctx.fillStyle='#D08020'; ctx.fillRect(ox+8,oy+7,1,1);ctx.fillRect(ox+15,oy+7,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+9,oy+7,1,1);ctx.fillRect(ox+16,oy+7,1,1);
+
+  // Face wrap (nose/mouth concealed)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+9,14,6);
+  ctx.fillStyle=WRAP;   ctx.fillRect(ox+6,oy+10,12,5);
+  ctx.fillStyle=HOODSH; ctx.fillRect(ox+6,oy+12,12,3);
+}
+
+function _drawFemaleRogue(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#050508';
+  const HOOD='#181620',HOODHI='#282440',HOODSH='#0E0C14';
+  const LEATH='#2A1E0E',LEATHI='#3E2E18',LEASH='#1A1008';
+  const STRAP='#4A3820',STRAPH='#6A5438';
+  const BOOT='#181012',BOOTHI='#2C1E28',BOOTST='#302840';
+  const BLD='#B8C0CA',BLDHI='#D8E0EA';
+  const BELT='#3A2810',BELTH='#5A4020';
+  const WRAP='#1C1A24';
+
+  // Shadow
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+5,oy+42,14,3);
+
+  // Hip dagger (facing right)
+  if(dir!==1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+18,oy+20+bob,3,14);
+    ctx.fillStyle=BLD;   ctx.fillRect(ox+19,oy+22+bob,2,12);
+    ctx.fillStyle=BLDHI; ctx.fillRect(ox+19,oy+22+bob,1,6);
+    ctx.fillStyle=BELT;  ctx.fillRect(ox+17,oy+24+bob,5,2);
+    ctx.fillStyle=BELTH; ctx.fillRect(ox+17,oy+24+bob,4,1);
+  }
+
+  // Boots (knee-high, straps)
+  [5,13].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+32,7,12);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx,  oy+33,6,11);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx,  oy+33,6,3);
+    ctx.fillStyle=BOOTST; ctx.fillRect(ox+bx+1,oy+36,4,1);
+    ctx.fillStyle=BOOTST; ctx.fillRect(ox+bx+1,oy+39,4,1);
+    ctx.fillStyle=BOOTST; ctx.fillRect(ox+bx+1,oy+42,4,1);
+  });
+
+  // Legs (tight, walk swing)
+  const lY=24;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+lY+swing-1,7,10);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+6, oy+lY+swing,  6,9);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+lY-swing-1,7,10);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+13,oy+lY-swing,  6,9);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+16,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Hair behind back (flowing)
+  ctx.fillStyle=hr.lo; ctx.fillRect(ox+2, oy+14,3,16);
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+2, oy+26,3,6);
+  ctx.fillStyle=hr.lo; ctx.fillRect(ox+18,oy+14,3,14);
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+18,oy+25,3,5);
+
+  // Left arm (slim)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+14,5,12);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+3, oy+15,4,11);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+3, oy+15,3,5);
+
+  // Right arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+17,oy+14,5,12);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+18,oy+15,4,11);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+18,oy+15,3,5);
+
+  // Corset/vest (shorter, narrower)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+6, oy+13,12,12);
+  ctx.fillStyle=LEATH; ctx.fillRect(ox+7, oy+14,10,11);
+  ctx.fillStyle=LEATHI;ctx.fillRect(ox+7, oy+14,7,5);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+14,oy+14,3,11);
+
+  // Lace-up front detail
+  ctx.fillStyle=STRAPH;
+  for(let i=0;i<4;i++) ctx.fillRect(ox+11,oy+15+i*2,2,1);
+
+  // Midriff (skin visible below corset)
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+7,oy+22,10,3);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+7,oy+22,8,1);
+
+  // Belt
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+23,14,3);
+  ctx.fillStyle=BELT;   ctx.fillRect(ox+6,oy+24,12,2);
+  ctx.fillStyle=BELTH;  ctx.fillRect(ox+6,oy+24,12,1);
+  ctx.fillStyle=BELTH;  ctx.fillRect(ox+10,oy+23,4,4); // buckle
+
+  // Left dagger (facing left)
+  if(dir===1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+3,oy+20,3,14);
+    ctx.fillStyle=BLD;   ctx.fillRect(ox+4,oy+22,2,12);
+    ctx.fillStyle=BLDHI; ctx.fillRect(ox+4,oy+22,1,6);
+    ctx.fillStyle=BELT;  ctx.fillRect(ox+2,oy+24,5,2);
+    ctx.fillStyle=BELTH; ctx.fillRect(ox+2,oy+24,4,1);
+  }
+
+  ctx.restore();
+
+  // Head — hair back (visible below hood sides)
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+3, oy+2,18,20);
+  ctx.fillStyle=hr.lo; ctx.fillRect(ox+4, oy+3,16,18);
+  ctx.fillStyle=hr.mid;ctx.fillRect(ox+5, oy+3,13,14);
+  ctx.fillStyle=hr.hi; ctx.fillRect(ox+6, oy+3,10,4);
+  ctx.fillStyle=hr.dk; ctx.fillRect(ox+15,oy+3,4,14);
+
+  // Hood (form-fitting, dark)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4,oy+0,16,12);
+  ctx.fillStyle=HOODSH; ctx.fillRect(ox+5,oy+1,14,11);
+  ctx.fillStyle=HOOD;   ctx.fillRect(ox+6,oy+1,12,10);
+  ctx.fillStyle=HOODHI; ctx.fillRect(ox+6,oy+1, 9,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+8,14,3);
+
+  // Face above wrap
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7,oy+5,10,8);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+8,oy+6, 8,4);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+8,oy+6, 6,2);
+
+  // Eyes (green, sharp)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+8,oy+7,3,2);ctx.fillRect(ox+13,oy+7,3,2);
+  ctx.fillStyle='#1A3010'; ctx.fillRect(ox+9,oy+7,2,2);ctx.fillRect(ox+14,oy+7,2,2);
+  ctx.fillStyle='#40A020'; ctx.fillRect(ox+9,oy+7,1,1);ctx.fillRect(ox+14,oy+7,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+9,oy+7,1,1);ctx.fillRect(ox+14,oy+7,1,1);
+
+  // Face wrap
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6,oy+9,12,5);
+  ctx.fillStyle=WRAP;   ctx.fillRect(ox+7,oy+10,10,4);
+  ctx.fillStyle=HOODSH; ctx.fillRect(ox+7,oy+11,10,3);
+}
+
+function drawHumanRogueSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk=_skinPal(skinToneIdx??2);
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
+    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleRogue:_drawMaleRogue)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HUMAN PALADIN SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Holy warrior clad in bright silver plate with gold trim. White tabard bearing
+// a 4-point holy star, subtle divine-glow aura, noble bearing.
+// Male: broad shoulders, glowing mace at hip, short cropped hair.
+// Female: elegant plate, flowing white cape-mantle, holy light on sword hand.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#10101C';
+  const PL='#C4C8D4',PLHI='#E4E8F4',PLSH='#8088A0',PLDK='#505870';
+  const GOLD='#D4A820',GOLHI='#F0CC40',GOLSH='#8A7010';
+  const TAB='#F0F0E8',TABSH='#C8C8C0';
+  const BOOT='#3A3C4C',BOOTHI='#5A5C70';
+  const HOLY='#FFE860';
+  const SIL='#C0C8D0',SILHI='#E0E8F0';
+  const GLOW='rgba(255,220,80,0.15)';
+
+  // Shadow
+  ctx.fillStyle='#00000028';
+  ctx.fillRect(ox+2,oy+42,20,3);
+
+  // Divine aura glow (behind everything)
+  ctx.fillStyle=GLOW; ctx.fillRect(ox-4,oy-4,32,50);
+
+  // Sword at right hip (behind body, facing right)
+  if(dir!==1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+19,oy+16+bob,3,22);
+    ctx.fillStyle=SIL;   ctx.fillRect(ox+20,oy+18+bob,2,20);
+    ctx.fillStyle=SILHI; ctx.fillRect(ox+20,oy+18+bob,1,12);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+17,oy+20+bob,8,2);
+    ctx.fillStyle=GOLHI; ctx.fillRect(ox+17,oy+20+bob,8,1);
+    ctx.fillStyle=PL;    ctx.fillRect(ox+18,oy+16+bob,3,5);
+  }
+
+  // Boots (polished plate sabatons)
+  [3,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+34,9,10);
+    ctx.fillStyle=PLSH;   ctx.fillRect(ox+bx,  oy+35,8,9);
+    ctx.fillStyle=PL;     ctx.fillRect(ox+bx,  oy+35,8,9);
+    ctx.fillStyle=PLHI;   ctx.fillRect(ox+bx,  oy+35,8,3);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+bx,  oy+36,8,1); // gold trim
+    ctx.fillStyle=PLDK;   ctx.fillRect(ox+bx+5,oy+36,3,8); // shadow side
+  });
+
+  // Legs (armored greaves)
+  const lY=26;
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+3, oy+lY+swing-1,9,10);
+  ctx.fillStyle=PLSH; ctx.fillRect(ox+4, oy+lY+swing,  8,9);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+4, oy+lY+swing,  7,9);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+4, oy+lY+swing,  7,3);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+12,oy+lY-swing-1,9,10);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+13,oy+lY-swing,  7,9);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+13,oy+lY-swing,  7,3);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+18,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Left arm (vambrace)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+0, oy+13,6,14);
+  ctx.fillStyle=PLSH; ctx.fillRect(ox+1, oy+14,5,13);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+1, oy+14,5,13);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+1, oy+14,4,5);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+4, oy+14,2,13);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+1, oy+20,5,1); // gold arm band
+
+  // Right arm
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+18,oy+13,6,14);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+19,oy+14,5,13);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+19,oy+14,4,5);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+22,oy+14,2,13);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+19,oy+20,5,1);
+
+  // White tabard (over chest armor)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+13,14,14);
+  ctx.fillStyle=TABSH; ctx.fillRect(ox+6, oy+14,12,13);
+  ctx.fillStyle=TAB;   ctx.fillRect(ox+7, oy+14,10,13);
+  ctx.fillStyle=TABSH; ctx.fillRect(ox+15,oy+14,2,13);
+  // Tabard border (gold trim)
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+6, oy+14,1,13);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+17,oy+14,1,13);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+6, oy+26,12,1);
+
+  // Holy 4-point star symbol on chest
+  ctx.fillStyle=HOLY;  ctx.fillRect(ox+11,oy+16,2,8); // vertical
+  ctx.fillStyle=HOLY;  ctx.fillRect(ox+9, oy+18,6,4); // horizontal
+  ctx.fillStyle='#FFF';ctx.fillRect(ox+11,oy+18,2,4); // bright center
+
+  // Plate shoulders (broad pauldrons)
+  [2,16].forEach(px=>{
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+px-1,oy+11,9,7);
+    ctx.fillStyle=PLSH; ctx.fillRect(ox+px,  oy+12,8,6);
+    ctx.fillStyle=PL;   ctx.fillRect(ox+px,  oy+12,8,6);
+    ctx.fillStyle=PLHI; ctx.fillRect(ox+px,  oy+12,7,3);
+    ctx.fillStyle=GOLD; ctx.fillRect(ox+px,  oy+12,8,1); // gold trim
+    ctx.fillStyle=PLDK; ctx.fillRect(ox+px+5,oy+13,3,5);
+  });
+
+  // Sword (facing left)
+  if(dir===1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+16,3,22);
+    ctx.fillStyle=SIL;   ctx.fillRect(ox+3, oy+18,2,20);
+    ctx.fillStyle=SILHI; ctx.fillRect(ox+3, oy+18,1,12);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox-1, oy+20,8,2);
+    ctx.fillStyle=GOLHI; ctx.fillRect(ox-1, oy+20,8,1);
+    ctx.fillStyle=PL;    ctx.fillRect(ox+3, oy+16,2,5);
+  }
+
+  ctx.restore();
+
+  // Head — noble short hair
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy-2,16,16);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy-1,14,14);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy-1,12,12);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+6, oy-1,10,4);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy-1,4,12);
+
+  // Face (noble, clean-shaven)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6, oy+2,12,11);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+7, oy+3,10,10);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+7, oy+3,8,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+7, oy+10,10,3);
+  ctx.fillStyle=sk.dk;  ctx.fillRect(ox+7, oy+11,10,2);
+
+  // Eyes (clear blue)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+7,oy+5,3,2);ctx.fillRect(ox+14,oy+5,3,2);
+  ctx.fillStyle='#1A3060'; ctx.fillRect(ox+8,oy+5,2,2);ctx.fillRect(ox+15,oy+5,2,2);
+  ctx.fillStyle='#4070CC'; ctx.fillRect(ox+8,oy+5,1,1);ctx.fillRect(ox+15,oy+5,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+8,oy+5,1,1);ctx.fillRect(ox+15,oy+5,1,1);
+
+  // Nose
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+11,oy+7,2,2);
+
+  // Mouth (determined set)
+  ctx.fillStyle=sk.dk; ctx.fillRect(ox+9,oy+10,6,1);
+
+  // Hair framing face
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5,oy+3,2,8);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+17,oy+3,2,8);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5,oy+8,2,3);
+
+  // Holy crown glow (golden halo above head)
+  ctx.fillStyle='rgba(255,220,60,0.4)'; ctx.fillRect(ox+4,oy-4,16,5);
+  ctx.fillStyle=GOLHI; ctx.fillRect(ox+6,oy-3,12,1);
+}
+
+function _drawFemalePaladin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#10101C';
+  const PL='#C4C8D4',PLHI='#E4E8F4',PLSH='#8088A0',PLDK='#505870';
+  const GOLD='#D4A820',GOLHI='#F0CC40',GOLSH='#8A7010';
+  const TAB='#F0F0E8',TABSH='#C8C8C0';
+  const BOOT='#3A3C4C',BOOTHI='#5A5C70';
+  const HOLY='#FFE860';
+  const SIL='#C0C8D0',SILHI='#E0E8F0';
+  const GLOW='rgba(255,220,80,0.15)';
+  const MANTLE='#E8E8E0',MANTSH='#C0C0B8';
+
+  // Shadow
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+4,oy+42,16,3);
+
+  // Divine aura
+  ctx.fillStyle=GLOW; ctx.fillRect(ox-4,oy-4,32,50);
+
+  // Sword at right hip (facing right)
+  if(dir!==1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+18,oy+16+bob,3,22);
+    ctx.fillStyle=SIL;   ctx.fillRect(ox+19,oy+18+bob,2,20);
+    ctx.fillStyle=SILHI; ctx.fillRect(ox+19,oy+18+bob,1,12);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+16,oy+20+bob,7,2);
+    ctx.fillStyle=GOLHI; ctx.fillRect(ox+16,oy+20+bob,7,1);
+    ctx.fillStyle=PL;    ctx.fillRect(ox+17,oy+16+bob,3,5);
+  }
+
+  // Plate boots (elegant, pointed)
+  [5,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+32,7,12);
+    ctx.fillStyle=PL;     ctx.fillRect(ox+bx,  oy+33,6,11);
+    ctx.fillStyle=PLHI;   ctx.fillRect(ox+bx,  oy+33,6,4);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+bx,  oy+34,6,1);
+    ctx.fillStyle=PLDK;   ctx.fillRect(ox+bx+4,oy+34,2,10);
+  });
+
+  // Greave legs
+  const lY=24;
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+4, oy+lY+swing-1,8,10);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+5, oy+lY+swing,  7,9);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+5, oy+lY+swing,  6,3);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+12,oy+lY-swing-1,8,10);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+13,oy+lY-swing,  7,9);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+13,oy+lY-swing,  6,3);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+17,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // White mantle/cape behind (elegant flowing)
+  ctx.fillStyle=MANTSH; ctx.fillRect(ox-2,oy+10,5,30);
+  ctx.fillStyle=MANTLE; ctx.fillRect(ox-1,oy+10,4,28);
+  ctx.fillStyle=MANTSH; ctx.fillRect(ox+21,oy+10,5,30);
+  ctx.fillStyle=MANTLE; ctx.fillRect(ox+21,oy+10,4,28);
+
+  // Slim plate arms
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+3, oy+13,5,13);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+4, oy+14,4,12);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+4, oy+14,3,5);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+6, oy+14,2,12);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+4, oy+20,4,1);
+
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+16,oy+13,5,13);
+  ctx.fillStyle=PL;   ctx.fillRect(ox+17,oy+14,4,12);
+  ctx.fillStyle=PLHI; ctx.fillRect(ox+17,oy+14,3,5);
+  ctx.fillStyle=PLDK; ctx.fillRect(ox+19,oy+14,2,12);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+17,oy+20,4,1);
+
+  // Breastplate + tabard
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+6, oy+12,12,14);
+  ctx.fillStyle=PL;    ctx.fillRect(ox+7, oy+13,10,6);  // upper plate
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+7, oy+13,9,3);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+14,oy+13,3,6);
+  // Tabard lower
+  ctx.fillStyle=TABSH; ctx.fillRect(ox+7, oy+18,10,8);
+  ctx.fillStyle=TAB;   ctx.fillRect(ox+8, oy+18,8,8);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+7, oy+18,1,8);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+16,oy+18,1,8);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+7, oy+25,10,1);
+
+  // Holy symbol (compact, on breastplate)
+  ctx.fillStyle=HOLY;  ctx.fillRect(ox+11,oy+14,2,6);
+  ctx.fillStyle=HOLY;  ctx.fillRect(ox+9, oy+16,6,2);
+  ctx.fillStyle='#FFF';ctx.fillRect(ox+11,oy+15,2,2);
+
+  // Shoulders (elegant pauldrons)
+  [5,14].forEach(px=>{
+    ctx.fillStyle=OUT;  ctx.fillRect(ox+px-1,oy+11,7,6);
+    ctx.fillStyle=PL;   ctx.fillRect(ox+px,  oy+12,6,5);
+    ctx.fillStyle=PLHI; ctx.fillRect(ox+px,  oy+12,5,2);
+    ctx.fillStyle=GOLD; ctx.fillRect(ox+px,  oy+12,6,1);
+    ctx.fillStyle=PLDK; ctx.fillRect(ox+px+4,oy+13,2,4);
+  });
+
+  // Sword (left-facing)
+  if(dir===1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+3, oy+16,3,22);
+    ctx.fillStyle=SIL;   ctx.fillRect(ox+4, oy+18,2,20);
+    ctx.fillStyle=SILHI; ctx.fillRect(ox+4, oy+18,1,12);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+1, oy+20,7,2);
+    ctx.fillStyle=GOLHI; ctx.fillRect(ox+1, oy+20,7,1);
+    ctx.fillStyle=PL;    ctx.fillRect(ox+4, oy+16,2,5);
+  }
+
+  ctx.restore();
+
+  // Head — long elegant hair
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy-1,18,28);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4, oy+0, 16,26);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy+0, 14,22);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy+0, 11,18);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7, oy+0, 9,5);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 3,18);
+
+  // Face (noble, feminine)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+2,10,12);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+8, oy+3,8,11);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+8, oy+3,7,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+8, oy+11,8,4);
+  ctx.fillStyle=sk.dk;  ctx.fillRect(ox+8, oy+13,8,1);
+
+  // Eyes (warm brown)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+8,oy+5,3,3);ctx.fillRect(ox+13,oy+5,3,3);
+  ctx.fillStyle='#3A1808'; ctx.fillRect(ox+9,oy+5,2,2);ctx.fillRect(ox+14,oy+5,2,2);
+  ctx.fillStyle='#8A4018'; ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+
+  // Nose + lips
+  ctx.fillStyle=sk.lo;     ctx.fillRect(ox+11,oy+8,2,1);
+  ctx.fillStyle='#C06870'; ctx.fillRect(ox+9,oy+11,6,2);
+  ctx.fillStyle='#E08898'; ctx.fillRect(ox+9,oy+11,6,1);
+
+  // Bangs
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+7,oy+3,2,3);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+15,oy+3,2,3);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+10,oy+2,4,3);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+10,oy+2,4,1);
+
+  // Holy crown halo
+  ctx.fillStyle='rgba(255,220,60,0.4)'; ctx.fillRect(ox+5,oy-3,14,4);
+  ctx.fillStyle=GOLHI; ctx.fillRect(ox+7,oy-2,10,1);
+}
+
+function drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk=_skinPal(skinToneIdx??2);
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
+    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemalePaladin:_drawMalePaladin)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ELF SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Tall and angular with very prominent pointed ears. Nature/arcane aesthetic:
+// forest-green tunic, silver-grey armour elements, elven agility implied.
+// Male: tall lean build, pointed ears, silver circlet, longbow on back.
+// Female: even more slender, longer ears, flowing silver-green robes, tiara.
+// Skin is parametric (can be pale, dusky, etc). Hair fully parametric.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080C0A';
+  const LEAF='#286030',LEAHI='#3E9048',LEASH='#184020',LEADK='#0E2818';
+  const SIL='#9AAAB8',SILHI='#C0D0DC',SILSH='#607080';
+  const WOOD='#6A4420',WOODHI='#9A6830';
+  const BOOT='#1A2810',BOOTHI='#304820';
+  const BOW='#7A5020',BOWHI='#A07030';
+  const SING='#C0C080'; // bowstring color
+
+  // Shadow
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+4,oy+42,16,3);
+
+  // Longbow on back (vertical, behind body)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+1,oy-8,3,50);
+  ctx.fillStyle=WOOD;   ctx.fillRect(ox+2,oy-7,2,48);
+  ctx.fillStyle=WOODHI; ctx.fillRect(ox+2,oy-4,1,36);
+  // Bow curve (top)
+  ctx.fillStyle=WOOD;   ctx.fillRect(ox-1,oy-8,4,4);
+  ctx.fillStyle=WOODHI; ctx.fillRect(ox-1,oy-8,3,2);
+  // Bow curve (bottom)
+  ctx.fillStyle=WOOD;   ctx.fillRect(ox-1,oy+40,4,4);
+  ctx.fillStyle=WOODHI; ctx.fillRect(ox-1,oy+40,3,2);
+  // Bowstring
+  ctx.fillStyle=SING;   ctx.fillRect(ox+0,oy-8,1,52);
+
+  // Boots (forest dark, pointed slightly)
+  [4,13].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+34,8,10);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx,  oy+35,7,9);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx,  oy+35,7,2);
+    ctx.fillStyle=LEASH;  ctx.fillRect(ox+bx,  oy+37,7,1); // leaf trim
+  });
+
+  // Legs (tight forest-green)
+  const lY=26;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+4, oy+lY+swing-1,8,10);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+5, oy+lY+swing,  7,9);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+5, oy+lY+swing,  6,9);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+5, oy+lY+swing,  5,3);
+  ctx.fillStyle=LEADK; ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+lY-swing-1,8,10);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+13,oy+lY-swing,  6,9);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+13,oy+lY-swing,  5,3);
+  ctx.fillStyle=LEADK; ctx.fillRect(ox+17,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Left arm (lean, vambrace)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+1, oy+13,5,14);
+  ctx.fillStyle=LEAF; ctx.fillRect(ox+2, oy+14,4,13);
+  ctx.fillStyle=LEAHI;ctx.fillRect(ox+2, oy+14,3,5);
+  ctx.fillStyle=LEADK;ctx.fillRect(ox+4, oy+20,2,6);
+  ctx.fillStyle=SIL;  ctx.fillRect(ox+2, oy+24,4,2); // silver vambrace cuff
+
+  // Right arm
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+18,oy+13,5,14);
+  ctx.fillStyle=LEAF; ctx.fillRect(ox+19,oy+14,4,13);
+  ctx.fillStyle=LEAHI;ctx.fillRect(ox+19,oy+14,3,5);
+  ctx.fillStyle=LEADK;ctx.fillRect(ox+21,oy+20,2,6);
+  ctx.fillStyle=SIL;  ctx.fillRect(ox+19,oy+24,4,2);
+
+  // Tunic (forest green, fitted)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+12,14,15);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+6, oy+13,12,14);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+7, oy+13,10,14);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+7, oy+13,8,5);
+  ctx.fillStyle=LEADK; ctx.fillRect(ox+15,oy+13,3,14);
+
+  // Silver chest armour panel
+  ctx.fillStyle=SILSH; ctx.fillRect(ox+7, oy+13,10,8);
+  ctx.fillStyle=SIL;   ctx.fillRect(ox+8, oy+14,8,7);
+  ctx.fillStyle=SILHI; ctx.fillRect(ox+8, oy+14,7,3);
+  // Leaf motif on chest (decorative)
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+10,oy+16,4,4);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+11,oy+15,2,5);
+  ctx.fillStyle=LEADK; ctx.fillRect(ox+13,oy+16,1,3);
+
+  // Belt (silver + leaf buckle)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+24,14,3);
+  ctx.fillStyle=SILSH;  ctx.fillRect(ox+6, oy+25,12,2);
+  ctx.fillStyle=SIL;    ctx.fillRect(ox+6, oy+25,12,2);
+  ctx.fillStyle=SILHI;  ctx.fillRect(ox+6, oy+25,12,1);
+  ctx.fillStyle=LEAF;   ctx.fillRect(ox+10,oy+24,4,4); // leaf buckle
+
+  ctx.restore();
+
+  // Head — pointed ears first (behind head)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+0, oy+4,4,8);   // left ear
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+1, oy+5,3,7);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+1, oy+5,2,3);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+2, oy+10,2,2); // ear tip shadow
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+20,oy+4,4,8);   // right ear
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+20,oy+5,3,7);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+21,oy+5,2,3);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+20,oy+10,2,2);
+
+  // Hair
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy-2,16,14);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy-1,14,12);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy-1,12,11);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+6, oy-1,10,4);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy-1,4,11);
+
+  // Face (angular, high cheekbones)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+2,14,12);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+6, oy+3,12,11);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+6, oy+3,10,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+6, oy+11,12,4);
+  ctx.fillStyle=sk.dk;  ctx.fillRect(ox+6, oy+13,12,2);
+  // High cheekbone shadow
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+6, oy+7,2,3); ctx.fillRect(ox+16,oy+7,2,3);
+
+  // Eyes (vivid green, slightly angular)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+7,oy+5,3,2);ctx.fillRect(ox+14,oy+5,3,2);
+  ctx.fillStyle='#103010'; ctx.fillRect(ox+8,oy+5,2,2);ctx.fillRect(ox+15,oy+5,2,2);
+  ctx.fillStyle='#30A840'; ctx.fillRect(ox+8,oy+5,1,1);ctx.fillRect(ox+15,oy+5,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+8,oy+5,1,1);ctx.fillRect(ox+15,oy+5,1,1);
+
+  // Nose (straight, elvish)
+  ctx.fillStyle=sk.lo; ctx.fillRect(ox+11,oy+8,2,3);
+
+  // Silver circlet
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+1,14,2);
+  ctx.fillStyle=SILSH;  ctx.fillRect(ox+6, oy+2,12,1);
+  ctx.fillStyle=SIL;    ctx.fillRect(ox+6, oy+2,12,1);
+  ctx.fillStyle=SILHI;  ctx.fillRect(ox+8, oy+1,8,2); // gemstone center
+  ctx.fillStyle=LEAHI;  ctx.fillRect(ox+10,oy+1,4,2); // emerald gem
+}
+
+function _drawFemaleElf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080C0A';
+  const LEAF='#286030',LEAHI='#3E9048',LEASH='#184020',LEADK='#0E2818';
+  const SIL='#9AAAB8',SILHI='#C0D0DC',SILSH='#607080';
+  const BOOT='#1A2810',BOOTHI='#304820';
+
+  // Shadow
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+5,oy+42,14,3);
+
+  // Boots (slender, forest)
+  [5,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx-1,oy+32,7,12);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx,  oy+33,6,11);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx,  oy+33,5,3);
+    ctx.fillStyle=LEASH;  ctx.fillRect(ox+bx,  oy+35,5,1);
+  });
+
+  // Legs (under robe, barely visible)
+  const lY=28;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+lY+swing-1,7,6);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+6, oy+lY+swing,  6,5);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+6, oy+lY+swing,  4,2);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+lY-swing-1,7,6);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+13,oy+lY-swing,  6,5);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+13,oy+lY-swing,  4,2);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Hair flowing behind (long, to waist)
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+2, oy+14,3,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+3, oy+14,2,16);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+18,oy+14,3,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+18,oy+14,2,16);
+
+  // Slim arms (elven grace)
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+3, oy+13,4,14);
+  ctx.fillStyle=LEAF; ctx.fillRect(ox+4, oy+14,3,13);
+  ctx.fillStyle=LEAHI;ctx.fillRect(ox+4, oy+14,2,5);
+  ctx.fillStyle=SIL;  ctx.fillRect(ox+4, oy+24,3,2); // vambrace
+
+  ctx.fillStyle=OUT;  ctx.fillRect(ox+17,oy+13,4,14);
+  ctx.fillStyle=LEAF; ctx.fillRect(ox+17,oy+14,3,13);
+  ctx.fillStyle=LEAHI;ctx.fillRect(ox+18,oy+14,2,5);
+  ctx.fillStyle=SIL;  ctx.fillRect(ox+17,oy+24,3,2);
+
+  // Flowing robe (A-line, green with silver trim)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+12,14,18);
+  ctx.fillStyle=LEASH; ctx.fillRect(ox+6, oy+13,12,17);
+  ctx.fillStyle=LEAF;  ctx.fillRect(ox+7, oy+13,10,17);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+7, oy+13,8,5);
+  ctx.fillStyle=LEADK; ctx.fillRect(ox+15,oy+13,3,17);
+  // Silver neckline and front trim
+  ctx.fillStyle=SILSH; ctx.fillRect(ox+9, oy+13,6,2);
+  ctx.fillStyle=SIL;   ctx.fillRect(ox+10,oy+13,4,2);
+  // Leaf emblem
+  ctx.fillStyle=SILHI; ctx.fillRect(ox+11,oy+16,2,4);
+  ctx.fillStyle=LEAHI; ctx.fillRect(ox+10,oy+17,4,2);
+
+  // Belt (silver, delicate)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5,oy+28,14,3);
+  ctx.fillStyle=SILSH;  ctx.fillRect(ox+6,oy+29,12,2);
+  ctx.fillStyle=SIL;    ctx.fillRect(ox+7,oy+29,10,1);
+  ctx.fillStyle=LEAHI;  ctx.fillRect(ox+10,oy+28,4,3); // gem clasp
+
+  ctx.restore();
+
+  // Head — long hair (cascading, back layer)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy-1,20,30);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+3, oy+0, 18,28);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+4, oy+0, 16,24);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5, oy+0, 13,20);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+6, oy+0, 10,5);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+15,oy+0, 4,20);
+
+  // Very prominent pointed ears
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-1,oy+5,5,10);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+0, oy+6,4,9);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+0, oy+6,3,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+1, oy+12,3,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+20,oy+5,5,10);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+20,oy+6,4,9);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+21,oy+6,3,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+20,oy+12,3,3);
+
+  // Face (narrow, angular)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+2,10,13);
+  ctx.fillStyle=sk.mid; ctx.fillRect(ox+8, oy+3,8,12);
+  ctx.fillStyle=sk.hi;  ctx.fillRect(ox+8, oy+3,7,4);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+8, oy+12,8,3);
+  ctx.fillStyle=sk.lo;  ctx.fillRect(ox+8, oy+7,2,3);ctx.fillRect(ox+14,oy+7,2,3); // cheekbones
+
+  // Eyes (vivid green, almond-shaped)
+  ctx.fillStyle=OUT;       ctx.fillRect(ox+8,oy+5,3,3);ctx.fillRect(ox+13,oy+5,3,3);
+  ctx.fillStyle='#103010'; ctx.fillRect(ox+9,oy+5,2,2);ctx.fillRect(ox+14,oy+5,2,2);
+  ctx.fillStyle='#30A840'; ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+  ctx.fillStyle='#FFF';    ctx.fillRect(ox+9,oy+5,1,1);ctx.fillRect(ox+14,oy+5,1,1);
+
+  // Nose + lips
+  ctx.fillStyle=sk.lo;     ctx.fillRect(ox+11,oy+8,2,2);
+  ctx.fillStyle='#A05060'; ctx.fillRect(ox+9,oy+11,6,2);
+  ctx.fillStyle='#C07080'; ctx.fillRect(ox+9,oy+11,6,1);
+
+  // Hair bangs
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+7,oy+3,2,4);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+15,oy+3,2,4);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+7,oy+3,1,2);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+10,oy+2,4,4);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+10,oy+2,4,1);
+
+  // Silver tiara
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6, oy+2,12,2);
+  ctx.fillStyle=SIL;    ctx.fillRect(ox+7, oy+2,10,1);
+  ctx.fillStyle=SILHI;  ctx.fillRect(ox+8, oy+1, 8,2);
+  ctx.fillStyle='#60D870';ctx.fillRect(ox+10,oy+1,4,2); // emerald center gem
+  ctx.fillStyle='#90F890';ctx.fillRect(ox+11,oy+1,2,1);
+}
+
+function drawElfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk=_skinPal(skinToneIdx??2);
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
+    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleElf:_drawMaleElf)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DWARF SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Very wide and stocky (same height, noticeably wider proportions). Heavy
+// plate/chainmail in earth tones. The beard is the defining feature.
+// Male: enormous braided beard (parametric hair colour), battle axe at hip,
+//        full helm with horns, very thick limbs.
+// Female: twin long braids, smaller visor helm, same heavy armour, war axe.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#0A0808';
+  const PLATE='#545264',PLHI='#747288',PLSH='#343048',PLDK='#201E30';
+  const GOLD='#C8A028',GOLHI='#E8C040',GOLSH='#887018';
+  const BOOT='#2A1808',BOOTHI='#4A2C18';
+  const AXE='#6A6870',AXEHI='#9A98A8',AXSH='#3A3848';
+  const AXHND='#5A3010',AXHHI='#8A5020';
+
+  // Shadow (wide)
+  ctx.fillStyle='#00000030';
+  ctx.fillRect(ox+0,oy+42,26,3);
+
+  // Axe at right hip (behind body)
+  if(dir!==1){
+    ctx.fillStyle=AXHND;  ctx.fillRect(ox+21,oy+14+bob,4,24);
+    ctx.fillStyle=AXHHI;  ctx.fillRect(ox+22,oy+14+bob,2,22);
+    // Axe head
+    ctx.fillStyle=AXSH;   ctx.fillRect(ox+20,oy+14+bob,8,10);
+    ctx.fillStyle=AXE;    ctx.fillRect(ox+21,oy+15+bob,7,9);
+    ctx.fillStyle=AXEHI;  ctx.fillRect(ox+21,oy+15+bob,5,4);
+    ctx.fillStyle=GOLSH;  ctx.fillRect(ox+21,oy+14+bob,7,2); // gold trim on axe
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+22,oy+14+bob,5,1);
+  }
+
+  // Boots (massive, iron-shod)
+  [-1,13].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+34,11,10);
+    ctx.fillStyle=PLSH;   ctx.fillRect(ox+bx+1,oy+35,10,9);
+    ctx.fillStyle=PLATE;  ctx.fillRect(ox+bx+1,oy+35,10,9);
+    ctx.fillStyle=PLHI;   ctx.fillRect(ox+bx+1,oy+35,9,3);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+bx+1,oy+36,9,1);
+    ctx.fillStyle=PLDK;   ctx.fillRect(ox+bx+8,oy+36,3,8);
+  });
+
+  // Legs (wide, armored greaves)
+  const lY=26;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+0, oy+lY+swing-1,11,10);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+1, oy+lY+swing,  10,9);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+1, oy+lY+swing,  9,4);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+8, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+13,oy+lY-swing-1,11,10);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+14,oy+lY-swing,  10,9);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+14,oy+lY-swing,  9,4);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+21,oy+lY-swing,  3,9);
+
+  // Torso (bob) — very wide
+  ctx.save(); ctx.translate(0,bob);
+
+  // Thick left arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox-2, oy+12,8,15);
+  ctx.fillStyle=PLSH;  ctx.fillRect(ox-1, oy+13,7,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox-1, oy+13,7,14);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox-1, oy+13,6,5);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+4, oy+13,3,14);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox-1, oy+20,7,1);
+
+  // Thick right arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+18,oy+12,8,15);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+19,oy+13,7,14);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+19,oy+13,6,5);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+24,oy+13,3,14);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+19,oy+20,7,1);
+
+  // Broad chest (very wide)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+4, oy+11,18,16);
+  ctx.fillStyle=PLSH;  ctx.fillRect(ox+5, oy+12,16,15);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+6, oy+12,14,15);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+6, oy+12,12,6);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+17,oy+12,3,15);
+  // Gold chest emblem (clan rune)
+  ctx.fillStyle=GOLSH; ctx.fillRect(ox+9, oy+15,8,7);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+10,oy+16,6,5);
+  ctx.fillStyle=GOLHI; ctx.fillRect(ox+11,oy+16,4,2);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+16,2,5); ctx.fillRect(ox+10,oy+18,6,2); // rune cross
+
+  // Massive pauldrons
+  [-3,17].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px,  oy+9,12,10);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox+px+1,oy+10,11,9);
+    ctx.fillStyle=PLATE; ctx.fillRect(ox+px+1,oy+10,11,9);
+    ctx.fillStyle=PLHI;  ctx.fillRect(ox+px+1,oy+10,10,4);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+px+1,oy+10,10,1);
+    ctx.fillStyle=PLDK;  ctx.fillRect(ox+px+8,oy+11,4,8);
+  });
+
+  // Axe (left-facing)
+  if(dir===1){
+    ctx.fillStyle=AXHND;  ctx.fillRect(ox-1, oy+14,4,24);
+    ctx.fillStyle=AXHHI;  ctx.fillRect(ox+0, oy+14,2,22);
+    ctx.fillStyle=AXSH;   ctx.fillRect(ox-4, oy+14,8,10);
+    ctx.fillStyle=AXE;    ctx.fillRect(ox-3, oy+15,7,9);
+    ctx.fillStyle=AXEHI;  ctx.fillRect(ox-3, oy+15,5,4);
+    ctx.fillStyle=GOLSH;  ctx.fillRect(ox-3, oy+14,7,2);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox-2, oy+14,5,1);
+  }
+
+  ctx.restore();
+
+  // Helm (full, with horns)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy-2,22,16);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+3, oy-1,20,15);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+4, oy-1,18,15);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+4, oy-1,16,5);
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+4, oy+0, 16,1); // gold helm band
+  // Helm horns
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy-5,4,6);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+3, oy-4,3,5);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+3, oy-4,2,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+18,oy-5,4,6);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+19,oy-4,3,5);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+19,oy-4,2,3);
+  // Visor slit
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6, oy+5,13,3);
+  ctx.fillStyle=PLDK;   ctx.fillRect(ox+7, oy+6,11,2);
+
+  // Eyes (visible through visor)
+  ctx.fillStyle='#FF6600'; ctx.fillRect(ox+8, oy+6,3,2);ctx.fillRect(ox+14,oy+6,3,2); // fiery
+  ctx.fillStyle='#FF9900'; ctx.fillRect(ox+9, oy+6,2,2);ctx.fillRect(ox+15,oy+6,2,2);
+
+  // Beard (massive, iconic — hangs below helm, wide)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy+11,20,20);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4, oy+12,18,19);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy+12,16,18);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy+12,14,17);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+8, oy+12,10,8);
+  // Beard braid strands
+  for(let i=0;i<4;i++){
+    ctx.fillStyle=hr.dk; ctx.fillRect(ox+8+i*3,oy+14,2,14);
+    ctx.fillStyle=hr.hi; ctx.fillRect(ox+8+i*3,oy+14,1,8);
+  }
+  // Beard gold rings
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+8,oy+20,14,2);
+  ctx.fillStyle=GOLHI;ctx.fillRect(ox+8,oy+20,14,1);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+9,oy+26,12,2);
+  ctx.fillStyle=GOLHI;ctx.fillRect(ox+9,oy+26,12,1);
+}
+
+function _drawFemaleDwarf(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#0A0808';
+  const PLATE='#545264',PLHI='#747288',PLSH='#343048',PLDK='#201E30';
+  const GOLD='#C8A028',GOLHI='#E8C040',GOLSH='#887018';
+  const BOOT='#2A1808',BOOTHI='#4A2C18';
+  const AXE='#6A6870',AXEHI='#9A98A8',AXSH='#3A3848';
+  const AXHND='#5A3010',AXHHI='#8A5020';
+
+  // Shadow
+  ctx.fillStyle='#00000028';
+  ctx.fillRect(ox+1,oy+42,22,3);
+
+  // Axe (right side)
+  if(dir!==1){
+    ctx.fillStyle=AXHND;  ctx.fillRect(ox+19,oy+14+bob,3,22);
+    ctx.fillStyle=AXHHI;  ctx.fillRect(ox+20,oy+14+bob,2,20);
+    ctx.fillStyle=AXSH;   ctx.fillRect(ox+18,oy+14+bob,7,8);
+    ctx.fillStyle=AXE;    ctx.fillRect(ox+19,oy+15+bob,6,7);
+    ctx.fillStyle=AXEHI;  ctx.fillRect(ox+19,oy+15+bob,4,3);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+19,oy+14+bob,6,1);
+  }
+
+  // Boots
+  [1,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+34,9,10);
+    ctx.fillStyle=PLATE;  ctx.fillRect(ox+bx+1,oy+35,8,9);
+    ctx.fillStyle=PLHI;   ctx.fillRect(ox+bx+1,oy+35,7,3);
+    ctx.fillStyle=GOLD;   ctx.fillRect(ox+bx+1,oy+36,7,1);
+    ctx.fillStyle=PLDK;   ctx.fillRect(ox+bx+6,oy+36,3,8);
+  });
+
+  // Legs
+  const lY=26;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+lY+swing-1,9,10);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+3, oy+lY+swing,  8,9);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+3, oy+lY+swing,  7,3);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+8, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+13,oy+lY-swing-1,9,10);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+14,oy+lY-swing,  8,9);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+14,oy+lY-swing,  7,3);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+19,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Hair braids behind (twin long braids, parametric color)
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+1, oy+13,4,22);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+2, oy+13,3,20);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+2, oy+13,2,18);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+17,oy+13,4,22);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+17,oy+13,3,20);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+18,oy+13,2,18);
+  // Braid knots
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+1,oy+20,4,2); ctx.fillRect(ox+17,oy+20,4,2);
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+1,oy+28,4,2); ctx.fillRect(ox+17,oy+28,4,2);
+
+  // Arms (somewhat wide but less than male)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+1, oy+12,7,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+2, oy+13,6,13);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+2, oy+13,5,5);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+6, oy+13,2,13);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+2, oy+19,6,1);
+
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+16,oy+12,7,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+16,oy+13,6,13);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+17,oy+13,5,5);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+20,oy+13,2,13);
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+16,oy+19,6,1);
+
+  // Chest (wide, armored)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+6, oy+11,13,15);
+  ctx.fillStyle=PLSH;  ctx.fillRect(ox+7, oy+12,11,14);
+  ctx.fillStyle=PLATE; ctx.fillRect(ox+8, oy+12,9,14);
+  ctx.fillStyle=PLHI;  ctx.fillRect(ox+8, oy+12,8,5);
+  ctx.fillStyle=PLDK;  ctx.fillRect(ox+14,oy+12,3,14);
+  // Clan emblem
+  ctx.fillStyle=GOLD;  ctx.fillRect(ox+10,oy+16,5,4);
+  ctx.fillStyle=GOLHI; ctx.fillRect(ox+11,oy+16,3,2);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+12,oy+16,1,4);ctx.fillRect(ox+10,oy+18,5,1);
+
+  // Pauldrons (substantial)
+  [4,14].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px-1,oy+10,9,8);
+    ctx.fillStyle=PLATE; ctx.fillRect(ox+px,  oy+11,8,7);
+    ctx.fillStyle=PLHI;  ctx.fillRect(ox+px,  oy+11,7,3);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+px,  oy+11,7,1);
+    ctx.fillStyle=PLDK;  ctx.fillRect(ox+px+5,oy+12,3,6);
+  });
+
+  // Axe (left-facing)
+  if(dir===1){
+    ctx.fillStyle=AXHND; ctx.fillRect(ox+2, oy+14,3,22);
+    ctx.fillStyle=AXHHI; ctx.fillRect(ox+2, oy+14,2,20);
+    ctx.fillStyle=AXSH;  ctx.fillRect(ox-1, oy+14,7,8);
+    ctx.fillStyle=AXE;   ctx.fillRect(ox+0, oy+15,6,7);
+    ctx.fillStyle=AXEHI; ctx.fillRect(ox+0, oy+15,4,3);
+    ctx.fillStyle=GOLD;  ctx.fillRect(ox+0, oy+14,6,1);
+  }
+
+  ctx.restore();
+
+  // Helm (with visor, smaller than male)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy-1,19,14);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+4, oy+0, 17,13);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+5, oy+0, 15,13);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+5, oy+0, 14,4);
+  ctx.fillStyle=GOLD;   ctx.fillRect(ox+5, oy+1, 14,1);
+  // Twin decorative horns (smaller, ornate)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy-4,4,5);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+5, oy-3,3,4);
+  ctx.fillStyle=GOLHI;  ctx.fillRect(ox+5, oy-3,2,2); // gold-tipped
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+17,oy-4,4,5);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+17,oy-3,3,4);
+  ctx.fillStyle=GOLHI;  ctx.fillRect(ox+18,oy-3,2,2);
+  // Visor
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6, oy+5,13,3);
+  ctx.fillStyle=PLDK;   ctx.fillRect(ox+7, oy+6,11,2);
+  // Eyes
+  ctx.fillStyle='#FF6600'; ctx.fillRect(ox+8,oy+6,3,2);ctx.fillRect(ox+13,oy+6,3,2);
+  ctx.fillStyle='#FF9900'; ctx.fillRect(ox+9,oy+6,2,1);ctx.fillRect(ox+14,oy+6,2,1);
+
+  // Twin braids hanging in front (shorter than male beard)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+12,4,18);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+5, oy+13,3,17);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5, oy+13,2,15);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+5, oy+13,1,8);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+16,oy+12,4,18);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+16,oy+13,3,17);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+17,oy+13,2,15);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+17,oy+13,1,8);
+  // Braid rings
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+4,oy+18,4,2); ctx.fillRect(ox+16,oy+18,4,2);
+  ctx.fillStyle=GOLD; ctx.fillRect(ox+4,oy+25,4,2); ctx.fillRect(ox+16,oy+25,4,2);
+}
+
+function drawDwarfSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk=_skinPal(skinToneIdx??2);
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+26,oy);ctx.scale(-1,1); // wider flip for dwarf
+    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleDwarf:_drawMaleDwarf)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// GOBLIN SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Small, hunched, mischievous. Disproportionately large head, enormous pointed
+// ears, bulbous yellow eyes, big hooked nose. Patchwork mismatched armor bits.
+// Skin: species-fixed bright green. Hair parametric (scraggly).
+// Male: slightly hunched, crude patchwork vest, club + small dagger.
+// Female: slightly different ear/face, simpler rag outfit, staff or club.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  // Species-fixed green skin
+  const SKNG='#7AAA30',SKNHI='#9ACC44',SKNSH='#507820',SKNDK='#345010';
+  const OUT='#080C04';
+  const LEATH='#3A2818',LEATHI='#5A4028',LEASH='#201408';
+  const PATCH='#5A4830',PATHI='#7A6848',PATSH='#3A2A18'; // patchwork cloth
+  const IRON='#5A585E',IRONHI='#7A7880',IRONSH='#3A3840'; // crude iron bits
+  const BOOT='#2A2010',BOOTHI='#3E3018';
+  const CLUB='#6A4420',CLUBHI='#8A6030';
+  const YEL='#CCCC00',YELHI='#FFFF40'; // yellow eyes
+
+  // Shadow (small)
+  ctx.fillStyle='#00000025';
+  ctx.fillRect(ox+5,oy+42,14,3);
+
+  // Club (right hip, crude weapon)
+  if(dir!==1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+18,oy+20+bob,4,18);
+    ctx.fillStyle=CLUB;  ctx.fillRect(ox+19,oy+21+bob,3,17);
+    ctx.fillStyle=CLUBHI;ctx.fillRect(ox+19,oy+21+bob,2,10);
+    // Club head (knobbly)
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+17,oy+20+bob,6,5);
+    ctx.fillStyle=CLUB;  ctx.fillRect(ox+18,oy+21+bob,5,4);
+    ctx.fillStyle=CLUBHI;ctx.fillRect(ox+18,oy+21+bob,4,2);
+  }
+
+  // Boots (ragged, mismatched)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+36,7,8);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+6, oy+37,6,7);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+6, oy+37,5,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+36,7,8);
+  ctx.fillStyle=LEATH;  ctx.fillRect(ox+13,oy+37,6,7); // mismatched boot
+  ctx.fillStyle=LEATHI; ctx.fillRect(ox+13,oy+37,5,2);
+
+  // Legs (scrawny)
+  const lY=28;
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+lY+swing-1,7,10);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+6, oy+lY+swing,  6,9);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+6, oy+lY+swing,  5,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+6, oy+lY+swing,  4,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+lY-swing-1,7,10);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+13,oy+lY-swing,  5,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+13,oy+lY-swing,  4,3);
+  // Crude knee pad (one side only — mismatched)
+  ctx.fillStyle=IRON;   ctx.fillRect(ox+6, oy+lY+swing,  5,2);
+
+  // Torso (hunched, bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Long scrawny left arm (hangs low)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy+16,5,16);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+3, oy+17,4,15);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+3, oy+17,3,15);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+3, oy+17,2,6);
+  // Fingerclaws on hand
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+3, oy+30,4,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+3, oy+32,1,2);ctx.fillRect(ox+5,oy+32,1,2);
+
+  // Right arm
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+17,oy+16,5,16);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+18,oy+17,4,15);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+18,oy+17,3,6);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+18,oy+30,4,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+18,oy+32,1,2);ctx.fillRect(ox+20,oy+32,1,2);
+
+  // Patchwork vest (crude, mismatched fabrics)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+15,14,14);
+  ctx.fillStyle=PATSH;  ctx.fillRect(ox+6, oy+16,12,13);
+  ctx.fillStyle=PATCH;  ctx.fillRect(ox+7, oy+16,10,13);
+  ctx.fillStyle=PATHI;  ctx.fillRect(ox+7, oy+16,7,4);
+  ctx.fillStyle=PATSH;  ctx.fillRect(ox+14,oy+16,3,13);
+  // Patch seams (mismatched pieces)
+  ctx.fillStyle=LEASH;  ctx.fillRect(ox+10,oy+16,2,13); // centre seam
+  ctx.fillStyle=LEASH;  ctx.fillRect(ox+7, oy+21,10,2); // horizontal seam
+  // Crude iron shoulder scrap (one side)
+  ctx.fillStyle=IRONSH; ctx.fillRect(ox+5, oy+14,5,5);
+  ctx.fillStyle=IRON;   ctx.fillRect(ox+6, oy+15,4,4);
+  ctx.fillStyle=IRONHI; ctx.fillRect(ox+6, oy+15,3,2);
+
+  // Belt (rope + scraps)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+26,14,3);
+  ctx.fillStyle=CLUB;   ctx.fillRect(ox+6, oy+27,12,2);
+  ctx.fillStyle=CLUBHI; ctx.fillRect(ox+6, oy+27,12,1);
+
+  // Club (facing left)
+  if(dir===1){
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+2, oy+20,4,18);
+    ctx.fillStyle=CLUB;  ctx.fillRect(ox+2, oy+21,3,17);
+    ctx.fillStyle=CLUBHI;ctx.fillRect(ox+2, oy+21,2,10);
+    ctx.fillStyle=LEASH; ctx.fillRect(ox+1, oy+20,6,5);
+    ctx.fillStyle=CLUB;  ctx.fillRect(ox+1, oy+21,5,4);
+    ctx.fillStyle=CLUBHI;ctx.fillRect(ox+1, oy+21,4,2);
+  }
+
+  ctx.restore();
+
+  // Big disproportionate head (large for a small body)
+  // Huge ears (sideways-pointing)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-2,oy+3,6,10);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox-1,oy+4,5,9);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+0, oy+4,4,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+0, oy+4,3,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+0, oy+10,4,3); // inner ear
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+20,oy+3,6,10);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+19,oy+4,5,9);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+20,oy+4,4,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+22,oy+4,2,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+20,oy+10,4,3);
+
+  // Scraggly hair (parametric)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+0,16,8);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+5, oy+1,14,7);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+6, oy+1,12,6);
+  // Scraggly spikes
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy-1,3,3);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+10,oy-2,3,4);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+15,oy-1,3,3);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+11,oy-2,1,2);
+
+  // Head (big, round)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+2,16,16);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+5, oy+3,14,15);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+6, oy+3,12,14);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+6, oy+3,10,5);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+15,oy+3,3,14); // shadow
+
+  // Big round yellow eyes (bulbous)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+5,5,5);ctx.fillRect(ox+14,oy+5,5,5);
+  ctx.fillStyle=YEL;    ctx.fillRect(ox+6, oy+6,4,4);ctx.fillRect(ox+15,oy+6,4,4);
+  ctx.fillStyle=YELHI;  ctx.fillRect(ox+6, oy+6,3,2);ctx.fillRect(ox+15,oy+6,3,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+7,2,2);ctx.fillRect(ox+16,oy+7,2,2); // pupil
+  ctx.fillStyle='#FFF'; ctx.fillRect(ox+7, oy+7,1,1);ctx.fillRect(ox+16,oy+7,1,1); // glint
+
+  // Big hooked nose
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+10,oy+10,4,5);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+11,oy+10,3,5);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+11,oy+10,2,3);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+11,oy+13,4,2); // hook tip
+
+  // Toothy grin (jagged)
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+7, oy+14,10,3);
+  ctx.fillStyle='#EEE'; ctx.fillRect(ox+8, oy+14,2,2); // teeth
+  ctx.fillStyle='#EEE'; ctx.fillRect(ox+11,oy+14,2,2);
+  ctx.fillStyle='#EEE'; ctx.fillRect(ox+14,oy+14,2,2);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+9, oy+14,2,1); ctx.fillRect(ox+12,oy+14,2,1); // gaps
+}
+
+function _drawFemaleGoblin(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const SKNG='#7AAA30',SKNHI='#9ACC44',SKNSH='#507820',SKNDK='#345010';
+  const OUT='#080C04';
+  const LEATH='#3A2818',LEATHI='#5A4028',LEASH='#201408';
+  const PATCH='#6A4860',PATHI='#8A6880',PATSH='#4A2840'; // different color cloth (purple-ish)
+  const BOOT='#2A2010',BOOTHI='#3E3018';
+  const STAFF='#6A4420',STAFFHI='#8A6030';
+  const YEL='#CCCC00',YELHI='#FFFF40';
+
+  // Shadow
+  ctx.fillStyle='#00000022';
+  ctx.fillRect(ox+5,oy+42,14,3);
+
+  // Staff (behind body)
+  ctx.fillStyle=OUT;     ctx.fillRect(ox+0,oy-4,3,48);
+  ctx.fillStyle=LEASH;   ctx.fillRect(ox+1,oy-3,2,46);
+  ctx.fillStyle=STAFFHI; ctx.fillRect(ox+1,oy+0,1,36);
+  // Skull/orb on top
+  ctx.fillStyle=OUT;     ctx.fillRect(ox-1,oy-6,5,4);
+  ctx.fillStyle='#B8B0A0';ctx.fillRect(ox+0, oy-5,4,3);
+  ctx.fillStyle='#D0C8B8';ctx.fillRect(ox+0, oy-5,3,2);
+
+  // Ragged boots
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+36,7,8);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+6, oy+37,6,7);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+6, oy+37,5,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+36,7,8);
+  ctx.fillStyle=BOOT;   ctx.fillRect(ox+13,oy+37,6,7);
+  ctx.fillStyle=BOOTHI; ctx.fillRect(ox+13,oy+37,5,2);
+
+  // Legs (scrawny)
+  const lY=28;
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+lY+swing-1,7,10);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+6, oy+lY+swing,  6,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+6, oy+lY+swing,  4,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+lY-swing-1,7,10);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+13,oy+lY-swing,  6,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+13,oy+lY-swing,  4,3);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Arms (scrawny)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+2, oy+16,4,14);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+3, oy+17,3,13);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+3, oy+17,2,5);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+3, oy+28,3,3); // hand
+
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+18,oy+16,4,14);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+18,oy+17,3,13);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+19,oy+17,2,5);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+18,oy+28,3,3);
+
+  // Ragged robe/dress
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+15,14,15);
+  ctx.fillStyle=PATSH;  ctx.fillRect(ox+6, oy+16,12,14);
+  ctx.fillStyle=PATCH;  ctx.fillRect(ox+7, oy+16,10,14);
+  ctx.fillStyle=PATHI;  ctx.fillRect(ox+7, oy+16,7,5);
+  ctx.fillStyle=PATSH;  ctx.fillRect(ox+14,oy+16,3,14);
+  // Ragged hem
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+27,2,3); ctx.fillRect(ox+11,oy+28,2,2);ctx.fillRect(ox+15,oy+27,2,3);
+  // Bone/trinket necklace
+  ctx.fillStyle='#C0B890';
+  for(let i=0;i<5;i++) ctx.fillRect(ox+7+i*2,oy+16,2,2);
+  ctx.fillStyle='#D0C8A0'; ctx.fillRect(ox+11,oy+15,2,2); // pendant
+
+  ctx.restore();
+
+  // Big head + huge ears
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-2,oy+3,6,10);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox-1,oy+4,5,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+0, oy+4,3,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+0, oy+10,4,3);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+20,oy+3,6,10);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+19,oy+4,5,9);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+21,oy+4,2,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+20,oy+10,4,3);
+
+  // Hair (scraggly, tied)
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+4, oy+0,16,7);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+5, oy+1,14,6);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+5, oy-1,4,3); ctx.fillRect(ox+15,oy-1,3,3); // wisps
+
+  // Head
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+2,16,15);
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+5, oy+3,14,14);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+6, oy+3,12,13);
+  ctx.fillStyle=SKNHI;  ctx.fillRect(ox+6, oy+3,10,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+15,oy+3,3,13);
+
+  // Eyes (yellow, large)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+5,5,5);ctx.fillRect(ox+14,oy+5,5,5);
+  ctx.fillStyle=YEL;    ctx.fillRect(ox+6, oy+6,4,4);ctx.fillRect(ox+15,oy+6,4,4);
+  ctx.fillStyle=YELHI;  ctx.fillRect(ox+6, oy+6,3,2);ctx.fillRect(ox+15,oy+6,3,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+7,2,2);ctx.fillRect(ox+16,oy+7,2,2);
+  ctx.fillStyle='#FFF'; ctx.fillRect(ox+7, oy+7,1,1);ctx.fillRect(ox+16,oy+7,1,1);
+
+  // Nose (hooked but slightly smaller)
+  ctx.fillStyle=SKNSH;  ctx.fillRect(ox+10,oy+10,4,4);
+  ctx.fillStyle=SKNG;   ctx.fillRect(ox+11,oy+10,3,4);
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+11,oy+12,3,2);
+
+  // Sly grin
+  ctx.fillStyle=SKNDK;  ctx.fillRect(ox+8, oy+14,8,2);
+  ctx.fillStyle='#EEE'; ctx.fillRect(ox+9, oy+14,2,2);ctx.fillRect(ox+13,oy+14,2,2);
+  // Little fang
+  ctx.fillStyle='#EEE'; ctx.fillRect(ox+11,oy+14,2,3);
+}
+
+function drawGoblinSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk={}; // not used — goblins have fixed green skin
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
+    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleGoblin:_drawMaleGoblin)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ORC SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Largest, widest silhouette. Grey-green skin, lower jaw tusks, tribal war
+// markings. Heavy fur-trimmed leather and crude metal plate, great axe.
+// Male: battle-scarred, war-painted face, massive frame, topknot hair.
+// Female: war-painted, battle-braids, armoured but showing more muscle.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const SKIN='#5A7840',SKINHI='#748C50',SKINSH='#3C5428',SKINDK='#283C1C';
+  const OUT='#080C04';
+  const FUR='#4A3020',FURHI='#6A5030',FURSH='#2A1808';
+  const PLATE='#4A4858',PLHI='#6A6878',PLSH='#2A2838';
+  const BONE='#C8B890',BONEHI='#E0D0A8';
+  const BOOT='#2A1808',BOOTHI='#4A3018';
+  const AXE='#6A6870',AXEHI='#9A98A8';
+  const AXHND='#4A3010',AXHHI='#7A5020';
+  const MARK='#CC3018'; // war-paint red
+  const TUSK='#E8D898',TUSKHI='#FFF0C0'; // tusk color
+
+  // Shadow (very wide)
+  ctx.fillStyle='#00000030';
+  ctx.fillRect(ox-2,oy+42,30,3);
+
+  // Great axe (behind, right side)
+  if(dir!==1){
+    ctx.fillStyle=AXHND;  ctx.fillRect(ox+22,oy+10+bob,4,28);
+    ctx.fillStyle=AXHHI;  ctx.fillRect(ox+23,oy+10+bob,2,26);
+    // Axe head (large)
+    ctx.fillStyle=PLSH;   ctx.fillRect(ox+18,oy+8+bob,12,14);
+    ctx.fillStyle=AXE;    ctx.fillRect(ox+19,oy+9+bob,11,13);
+    ctx.fillStyle=AXEHI;  ctx.fillRect(ox+19,oy+9+bob,8,6);
+    ctx.fillStyle=BONE;   ctx.fillRect(ox+19,oy+8+bob,11,2); // bone inlay
+    ctx.fillStyle=BONEHI; ctx.fillRect(ox+19,oy+8+bob,9,1);
+  }
+
+  // Boots (heavy, fur-lined)
+  [-2,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+32,12,12);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx+1,oy+33,11,11);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx+1,oy+33,10,3);
+    // Fur trim
+    ctx.fillStyle=FURSH;  ctx.fillRect(ox+bx+1,oy+33,10,2);
+    ctx.fillStyle=FUR;    ctx.fillRect(ox+bx+2,oy+33,8,2);
+    ctx.fillStyle=FURHI;  ctx.fillRect(ox+bx+2,oy+33,6,1);
+    ctx.fillStyle=PLSH;   ctx.fillRect(ox+bx+8,oy+35,4,10); // shadow
+  });
+
+  // Legs (massive, fur-wrapped)
+  const lY=24;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox-1, oy+lY+swing-1,12,10);
+  ctx.fillStyle=FURSH; ctx.fillRect(ox+0, oy+lY+swing,  11,9);
+  ctx.fillStyle=FUR;   ctx.fillRect(ox+1, oy+lY+swing,  9,9);
+  ctx.fillStyle=FURHI; ctx.fillRect(ox+1, oy+lY+swing,  8,3);
+  ctx.fillStyle=FURSH; ctx.fillRect(ox+8, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+14,oy+lY-swing-1,12,10);
+  ctx.fillStyle=FUR;   ctx.fillRect(ox+15,oy+lY-swing,  9,9);
+  ctx.fillStyle=FURHI; ctx.fillRect(ox+15,oy+lY-swing,  8,3);
+  ctx.fillStyle=FURSH; ctx.fillRect(ox+22,oy+lY-swing,  3,9);
+
+  // Torso (bob) — very wide
+  ctx.save(); ctx.translate(0,bob);
+
+  // Massive left arm
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-3, oy+10,9,18);
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox-2, oy+11,8,17);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox-2, oy+11,7,17);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox-2, oy+11,6,6);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+4, oy+11,3,17);
+  // Crude metal arm brace
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox-2, oy+20,7,4);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox-1, oy+21,6,3);
+  ctx.fillStyle=BONE;   ctx.fillRect(ox-1, oy+21,6,1);
+
+  // Massive right arm
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+18,oy+10,9,18);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+19,oy+11,7,17);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox+19,oy+11,6,6);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+24,oy+11,3,17);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+19,oy+20,7,4);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+20,oy+21,6,3);
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+20,oy+21,6,1);
+
+  // Broad chest (fur-trimmed plate)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+9,18,17);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+5, oy+10,16,16);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+6, oy+10,14,16);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+6, oy+10,12,6);
+  ctx.fillStyle=FURSH;  ctx.fillRect(ox+6, oy+10,14,3); // fur collar
+  ctx.fillStyle=FUR;    ctx.fillRect(ox+7, oy+10,12,3);
+  ctx.fillStyle=FURHI;  ctx.fillRect(ox+8, oy+10,10,2);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+17,oy+10,3,16);
+  // Bone trophy on chest
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+10,oy+16,6,5);
+  ctx.fillStyle=BONEHI; ctx.fillRect(ox+11,oy+16,4,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+16,2,5);ctx.fillRect(ox+10,oy+18,6,2);
+
+  // Massive pauldrons (crude)
+  [-4,18].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px,  oy+8,12,10);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox+px+1,oy+9,11,9);
+    ctx.fillStyle=PLATE; ctx.fillRect(ox+px+1,oy+9,11,9);
+    ctx.fillStyle=PLHI;  ctx.fillRect(ox+px+1,oy+9,10,4);
+    ctx.fillStyle=FURSH; ctx.fillRect(ox+px+1,oy+9,10,3);
+    ctx.fillStyle=FUR;   ctx.fillRect(ox+px+2,oy+9,8,3);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox+px+8,oy+10,4,8);
+  });
+
+  // Axe (facing left)
+  if(dir===1){
+    ctx.fillStyle=AXHND; ctx.fillRect(ox-2, oy+10,4,28);
+    ctx.fillStyle=AXHHI; ctx.fillRect(ox-1, oy+10,2,26);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox-6, oy+8, 12,14);
+    ctx.fillStyle=AXE;   ctx.fillRect(ox-6, oy+9, 11,13);
+    ctx.fillStyle=AXEHI; ctx.fillRect(ox-6, oy+9, 8,6);
+    ctx.fillStyle=BONE;  ctx.fillRect(ox-6, oy+8, 11,2);
+    ctx.fillStyle=BONEHI;ctx.fillRect(ox-6, oy+8, 9,1);
+  }
+
+  ctx.restore();
+
+  // Head — topknot hair (parametric)
+  // Topknot
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+8, oy-6,8,8);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+9, oy-5,6,7);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+10,oy-5,4,6);
+  ctx.fillStyle=hr.hi;  ctx.fillRect(ox+10,oy-5,3,3);
+
+  // Face (scarred, heavy-browed)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+2,18,16);
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+5, oy+3,16,15);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+6, oy+3,14,14);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox+6, oy+3,12,5);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+17,oy+3,3,14);
+  // Heavy brow ridge
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+6, oy+6,14,2);
+
+  // Eyes (red, burning)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7, oy+7,4,2);ctx.fillRect(ox+15,oy+7,4,2);
+  ctx.fillStyle='#CC2010';ctx.fillRect(ox+8,oy+7,3,2);ctx.fillRect(ox+16,oy+7,3,2);
+  ctx.fillStyle='#FF4020';ctx.fillRect(ox+8,oy+7,2,1);ctx.fillRect(ox+16,oy+7,2,1);
+
+  // War paint (red diagonal slashes)
+  ctx.fillStyle=MARK;
+  ctx.fillRect(ox+6, oy+4,3,6); // left slash
+  ctx.fillRect(ox+8, oy+4,2,4);
+  ctx.fillRect(ox+17,oy+4,3,6); // right slash
+  ctx.fillRect(ox+15,oy+4,2,4);
+  // Nose (broad, flat)
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+10,oy+10,6,4);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+11,oy+10,4,4);
+
+  // Tusks (lower jaw)
+  ctx.fillStyle=TUSK;   ctx.fillRect(ox+8, oy+14,3,5);
+  ctx.fillStyle=TUSKHI; ctx.fillRect(ox+9, oy+14,2,4);
+  ctx.fillStyle=TUSK;   ctx.fillRect(ox+15,oy+14,3,5);
+  ctx.fillStyle=TUSKHI; ctx.fillRect(ox+16,oy+14,2,4);
+
+  // Mouth (grimace)
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+9, oy+13,8,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+10,oy+13,6,1);
+}
+
+function _drawFemaleOrc(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const SKIN='#5A7840',SKINHI='#748C50',SKINSH='#3C5428',SKINDK='#283C1C';
+  const OUT='#080C04';
+  const FUR='#4A3020',FURHI='#6A5030',FURSH='#2A1808';
+  const PLATE='#4A4858',PLHI='#6A6878',PLSH='#2A2838';
+  const BONE='#C8B890',BONEHI='#E0D0A8';
+  const BOOT='#2A1808',BOOTHI='#4A3018';
+  const AXE='#6A6870',AXEHI='#9A98A8';
+  const AXHND='#4A3010',AXHHI='#7A5020';
+  const MARK='#CC3018';
+  const TUSK='#E8D898',TUSKHI='#FFF0C0';
+
+  // Shadow
+  ctx.fillStyle='#00000030';
+  ctx.fillRect(ox+0,oy+42,26,3);
+
+  // Axe
+  if(dir!==1){
+    ctx.fillStyle=AXHND; ctx.fillRect(ox+20,oy+12+bob,3,24);
+    ctx.fillStyle=AXHHI; ctx.fillRect(ox+21,oy+12+bob,2,22);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox+17,oy+10+bob,9,12);
+    ctx.fillStyle=AXE;   ctx.fillRect(ox+18,oy+11+bob,8,11);
+    ctx.fillStyle=AXEHI; ctx.fillRect(ox+18,oy+11+bob,6,5);
+    ctx.fillStyle=BONE;  ctx.fillRect(ox+18,oy+10+bob,8,2);
+  }
+
+  // Boots
+  [0,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+32,11,12);
+    ctx.fillStyle=BOOT;   ctx.fillRect(ox+bx+1,oy+33,10,11);
+    ctx.fillStyle=BOOTHI; ctx.fillRect(ox+bx+1,oy+33,9,3);
+    ctx.fillStyle=FURSH;  ctx.fillRect(ox+bx+1,oy+33,9,2);
+    ctx.fillStyle=FUR;    ctx.fillRect(ox+bx+2,oy+33,7,2);
+    ctx.fillStyle=PLSH;   ctx.fillRect(ox+bx+7,oy+35,4,10);
+  });
+
+  // Legs
+  const lY=25;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+1, oy+lY+swing-1,10,10);
+  ctx.fillStyle=SKIN;  ctx.fillRect(ox+2, oy+lY+swing,  9,9); // bare muscle
+  ctx.fillStyle=SKINHI;ctx.fillRect(ox+2, oy+lY+swing,  7,3);
+  ctx.fillStyle=SKINDK;ctx.fillRect(ox+9, oy+lY+swing,  3,9);
+  // Leg wrap (fur)
+  ctx.fillStyle=FURSH; ctx.fillRect(ox+2, oy+lY+swing+3,9,3);
+  ctx.fillStyle=FUR;   ctx.fillRect(ox+3, oy+lY+swing+3,7,2);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+14,oy+lY-swing-1,10,10);
+  ctx.fillStyle=SKIN;  ctx.fillRect(ox+15,oy+lY-swing,  9,9);
+  ctx.fillStyle=SKINHI;ctx.fillRect(ox+15,oy+lY-swing,  7,3);
+  ctx.fillStyle=SKINDK;ctx.fillRect(ox+22,oy+lY-swing,  2,9);
+  ctx.fillStyle=FURSH; ctx.fillRect(ox+15,oy+lY-swing+3,9,3);
+  ctx.fillStyle=FUR;   ctx.fillRect(ox+16,oy+lY-swing+3,7,2);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Arms (bare muscular skin)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox-1, oy+11,8,16);
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+0, oy+12,7,15);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+0, oy+12,6,15);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox+0, oy+12,5,6);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+5, oy+12,2,15);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+0, oy+21,6,3); // arm brace
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+1, oy+22,5,2);
+
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+17,oy+11,8,16);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+18,oy+12,6,15);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox+18,oy+12,5,6);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+22,oy+12,3,15);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+18,oy+21,6,3);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+18,oy+22,5,2);
+
+  // Chest armour (slightly narrower than male)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+10,16,17);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+6, oy+11,14,16);
+  ctx.fillStyle=PLATE;  ctx.fillRect(ox+7, oy+11,12,16);
+  ctx.fillStyle=PLHI;   ctx.fillRect(ox+7, oy+11,10,5);
+  ctx.fillStyle=FURSH;  ctx.fillRect(ox+7, oy+11,12,3);
+  ctx.fillStyle=FUR;    ctx.fillRect(ox+8, oy+11,10,2);
+  ctx.fillStyle=FURHI;  ctx.fillRect(ox+9, oy+11,8,1);
+  ctx.fillStyle=PLSH;   ctx.fillRect(ox+16,oy+11,3,16);
+  // War trophy
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+10,oy+16,6,4);
+  ctx.fillStyle=BONEHI; ctx.fillRect(ox+11,oy+16,4,2);
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+12,oy+17,2,3);
+
+  // Pauldrons
+  [-2,17].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px,  oy+9,10,9);
+    ctx.fillStyle=PLATE; ctx.fillRect(ox+px+1,oy+10,9,8);
+    ctx.fillStyle=PLHI;  ctx.fillRect(ox+px+1,oy+10,8,3);
+    ctx.fillStyle=FURSH; ctx.fillRect(ox+px+1,oy+10,8,2);
+    ctx.fillStyle=FUR;   ctx.fillRect(ox+px+2,oy+10,6,2);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox+px+6,oy+11,4,7);
+  });
+
+  // Axe (facing left)
+  if(dir===1){
+    ctx.fillStyle=AXHND; ctx.fillRect(ox+1, oy+12,3,24);
+    ctx.fillStyle=AXHHI; ctx.fillRect(ox+1, oy+12,2,22);
+    ctx.fillStyle=PLSH;  ctx.fillRect(ox-4, oy+10,9,12);
+    ctx.fillStyle=AXE;   ctx.fillRect(ox-4, oy+11,8,11);
+    ctx.fillStyle=AXEHI; ctx.fillRect(ox-4, oy+11,6,5);
+    ctx.fillStyle=BONE;  ctx.fillRect(ox-4, oy+10,8,2);
+  }
+
+  ctx.restore();
+
+  // Head — battle braids (parametric hair)
+  // Braids
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+2, oy+0,4,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+3, oy+0,3,16);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+3, oy+0,2,14);
+  ctx.fillStyle=hr.dk;  ctx.fillRect(ox+19,oy+0,4,18);
+  ctx.fillStyle=hr.lo;  ctx.fillRect(ox+19,oy+0,3,16);
+  ctx.fillStyle=hr.mid; ctx.fillRect(ox+20,oy+0,2,14);
+  // Braid rings
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+6,4,2);ctx.fillRect(ox+18,oy+6,4,2);
+  ctx.fillStyle=BONE;   ctx.fillRect(ox+2,oy+12,4,2);ctx.fillRect(ox+18,oy+12,4,2);
+
+  // Face
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+2,16,14);
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+6, oy+3,14,13);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+7, oy+3,12,12);
+  ctx.fillStyle=SKINHI; ctx.fillRect(ox+7, oy+3,10,4);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+16,oy+3,3,12);
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+7, oy+5,12,2); // brow
+
+  // Eyes
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+8, oy+6,3,2);ctx.fillRect(ox+15,oy+6,3,2);
+  ctx.fillStyle='#CC2010';ctx.fillRect(ox+9,oy+6,2,2);ctx.fillRect(ox+16,oy+6,2,2);
+  ctx.fillStyle='#FF4020';ctx.fillRect(ox+9,oy+6,1,1);ctx.fillRect(ox+16,oy+6,1,1);
+
+  // War paint (different pattern — more elaborate markings)
+  ctx.fillStyle=MARK;
+  ctx.fillRect(ox+7, oy+3,2,8);  // left stripe
+  ctx.fillRect(ox+17,oy+3,2,8);  // right stripe
+  ctx.fillRect(ox+9, oy+3,8,2);  // forehead stripe
+
+  // Nose + tusks (slightly smaller than male)
+  ctx.fillStyle=SKINSH; ctx.fillRect(ox+11,oy+9,5,3);
+  ctx.fillStyle=SKIN;   ctx.fillRect(ox+11,oy+9,4,3);
+  ctx.fillStyle=TUSK;   ctx.fillRect(ox+9, oy+13,2,4);
+  ctx.fillStyle=TUSKHI; ctx.fillRect(ox+9, oy+13,1,3);
+  ctx.fillStyle=TUSK;   ctx.fillRect(ox+15,oy+13,2,4);
+  ctx.fillStyle=TUSKHI; ctx.fillRect(ox+16,oy+13,1,3);
+  ctx.fillStyle=SKINDK; ctx.fillRect(ox+9, oy+12,8,2); // mouth
+}
+
+function drawOrcSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk={};
+  const hr=_hairPal(hairHex||HAIR_COLORS[1]);
+  if(dir===1){
+    ctx.save();ctx.translate(ox+28,oy);ctx.scale(-1,1); // widest flip for orc
+    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleOrc:_drawMaleOrc)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ROBOT SPRITES
+// ─────────────────────────────────────────────────────────────────────────────
+// Fully mechanical — no skin or hair palette. Angular plate segments,
+// articulated joints (circles at shoulders, elbows, hips), glowing visor.
+// Color scheme: dark gunmetal chassis with cyan energy accents.
+// Male: broader rectangular chassis, single antenna, laser pistol.
+// Female: tapered chassis, twin antennae, more curved panel shaping.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function _drawMaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080810';
+  const MTAL='#3A4050',MTHI='#5A6070',MTSH='#222830',MTDK='#161C22';
+  const CYAN='#20CCDD',CYANHI='#60F0FF',CYSH='#108899';
+  const LITE='rgba(32,204,221,0.20)'; // energy glow
+  const JOINT='#2A3038',JOIHI='#4A5060';
+  const GUN='#2A2C34',GUNHI='#4A4C58';
+
+  // Glow pulse (faint energy field)
+  ctx.fillStyle=LITE; ctx.fillRect(ox+2,oy+0,20,44);
+
+  // Shadow
+  ctx.fillStyle='#00000030';
+  ctx.fillRect(ox+3,oy+42,18,3);
+
+  // Laser pistol / arm cannon (right side)
+  if(dir!==1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+19,oy+22+bob,8,5);
+    ctx.fillStyle=GUN;   ctx.fillRect(ox+20,oy+23+bob,7,4);
+    ctx.fillStyle=GUNHI; ctx.fillRect(ox+20,oy+23+bob,6,2);
+    ctx.fillStyle=CYAN;  ctx.fillRect(ox+25,oy+24+bob,3,2); // energy cell
+    ctx.fillStyle=CYANHI;ctx.fillRect(ox+25,oy+24+bob,2,1);
+    // barrel
+    ctx.fillStyle=GUN;   ctx.fillRect(ox+26,oy+23+bob,4,4);
+    ctx.fillStyle=CYAN;  ctx.fillRect(ox+28,oy+24+bob,2,2);
+  }
+
+  // Feet / boots (blocky robot feet)
+  [-1,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+36,10,8);
+    ctx.fillStyle=MTSH;   ctx.fillRect(ox+bx+1,oy+37,9,7);
+    ctx.fillStyle=MTAL;   ctx.fillRect(ox+bx+1,oy+37,9,7);
+    ctx.fillStyle=MTHI;   ctx.fillRect(ox+bx+1,oy+37,8,3);
+    ctx.fillStyle=CYAN;   ctx.fillRect(ox+bx+1,oy+38,8,1); // energy strip
+    ctx.fillStyle=MTDK;   ctx.fillRect(ox+bx+7,oy+38,3,6);
+  });
+
+  // Leg segments (mechanical, walk swing)
+  const lY=28;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+lY+swing-1,9,10);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+3, oy+lY+swing,  8,9);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+3, oy+lY+swing,  8,9);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+3, oy+lY+swing,  7,4);
+  ctx.fillStyle=CYAN;  ctx.fillRect(ox+3, oy+lY+swing+4,7,1);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+8, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+13,oy+lY-swing-1,9,10);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+14,oy+lY-swing,  8,9);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+14,oy+lY-swing,  7,4);
+  ctx.fillStyle=CYAN;  ctx.fillRect(ox+14,oy+lY-swing+4,7,1);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+19,oy+lY-swing,  3,9);
+  // Hip joint circles
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+4, oy+lY+swing+7,5,3);
+  ctx.fillStyle=JOIHI; ctx.fillRect(ox+5, oy+lY+swing+7,3,2);
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+15,oy+lY-swing+7,5,3);
+  ctx.fillStyle=JOIHI; ctx.fillRect(ox+16,oy+lY-swing+7,3,2);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Left arm (mechanical segments)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+0, oy+14,5,14);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+1, oy+15,4,13);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+1, oy+15,4,13);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+1, oy+15,3,5);
+  // Elbow joint
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+1, oy+20,4,4);
+  ctx.fillStyle=CYAN;  ctx.fillRect(ox+2, oy+21,2,2);
+  ctx.fillStyle=CYANHI;ctx.fillRect(ox+2, oy+21,1,1);
+
+  // Right arm
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+19,oy+14,5,14);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+19,oy+15,4,13);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+20,oy+15,3,5);
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+19,oy+20,4,4);
+  ctx.fillStyle=CYAN;  ctx.fillRect(ox+20,oy+21,2,2);
+  ctx.fillStyle=CYANHI;ctx.fillRect(ox+20,oy+21,1,1);
+
+  // Chassis (rectangular, broad)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+4, oy+12,16,18);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+5, oy+13,14,17);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+6, oy+13,12,17);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+6, oy+13,10,5);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+15,oy+13,3,17);
+  // Panel lines
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+6, oy+20,12,1);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+11,oy+13,1,17);
+  // Cyan energy core (chest)
+  ctx.fillStyle=CYSH;  ctx.fillRect(ox+8, oy+15,8,6);
+  ctx.fillStyle=CYAN;  ctx.fillRect(ox+9, oy+16,6,4);
+  ctx.fillStyle=CYANHI;ctx.fillRect(ox+9, oy+16,5,2);
+  ctx.fillStyle='rgba(32,204,221,0.4)'; ctx.fillRect(ox+7,oy+14,10,8);
+
+  // Shoulder joints (large circles)
+  [-1,18].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px,  oy+12,7,7);
+    ctx.fillStyle=JOINT; ctx.fillRect(ox+px+1,oy+13,5,5);
+    ctx.fillStyle=JOIHI; ctx.fillRect(ox+px+1,oy+13,4,3);
+    ctx.fillStyle=CYAN;  ctx.fillRect(ox+px+2,oy+14,2,2);
+    ctx.fillStyle=CYANHI;ctx.fillRect(ox+px+2,oy+14,1,1);
+  });
+
+  // Arm cannon (facing left)
+  if(dir===1){
+    ctx.fillStyle=OUT;   ctx.fillRect(ox-3, oy+22,8,5);
+    ctx.fillStyle=GUN;   ctx.fillRect(ox-3, oy+23,7,4);
+    ctx.fillStyle=GUNHI; ctx.fillRect(ox-2, oy+23,6,2);
+    ctx.fillStyle=CYAN;  ctx.fillRect(ox-3, oy+24,3,2);
+    ctx.fillStyle=GUN;   ctx.fillRect(ox-7, oy+23,4,4);
+    ctx.fillStyle=CYAN;  ctx.fillRect(ox-7, oy+24,2,2);
+  }
+
+  ctx.restore();
+
+  // Head (angular, rectangular)
+  // Antenna
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+11,oy-8,2,10);
+  ctx.fillStyle=MTAL;   ctx.fillRect(ox+12,oy-7,1,8);
+  ctx.fillStyle=CYAN;   ctx.fillRect(ox+11,oy-9,3,3);
+  ctx.fillStyle=CYANHI; ctx.fillRect(ox+11,oy-9,2,2);
+
+  // Head chassis
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+4, oy+0,16,14);
+  ctx.fillStyle=MTSH;   ctx.fillRect(ox+5, oy+1,14,13);
+  ctx.fillStyle=MTAL;   ctx.fillRect(ox+6, oy+1,12,12);
+  ctx.fillStyle=MTHI;   ctx.fillRect(ox+6, oy+1,10,4);
+  ctx.fillStyle=MTDK;   ctx.fillRect(ox+15,oy+1,3,12);
+  // Panel seam
+  ctx.fillStyle=MTSH;   ctx.fillRect(ox+6, oy+6,12,1);
+
+  // Visor (wide cyan glow)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+4,14,5);
+  ctx.fillStyle=CYSH;   ctx.fillRect(ox+6, oy+5,12,4);
+  ctx.fillStyle=CYAN;   ctx.fillRect(ox+6, oy+5,12,3);
+  ctx.fillStyle=CYANHI; ctx.fillRect(ox+6, oy+5,12,1);
+  ctx.fillStyle='rgba(32,204,221,0.5)'; ctx.fillRect(ox+5,oy+4,14,5);
+
+  // Mouth grille
+  ctx.fillStyle=MTDK;   ctx.fillRect(ox+7, oy+9,10,3);
+  ctx.fillStyle=MTSH;   ctx.fillRect(ox+8, oy+10,8,1);
+  for(let i=0;i<4;i++) ctx.fillRect(ox+8+i*2,oy+9,1,3); // grille slits in MTSH
+}
+
+function _drawFemaleRobot(ctx,ox,oy,dir,f,swing,bob,sk,hr){
+  const OUT='#080810';
+  const MTAL='#3A3850',MTHI='#5A5878',MTSH='#222030',MTDK='#161428'; // slightly purple tint
+  const CYAN='#20CCDD',CYANHI='#60F0FF',CYSH='#108899';
+  const LITE='rgba(32,204,221,0.18)';
+  const JOINT='#2A2838',JOIHI='#4A4860';
+  const PURP='#8040C8',PURPHI='#A868E8'; // accent color (purple instead of gunmetal)
+
+  // Glow
+  ctx.fillStyle=LITE; ctx.fillRect(ox+3,oy+0,18,44);
+
+  // Shadow
+  ctx.fillStyle='#00000028';
+  ctx.fillRect(ox+4,oy+42,16,3);
+
+  // Feet (slightly narrower, pointed)
+  [1,14].forEach(bx=>{
+    ctx.fillStyle=OUT;    ctx.fillRect(ox+bx,  oy+36,9,8);
+    ctx.fillStyle=MTSH;   ctx.fillRect(ox+bx+1,oy+37,8,7);
+    ctx.fillStyle=MTAL;   ctx.fillRect(ox+bx+1,oy+37,8,7);
+    ctx.fillStyle=MTHI;   ctx.fillRect(ox+bx+1,oy+37,7,3);
+    ctx.fillStyle=PURP;   ctx.fillRect(ox+bx+1,oy+38,7,1);
+    ctx.fillStyle=MTDK;   ctx.fillRect(ox+bx+6,oy+38,3,6);
+  });
+
+  // Leg segments
+  const lY=28;
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+3, oy+lY+swing-1,8,10);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+4, oy+lY+swing,  7,9);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+4, oy+lY+swing,  6,4);
+  ctx.fillStyle=PURP;  ctx.fillRect(ox+4, oy+lY+swing+4,6,1);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+8, oy+lY+swing,  3,9);
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+13,oy+lY-swing-1,8,10);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+13,oy+lY-swing,  7,9);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+14,oy+lY-swing,  6,4);
+  ctx.fillStyle=PURP;  ctx.fillRect(ox+14,oy+lY-swing+4,6,1);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+18,oy+lY-swing,  3,9);
+
+  // Torso (bob)
+  ctx.save(); ctx.translate(0,bob);
+
+  // Slender arms
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+2, oy+14,4,14);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+3, oy+15,3,13);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+3, oy+15,2,5);
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+3, oy+21,3,4);
+  ctx.fillStyle=PURP;  ctx.fillRect(ox+3, oy+22,2,2);
+  ctx.fillStyle=PURPHI;ctx.fillRect(ox+3, oy+22,1,1);
+
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+18,oy+14,4,14);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+18,oy+15,3,13);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+19,oy+15,2,5);
+  ctx.fillStyle=JOINT; ctx.fillRect(ox+18,oy+21,3,4);
+  ctx.fillStyle=PURP;  ctx.fillRect(ox+18,oy+22,2,2);
+  ctx.fillStyle=PURPHI;ctx.fillRect(ox+18,oy+22,1,1);
+
+  // Chassis (tapered, more curved panel styling)
+  ctx.fillStyle=OUT;   ctx.fillRect(ox+5, oy+12,14,18);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+6, oy+13,12,17);
+  ctx.fillStyle=MTAL;  ctx.fillRect(ox+7, oy+13,10,17);
+  ctx.fillStyle=MTHI;  ctx.fillRect(ox+7, oy+13,8,5);
+  ctx.fillStyle=MTDK;  ctx.fillRect(ox+14,oy+13,3,17);
+  // Curved panel lines
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+7, oy+19,10,1);
+  ctx.fillStyle=MTSH;  ctx.fillRect(ox+11,oy+13,1,17);
+  // Energy core (purple)
+  ctx.fillStyle='#4010A0'; ctx.fillRect(ox+9, oy+15,6,5);
+  ctx.fillStyle=PURP;  ctx.fillRect(ox+9, oy+15,5,4);
+  ctx.fillStyle=PURPHI;ctx.fillRect(ox+10,oy+15,4,2);
+  ctx.fillStyle='rgba(128,64,200,0.35)'; ctx.fillRect(ox+8,oy+14,8,7);
+
+  // Shoulder joints (more rounded/organic shape)
+  [4,15].forEach(px=>{
+    ctx.fillStyle=OUT;   ctx.fillRect(ox+px,  oy+12,6,6);
+    ctx.fillStyle=JOINT; ctx.fillRect(ox+px+1,oy+13,4,4);
+    ctx.fillStyle=JOIHI; ctx.fillRect(ox+px+1,oy+13,3,2);
+    ctx.fillStyle=PURP;  ctx.fillRect(ox+px+2,oy+14,1,2);
+  });
+
+  ctx.restore();
+
+  // Head (slightly rounder, more tapered)
+  // Twin antennae
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+7,oy-7,2,9); ctx.fillRect(ox+15,oy-7,2,9);
+  ctx.fillStyle=MTAL;   ctx.fillRect(ox+8,oy-6,1,7); ctx.fillRect(ox+16,oy-6,1,7);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+7,oy-8,2,2); ctx.fillRect(ox+15,oy-8,2,2);
+  ctx.fillStyle=PURPHI; ctx.fillRect(ox+7,oy-8,1,1); ctx.fillRect(ox+15,oy-8,1,1);
+
+  // Head chassis (slightly tapered)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+5, oy+0,14,13);
+  ctx.fillStyle=MTSH;   ctx.fillRect(ox+6, oy+1,12,12);
+  ctx.fillStyle=MTAL;   ctx.fillRect(ox+7, oy+1,10,11);
+  ctx.fillStyle=MTHI;   ctx.fillRect(ox+7, oy+1,8,4);
+  ctx.fillStyle=MTDK;   ctx.fillRect(ox+14,oy+1,3,11);
+
+  // Visor (slightly narrower, more refined)
+  ctx.fillStyle=OUT;    ctx.fillRect(ox+6, oy+4,12,4);
+  ctx.fillStyle=CYSH;   ctx.fillRect(ox+7, oy+5,10,3);
+  ctx.fillStyle=CYAN;   ctx.fillRect(ox+7, oy+5,10,2);
+  ctx.fillStyle=CYANHI; ctx.fillRect(ox+7, oy+5,10,1);
+  ctx.fillStyle='rgba(32,204,221,0.45)'; ctx.fillRect(ox+6,oy+4,12,4);
+
+  // Mouth detail (more refined grille)
+  ctx.fillStyle=MTDK;   ctx.fillRect(ox+8, oy+9,8,3);
+  for(let i=0;i<3;i++) ctx.fillRect(ox+9+i*2,oy+9,1,3); // MTSH grille
+
+  // Cheek panels (subtle detail marking)
+  ctx.fillStyle=MTSH;   ctx.fillRect(ox+6, oy+5,2,4); ctx.fillRect(ox+16,oy+5,2,4);
+  ctx.fillStyle=PURP;   ctx.fillRect(ox+6, oy+6,2,1); ctx.fillRect(ox+16,oy+6,2,1);
+}
+
+function drawRobotSprite(ctx,ox,oy,dir,frame,moving,gender,skinToneIdx,hairHex){
+  const f=moving?(Math.floor(frame/4)%6):0;
+  const swing=moving?_WK_SWING[f]:0;
+  const bob=moving?_WK_BOB[f]:0;
+  const sk={}; // unused for robot
+  const hr={}; // unused for robot
+  if(dir===1){
+    ctx.save();ctx.translate(ox+24,oy);ctx.scale(-1,1);
+    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,0,0,dir,f,swing,bob,sk,hr);
+    ctx.restore();
+  } else {
+    (gender==='female'?_drawFemaleRobot:_drawMaleRobot)(ctx,ox,oy,dir,f,swing,bob,sk,hr);
   }
 }
 
