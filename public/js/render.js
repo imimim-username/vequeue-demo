@@ -1311,25 +1311,24 @@ function drawVillageBG(ctx,W,H,tick){
 // gender + skinToneIdx + class_ route human characters to the correct procedural sprite.
 function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx,class_){
   const sp=species||'human';
+  const _g=gender||'male', _st=skinToneIdx??2, _hr=hairColor||HAIR_COLORS[1];
 
   // ── Human characters: class determines sprite archetype ──────────────────
   if(sp==='human'){
     const cls=class_||'warrior';
-    const g=gender||'male', sk=skinToneIdx??2, hr=hairColor||HAIR_COLORS[1];
-    if     (cls==='mage')    drawHumanMageSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr);
-    else if(cls==='rogue')   drawHumanRogueSprite  (ctx,ox,oy,dir,frame,moving,g,sk,hr);
-    else if(cls==='paladin') drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr);
-    else                     drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr);
+    if     (cls==='mage')    drawHumanMageSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
+    else if(cls==='rogue')   drawHumanRogueSprite  (ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
+    else if(cls==='paladin') drawHumanPaladinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
+    else                     drawHumanWarriorSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr);
     return;
   }
 
   // ── Non-human species: dedicated procedural sprites ───────────────────────
-  const g=gender||'male', sk=skinToneIdx??2, hr=hairColor||HAIR_COLORS[1];
-  if(sp==='elf')   { drawElfSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
-  if(sp==='dwarf') { drawDwarfSprite (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
-  if(sp==='goblin'){ drawGoblinSprite(ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
-  if(sp==='orc')   { drawOrcSprite   (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
-  if(sp==='robot') { drawRobotSprite (ctx,ox,oy,dir,frame,moving,g,sk,hr); return; }
+  if(sp==='elf')   { drawElfSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
+  if(sp==='dwarf') { drawDwarfSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
+  if(sp==='goblin'){ drawGoblinSprite(ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
+  if(sp==='orc')   { drawOrcSprite   (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
+  if(sp==='robot') { drawRobotSprite (ctx,ox,oy,dir,frame,moving,_g,_st,_hr); return; }
 
   // ── Legacy generic fallback (safety net for unknown species) ──────────────
   const f=moving?(Math.floor(frame/4)%6):0;
