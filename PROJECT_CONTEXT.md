@@ -1,6 +1,6 @@
 # Governance Town / veQueue Demo — Project Context
 
-_Last updated: 2026-04-02_
+_Last updated: 2026-04-03_
 
 ---
 
@@ -22,8 +22,8 @@ ssh -i /workspace/group/.ssh/droplet_deploy -o StrictHostKeyChecking=no root@24.
 | Live URL | `https://vequeue.imimim.info` |
 
 **Full deploy flow:**
-1. Make changes
-2. Bump asset version in `public/index.html` (`v=YYYYMMDDX`)
+1. Make changes in `/workspace/extra/gits/vequeue-demo/`
+2. Bump asset version in `public/index.html` (all `v=YYYYMMDDX` occurrences, currently `v=20260402l`)
 3. `git add … && git commit -m "…"`
 4. `GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" git push origin main`
 5. Run the one-liner above to pull + restart on the droplet
@@ -32,200 +32,195 @@ ssh -i /workspace/group/.ssh/droplet_deploy -o StrictHostKeyChecking=no root@24.
 
 ## What This Project Is
 
-A browser-based educational game teaching the **veQueue protocol** — a rate-limited governance token locking mechanism with entry/exit queues, watermark/principal protection, ERC-6909 NFT positions, and vqShares.
+A browser-based **multiplayer educational RPG** teaching the **veQueue protocol** — a rate-limited governance token locking mechanism with entry/exit queues, watermark/principal protection, ERC-6909 NFT positions, and vqShares.
 
-The project lives at: `/workspace/extra/gits/vequeue-demo/`
-GitHub remote: `github.com:imimim-username/vequeue-demo.git`
-Deploy key: `/workspace/extra/github-keys/github_deploy`
-
----
-
-## Git History
-
-| Commit | Description |
-|--------|-------------|
-| `aa047d5` | initial commit — v2 single-player SNES-style demo (`index.html`) |
-| `c800dc6` | Add Governance Town multiplayer game (v2) — **reverted** |
-| `d502c0c` | Revert of multiplayer commit (files removed, history preserved) |
-
-The multiplayer code (server.js, public/index.html, package.json, nginx-vequeue.conf) is preserved in commit `c800dc6` and can be cherry-picked or referenced later.
+- **Live at:** `https://vequeue.imimim.info`
+- **Repo:** `/workspace/extra/gits/vequeue-demo/`
+- **GitHub:** `github.com:imimim-username/vequeue-demo.git`
+- **GitHub deploy key:** `/workspace/extra/github-keys/github_deploy`
 
 ---
 
-## Current State of the Repo
+## Current Asset Version
 
-Only `index.html` is in the working tree — the v2 single-player SNES-style demo.
-
-Published static demo URL: `https://earthy-atlas-nvjk.here.now/`
+`v=20260402l` — set in `public/index.html` for CSS + all JS files. Bump each deploy.
 
 ---
 
-## v2 Single-Player Demo (`index.html`)
+## Architecture
 
-### Visual Style
-- SNES-quality pixel art
-- Wainscoting walls: plaster + wood baseboard + gold chair rail
-- Checkered marble floors, carpet texture, tech floor tiles
-- Chunky 2×2 pixel-art sprites
-- CRT scanline overlay
+| Layer | Tech |
+|-------|------|
+| Backend | Node.js + Socket.io, `server.js` |
+| Frontend | `public/index.html` + `public/js/*.js` |
+| Maps | `public/js/maps.js` |
+| Rendering | `public/js/render.js` |
+| Audio | `public/js/audio.js` |
+| Data/config | `public/js/data.js` — `CFG`, `ZONES`, `ITEMS`, `ENEMIES`, etc. |
+| Game logic | `public/js/game.js` — main game loop, all UI, socket handlers |
+| Proxy | nginx → `localhost:3001` |
+| Process manager | pm2, process name `governance-town` |
 
-### Responsive / Mobile
-- Canvas scales via CSS `width/height`; `image-rendering: pixelated`
-- Scale factor: `Math.min(availableWidth/BASE_W, availableHeight/BASE_H, 2)`
-- Mobile D-pad overlay shown when `window.matchMedia('(pointer:coarse)')` is true
-- Touch events feed into `held` object (same as keyboard)
-
-### Queue Flow (Fixed)
-1. Player enters lobby → picks up number ticket
-2. Serving counter advances → player's number gets called (`G.queue.called = true`)
-3. Player walks to WN (clerk window) tile at row 2 of entryQueue
-4. 6-page clerk dialog plays out
-5. `G.processed = true` → lobby side/south doors unlock (tiles flip from WA to open)
-
-### Map Generation
-- `getLobbyMap()` builds the governance hall dynamically
-- Side/south doors are WA (wall) until `G.processed = true`
+Canvas is **640×416** (`W=640`, `H=416`). All drawing on `cv-ui` canvas using `ctxUI`.
 
 ---
 
-## Multiplayer Game Design (Governance Town) — Future Work
+## Key Files
 
-This was designed but the commit was reverted pending proper droplet setup.
+### `server.js`
+- Socket.io server: queue management, NPC bot cycling, auction/serve logic
+- Queue zones: `marketplace`, `treasury` (both `entry` and `exit` queue types)
+- NPC bots seeded at startup (4–7 per zone entry queue); cycle out/in after serving
+- Excluded from auction payouts; exist only to make queue feel real
+- `queue_fast_exit` handler: player pays ALCX fee to skip exit queue
+- `serveNext()`: advances queue, notifies player via `queue_served` event
 
-### Architecture
-- **Backend**: Node.js + Socket.io, bind to `127.0.0.1:3001`
-- **Frontend**: Single `public/index.html` served by Express
-- **Proxy**: nginx → localhost:3001, domain: `vequeue.imimim.info`
-- **TLS**: Certbot / Let's Encrypt
+### `public/js/game.js`
+- All game state in `G` object (top of file)
+- `gameLoop()` → `updateCamera()`, input handling, tick-based logic
+- `renderHUD()` — world/overworld UI
+- `renderInventoryScreen()` — pause screen: equipped gear + 8-slot bag
+- `renderBattle()` / `drawBattleUI()` — combat screen canvas drawing
+- `renderShop()` — vendor HTML overlay
+- `renderQueuePanel()` / `updateQueuePanel()` — queue HUD widget
+- Socket event handlers inline (search for `socket.on(`)
 
-### Player Model
-- Anonymous nicknames + color selection (no login)
-- localStorage opt-in persistence: `gt_state` key stores `{tokens, quests, nickname, color}`
-- Warn users who opt out that progress won't be saved
-- 1000 GOV tokens starting balance
-
-### World
-- Small town, 40×28 tile map
-- 4 buildings: Tavern, Governance Hall, Marketplace, Treasury
-- Local (zone-scoped) chat only — not global
-- Camera follows player in town; buildings use fixed viewport
-
-### Quest Chain (5 quests)
-1. Talk to Town Crier (SI tile, col 16 row 9 in town)
-2. Complete intake window in Governance Hall
-3. Talk to vault keeper NPC
-4. Talk to assessor NPC
-5. Talk to exit clerk NPC
-
-### Rewards (Scaffolded, Not Wired)
-- Discord role assignment (bot not built yet)
-- Base free mint (contract not deployed yet)
-- Both appear as buttons in completion modal with "coming soon" labels
-
-### Socket Events
-```
-join          → spawn at x:20,y:14 in town; emit 'welcome' + 'player_joined'
-move          → update pos; broadcast to zone
-zone_change   → leave old zone room; join new; sync players
-chat          → io.to(p.zone).emit (local chat)
-quest_update  → update quests/tokens; broadcast player_updated
-get_scoreboard → emit sorted scoreboard
-disconnect    → broadcast player_left; delete from registry
-```
+### `public/js/data.js`
+- `CFG` — canvas size, starting stats, currency amounts
+- `ZONES` — zone definitions (w, h, entry point)
+- `ITEMS`, `WEAPONS`, `ARMORS`, `ENEMIES`, `VENDORS`
+- `RARITY_COLOR`, `MAX_DUR`, `PLAYER_COLORS`, `HAIR_COLORS`, `SKIN_TONES`
 
 ---
 
-## Droplet Deployment (TODO — Do Properly Next Time)
+## Game State (`G` object)
 
-**Before doing anything on the droplet, run recon first:**
+Key fields to know:
 
-```bash
-# What's already running?
-sudo systemctl list-units --type=service --state=running
+| Field | Description |
+|-------|-------------|
+| `G.zone` | Current zone name (`'world'`, `'marketplace'`, `'treasury'`, `'battle'`, …) |
+| `G.inventory[0]` | Equipped weapon |
+| `G.inventory[1]` | Equipped shield |
+| `G.inventory[2..7]` | Bag slots (items, potions, accessories) |
+| `G.equippedArmor` | Armor item object (separate from inventory) |
+| `G.battle` | Active battle state or `null` |
+| `G.queueState` | `{zone, type, ticket, served}` or `null` |
+| `G.lockedAlcx` | ALCX locked while in entry queue |
+| `G.zoneSeniority` | Increments every 300 ticks while in economic zone |
+| `G._queueServExpiry` | Timestamp: 2-min window to enter after being served |
+| `G._bagMenuIdx` | Selected bag slot index (for action sheet) or `null` |
+| `G.paused` | Whether inventory/pause screen is open |
+| `G.shop` | Active shop `{vendorId}` or `null` |
+| `G.npcDialog` | Active NPC conversation state or `null` |
 
-# What ports are in use?
-sudo ss -tlnp
+---
 
-# Is nginx already installed?
-nginx -v 2>/dev/null || echo "not installed"
+## veQueue Mechanic (How It's Taught)
 
-# Is node already installed?
-node -v 2>/dev/null || echo "not installed"
-npm -v 2>/dev/null || echo "not installed"
+1. Player enters **Marketplace** or **Treasury** zone → prompted to join entry queue
+2. Queue shows real NPC bots ahead of them — must wait their turn
+3. Player can **roam freely** while waiting (background queue); notified when served
+4. Once served: 2-minute window to enter the economic zone; countdown shown in queue panel
+5. In zone: ALCX drip every 300 ticks, multiplied by `zoneSeniority`
+6. To leave: must join **exit queue** (same mechanic in reverse)
+7. Fast-exit available: pay ALCX fee to skip exit queue (`doFastExit(fee)`)
 
-# Is pm2 already installed?
-pm2 -v 2>/dev/null || echo "not installed"
+**Seniority rule:** only accumulates while `G.zone === 'marketplace' || 'treasury'` (not while roaming or in queue lobby). Resets to 0 on zone exit.
 
-# Any existing nginx sites?
-ls /etc/nginx/sites-enabled/ 2>/dev/null || echo "no nginx"
+---
 
-# What's in /etc/nginx/sites-enabled if it exists?
-cat /etc/nginx/sites-enabled/* 2>/dev/null
-```
+## Item System
 
-Only proceed with installs after reviewing output — don't clobber existing bots or services.
+### Durability
+- `itemMaxDur(item)` → max based on rarity (`MAX_DUR` table in data.js)
+- `stampDurability(item)` → sets `item.durability = item.maxDurability` if not already set
+- `degradeItem(item, amt=1)` → reduces `item.durability` by `amt`, floored at 0
+- Items degrade on hit (weapon), on being hit (shield, armor)
+- Broken items show warning; repair at shops
 
-### Install Node.js (if not present)
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-node -v && npm -v
-```
+### Bag Action Sheet
+Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action sheet appears:
+- **[⚔ EQUIP]** — `equipFromBag(idx)` — move to slot 0 or 1
+- **[🧪 USE]** — `usePotion(idx)` — consume potion (heal HP)
+- **[💰 SELL Nsb]** — `sellFromBag(idx)` — sell for ~40% of cost price
+- **[🗑 DROP]** — `dropFromBag(idx)` — 30% durability hit, emit `loot_drop` if online
+- **[✕]** — dismiss action sheet
 
-### Install nginx (if not present)
-```bash
-sudo apt install -y nginx
-sudo systemctl status nginx
-```
+### `dropFromBag(idx)` (added 2026-04-03)
+- Copies item, applies 30% durability loss (item thrown carelessly)
+- If connected: `socket.emit('loot_drop', {zone, x, y, items:[dropped], …})` → world loot pile
+- If offline: discards silently
+- Clears `G.inventory[idx]`, saves state
 
-### Deploy nginx config
-```bash
-sudo cp nginx-vequeue.conf /etc/nginx/sites-available/vequeue
-sudo ln -sf /etc/nginx/sites-available/vequeue /etc/nginx/sites-enabled/vequeue
-# Remove listen 443 ssl line BEFORE certbot (certbot adds it)
-sudo sed -i 's/listen 443 ssl;/listen 443;/' /etc/nginx/sites-available/vequeue
-sudo nginx -t && sudo systemctl reload nginx
-```
+---
 
-### TLS
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d vequeue.imimim.info
-```
+## Battle System
 
-### Start server
-```bash
-cd ~/gits/vequeue-demo
-npm install
-# Option A: foreground (testing)
-node server.js
-# Option B: pm2 (persistent)
-npm install -g pm2
-pm2 start server.js --name governance-town
-pm2 save
-pm2 startup   # follow printed instructions
-```
+- `G.battle` holds full state: `{enemy, hp, maxHp, phase, log, turn, …}`
+- Battle canvas layout (all in px, on 640×416 canvas):
+  - `pY = Math.floor(H * 0.58) = 241` — top of battle panel
+  - **Left column** (x=4–264): battle log (3 lines) + weapon loadout below
+  - **Middle column** (x=274–449): action buttons (Attack / Magic / Item / Flee + weapon swap)
+  - **Right column** (x=460–640): player sprite + HP/MP bars + turn indicator
+- Weapon loadout renders in left column starting at `pY+64`, each card 18px tall — fits 4 weapons
+- HP/MP text rendered **inside** bars (at `piX+3`), not outside — avoids right-edge clipping
+
+---
+
+## Queue Panel UI
+
+- Rendered by `updateQueuePanel()` into `#queue-panel` div (bottom-left HUD)
+- Shows: queue position, ticket number, served status, expiry countdown (red under 30s)
+- Fast-exit button appears when in exit queue
+- `doFastExit(fee)` deducts ALCX, emits `queue_fast_exit`
+- 1-second interval refreshes countdown when served: `setInterval(…, 1000)`
+
+---
+
+## Recent Changes (This Session — 2026-04-03)
+
+| Change | Details |
+|--------|---------|
+| `dropFromBag()` added | 30% durability on drop, world loot emit if online |
+| Bag action sheet wired | All 4 actions (EQUIP/USE/SELL/DROP) now functional |
+| Battle loadout fix | Moved to left column — was overflowing y=416 canvas boundary |
+| HP/MP text fix | Embedded inside bars — was overflowing x=640 right edge |
+| Version bumped | `v=20260402l` |
+
+---
+
+## Previous Session Changes (2026-04-02)
+
+| Change | Details |
+|--------|---------|
+| NPC bots | 4–7 bots seeded per zone entry queue at startup; cycle after serving |
+| Background queuing | Queue ticket persists while roaming; 2-min served window |
+| Seniority fix | Now only increments inside economic zone, not while roaming |
+| Exit queue cost | Fast-exit button with ALCX fee |
+| Queue tutorial | 5-page tutorial, updated to reflect roam-while-waiting |
+| Join message | "Roam freely — we'll notify you when your ticket is called!" |
+| Queue served alert | Prominent 2-line chat notification + SFX on being served |
+
+---
+
+## Possible Next Steps
+
+- [ ] More dungeon content / boss encounters
+- [ ] NPC quest chain tied deeper into veQueue lore
+- [ ] Auction mechanic for marketplace listings
+- [ ] vqShares / ERC-6909 position NFT visualization
+- [ ] Governance proposal voting mini-game
+- [ ] Discord role reward on quest completion
+- [ ] Mobile layout polish (D-pad, action sheet sizing)
+- [ ] Sound effects expansion (currently sparse)
+- [ ] World loot cleanup (server-side expiry for dropped items)
 
 ---
 
 ## Git Push Command
 
-SSH deploy key is at `/workspace/extra/github-keys/github_deploy`
-
 ```bash
-mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
-GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" git push origin main
+GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" \
+  git push origin main
 ```
-
----
-
-## Key Design Decisions
-
-| Decision | Choice | Reason |
-|----------|--------|--------|
-| Auth | Anonymous nicknames | No friction; no PII |
-| Persistence | localStorage opt-in | Simple; no server DB needed |
-| Chat scope | Zone-local only | Reduces noise; more immersive |
-| Backend | Node.js + Socket.io | ~50-80MB RAM; single process |
-| Port | 3001 internal | nginx is sole public entry point |
-| Rewards | Scaffolded only | Discord bot / contract not ready |
