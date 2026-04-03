@@ -1716,14 +1716,68 @@ function renderBattleScreen(){
   ctxUI.fillStyle='#0C0A06';ctxUI.fillRect(0,pY,W,H-pY);
   ctxUI.fillStyle='#7A5020';ctxUI.fillRect(0,pY,W,2); // gold divider
 
-  // ── Battle log ──
-  ctxUI.fillStyle='#180E04';ctxUI.fillRect(4,pY+4,260,H-pY-8);
-  ctxUI.strokeStyle='#5A3A10';ctxUI.lineWidth=1;ctxUI.strokeRect(4,pY+4,260,H-pY-8);
+  // ── Left column: battle log (top 3 lines) + weapon loadout (below) ──────────
+  const lcX=4,lcW=260,lcH=H-pY-8;
+  ctxUI.fillStyle='#180E04';ctxUI.fillRect(lcX,pY+4,lcW,lcH);
+  ctxUI.strokeStyle='#5A3A10';ctxUI.lineWidth=1;ctxUI.strokeRect(lcX,pY+4,lcW,lcH);
   ctxUI.font='11px monospace';
-  bt.log.slice(-4).forEach((line,i,arr)=>{
+  bt.log.slice(-3).forEach((line,i,arr)=>{
     ctxUI.fillStyle=i===arr.length-1?'#FFD080':'#907050';
-    ctxUI.fillText(line,10,pY+20+i*22,250);
+    ctxUI.fillText(line,lcX+6,pY+18+i*20,lcW-8);
   });
+  // ── Weapon loadout (left column, below log — all cards visible, no overflow) ─
+  {
+    const llWeapons=[
+      ...(G.inventory[0]?[{item:G.inventory[0],idx:0}]:[]),
+      ...G.inventory.slice(2)
+        .map((it,i)=>it?.type==='weapon'?{item:it,idx:i+2}:null)
+        .filter(Boolean),
+    ];
+    if(llWeapons.length>0){
+      const lwX=lcX+1,lwW=lcW-2;
+      ctxUI.fillStyle='#3A2A10';ctxUI.fillRect(lwX,pY+64,lwW,1);
+      ctxUI.fillStyle='#7A6040';ctxUI.font='bold 9px monospace';
+      ctxUI.fillText('LOADOUT',lwX+1,pY+73);
+      if(llWeapons.length>1){
+        ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
+        ctxUI.fillText('[W] cycle',lwX+lwW-58,pY+73);
+      }
+      const wH=18,wGap=2;
+      llWeapons.slice(0,4).forEach(({item,idx},i)=>{
+        const isEquipped=idx===0;
+        const wy=pY+78+i*(wH+wGap);
+        ctxUI.fillStyle=isEquipped?'#2A1A08':'#0E0A04';
+        ctxUI.fillRect(lwX,wy,lwW,wH);
+        ctxUI.strokeStyle=isEquipped?'#FFD080':active?RARITY_COLOR[item.rarity||'common']:'#2A2A2A';
+        ctxUI.lineWidth=1;ctxUI.strokeRect(lwX,wy,lwW,wH);
+        ctxUI.fillStyle='#FFD080';ctxUI.font='9px monospace';
+        ctxUI.fillText(isEquipped?'▶':' ',lwX+2,wy+12);
+        ctxUI.fillStyle=isEquipped?'#FFE090':active?'#AA9966':'#555544';
+        ctxUI.font=(isEquipped?'bold ':'')+'10px monospace';
+        ctxUI.fillText(`${item.icon} ${item.name}`,lwX+11,wy+11,lwW-56);
+        const dtCol={physical:'#999',magic:'#B080FF',holy:'#FFE566'}[item.dmgType||'physical']||'#999';
+        ctxUI.fillStyle=active?dtCol:'#444';ctxUI.font='9px monospace';
+        ctxUI.fillText(`+${itemEffDmg(item)}[${(item.dmgType||'phys').slice(0,4)}]`,lwX+11,wy+19);
+        if(item.durability!=null){
+          const maxD=item.maxDurability||itemMaxDur(item);
+          const pct=item.durability/maxD;
+          const barW=30,barH=4,barX=lwX+lwW-barW-3,barY=wy+3;
+          ctxUI.fillStyle='#111';ctxUI.fillRect(barX,barY,barW,barH);
+          ctxUI.fillStyle=active?(pct>0.6?'#4CAF50':pct>0.25?'#FFD700':'#FF4444'):'#333';
+          ctxUI.fillRect(barX,barY,Math.round(barW*pct),barH);
+          ctxUI.strokeStyle='#2A2A2A';ctxUI.lineWidth=1;ctxUI.strokeRect(barX,barY,barW,barH);
+          ctxUI.fillStyle=active?'#776655':'#333';ctxUI.font='8px monospace';
+          ctxUI.fillText(`${Math.round(pct*100)}%`,barX-2,barY+12);
+        }
+        if(!isEquipped) BATTLE_BTNS[`ws_${idx}`]={x:lwX,y:wy,w:lwW,h:wH};
+      });
+      if(llWeapons.length>1&&active){
+        const hY=pY+78+Math.min(4,llWeapons.length)*(wH+wGap)+1;
+        if(hY<H-8){ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
+          ctxUI.fillText('tap to swap (uses turn)',lwX,hY);}
+      }
+    }
+  }
 
   // ── Action buttons ──
   const cls=G.class_||'warrior';
@@ -1749,71 +1803,7 @@ function renderBattleScreen(){
     ctxUI.fillText(a.label,bx+8,by+18);
   });
 
-  // ── Weapon loadout strip (always visible; one-click switch, costs a turn) ────
-  // Collect equipped weapon + any weapons in bag slots
-  const loadoutWeapons=[
-    ...(G.inventory[0]?[{item:G.inventory[0],idx:0}]:[]),
-    ...G.inventory.slice(2)
-      .map((it,i)=>it?.type==='weapon'?{item:it,idx:i+2}:null)
-      .filter(Boolean),
-  ];
-  if(loadoutWeapons.length>0){
-    const lwY=bStartY+actions.length*(bH+bGap)+2;
-    // Divider + section label
-    ctxUI.fillStyle='#3A2A10';ctxUI.fillRect(bX,lwY,bW,1);
-    ctxUI.fillStyle='#7A6040';ctxUI.font='bold 9px monospace';
-    ctxUI.fillText('LOADOUT',bX+1,lwY+9);
-    if(loadoutWeapons.length>1){
-      ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
-      ctxUI.fillText('[W] cycle',bX+bW-55,lwY+9);
-    }
-    const wH=22,wGap=2;
-    loadoutWeapons.forEach(({item,idx},i)=>{
-      const isEquipped=idx===0;
-      const wy=lwY+12+i*(wH+wGap);
-      // Background
-      ctxUI.fillStyle=isEquipped?'#2A1A08':'#0E0A04';
-      ctxUI.fillRect(bX,wy,bW,wH);
-      // Border
-      ctxUI.strokeStyle=isEquipped?'#FFD080':active?RARITY_COLOR[item.rarity||'common']:'#2A2A2A';
-      ctxUI.lineWidth=1;ctxUI.strokeRect(bX,wy,bW,wH);
-      // Equipped arrow
-      ctxUI.fillStyle='#FFD080';ctxUI.font='9px monospace';
-      ctxUI.fillText(isEquipped?'▶':' ',bX+2,wy+13);
-      // Name
-      ctxUI.fillStyle=isEquipped?'#FFE090':active?'#AA9966':'#555544';
-      ctxUI.font=(isEquipped?'bold ':'')+'10px monospace';
-      ctxUI.fillText(`${item.icon} ${item.name}`,bX+11,wy+12);
-      // Damage + type
-      const dtCol={physical:'#999',magic:'#B080FF',holy:'#FFE566'}[item.dmgType||'physical']||'#999';
-      ctxUI.fillStyle=active?dtCol:'#444';ctxUI.font='9px monospace';
-      const effDmg=itemEffDmg(item);
-      ctxUI.fillText(`+${effDmg} [${(item.dmgType||'phys').slice(0,4)}]`,bX+11,wy+21);
-      // Durability bar (right side)
-      if(item.durability!=null){
-        const maxD=item.maxDurability||itemMaxDur(item);
-        const pct=item.durability/maxD;
-        const barW=28,barH=4,barX=bX+bW-barW-3,barY=wy+4;
-        ctxUI.fillStyle='#111';ctxUI.fillRect(barX,barY,barW,barH);
-        ctxUI.fillStyle=active?(pct>0.6?'#4CAF50':pct>0.25?'#FFD700':'#FF4444'):'#333';
-        ctxUI.fillRect(barX,barY,Math.round(barW*pct),barH);
-        ctxUI.strokeStyle='#2A2A2A';ctxUI.lineWidth=1;ctxUI.strokeRect(barX,barY,barW,barH);
-        // % text
-        ctxUI.fillStyle=active?'#776655':'#333';ctxUI.font='8px monospace';
-        ctxUI.fillText(`${Math.round(pct*100)}%`,barX,barY+13);
-      }
-      // Register click target for non-equipped weapons (only when player's turn)
-      if(!isEquipped){
-        BATTLE_BTNS[`ws_${idx}`]={x:bX,y:wy,w:bW,h:wH};
-      }
-    });
-    // "costs a turn" hint shown only when alternates exist
-    if(loadoutWeapons.length>1&&active){
-      const hY=lwY+12+loadoutWeapons.length*(wH+wGap)+1;
-      ctxUI.fillStyle='#443322';ctxUI.font='8px monospace';
-      ctxUI.fillText('tap alt weapon to swap  (uses turn)',bX,hY);
-    }
-  }
+  // (Weapon loadout strip now rendered in left column above — no overflow)
 
   // ── Potion picker (shown when player has multiple potion types and tapped POTION) ──
   if(bt._potionPick){
@@ -1855,33 +1845,34 @@ function renderBattleScreen(){
     ctxUI.restore();
   }
 
-  // ── Player info panel (bottom-right) ──
-  const piX=460,piY=pY+10;
-  ctxUI.fillStyle='#C0A050';ctxUI.font='bold 12px monospace';
-  ctxUI.fillText(G.nickname,piX,piY+12);
-  // HP bar
-  ctxUI.fillStyle='#1A0000';ctxUI.fillRect(piX,piY+16,155,10);
+  // ── Player info panel (bottom-right) — all content stays within canvas ──────
+  const piX=462,piY=pY+8;
+  ctxUI.fillStyle='#C0A050';ctxUI.font='bold 11px monospace';
+  ctxUI.fillText(G.nickname,piX,piY+11);
+  // HP bar — text embedded inside bar so nothing overflows right edge
+  const piBarW=155;
+  ctxUI.fillStyle='#1A0000';ctxUI.fillRect(piX,piY+15,piBarW,11);
   const pf=Math.max(0,G.hp/G.maxHp);
   ctxUI.fillStyle=pf>0.5?'#20A830':pf>0.25?'#C09000':'#C01020';
-  ctxUI.fillRect(piX,piY+16,Math.floor(155*pf),10);
-  ctxUI.strokeStyle='#604010';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+16,155,10);
-  ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
-  ctxUI.fillText(`HP ${G.hp}/${G.maxHp}`,piX+158,piY+25);
-  // MP bar
-  ctxUI.fillStyle='#001830';ctxUI.fillRect(piX,piY+29,155,8);
+  ctxUI.fillRect(piX,piY+15,Math.floor(piBarW*pf),11);
+  ctxUI.strokeStyle='#604010';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+15,piBarW,11);
+  ctxUI.fillStyle='rgba(255,255,255,0.85)';ctxUI.font='9px monospace';
+  ctxUI.fillText(`♥ ${G.hp}/${G.maxHp}`,piX+3,piY+24);
+  // MP bar — same treatment
+  ctxUI.fillStyle='#001830';ctxUI.fillRect(piX,piY+29,piBarW,9);
   const mf=Math.max(0,G.mp/G.maxMp);
-  ctxUI.fillStyle='#4FC3F7';ctxUI.fillRect(piX,piY+29,Math.floor(155*mf),8);
-  ctxUI.strokeStyle='#1A4060';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+29,155,8);
-  ctxUI.fillStyle='#AAAAAA';ctxUI.font='10px monospace';
-  ctxUI.fillText(`MP ${G.mp}/${G.maxMp}`,piX+158,piY+37);
+  ctxUI.fillStyle='#4FC3F7';ctxUI.fillRect(piX,piY+29,Math.floor(piBarW*mf),9);
+  ctxUI.strokeStyle='#1A4060';ctxUI.lineWidth=1;ctxUI.strokeRect(piX,piY+29,piBarW,9);
+  ctxUI.fillStyle='rgba(200,240,255,0.85)';ctxUI.font='9px monospace';
+  ctxUI.fillText(`◆ ${G.mp}/${G.maxMp}`,piX+3,piY+37);
   // Mini stats
-  ctxUI.fillStyle='#7A5830';
-  ctxUI.fillText(`STR${G.stats.str} AGI${G.stats.agi} LCK${G.stats.lck}`,piX,piY+50);
-  // Turn indicator
+  ctxUI.fillStyle='#7A5830';ctxUI.font='10px monospace';
+  ctxUI.fillText(`STR${G.stats.str} AGI${G.stats.agi} LCK${G.stats.lck}`,piX,piY+52);
+  // Turn indicator (separate line — no overlap)
   if(!bt.result){
     ctxUI.fillStyle=bt.phase==='player_turn'?'#FFD080':'#FF6060';
     ctxUI.font='11px monospace';
-    ctxUI.fillText(bt.phase==='player_turn'?'▶ Your turn':`▶ ${e.name}...`,piX,piY+52);
+    ctxUI.fillText(bt.phase==='player_turn'?'▶ Your turn':`▶ ${e.name}...`,piX,piY+66);
   }
 
   // ── Anim overlay rendering ────────────────────────────────────────────────────
@@ -3473,6 +3464,32 @@ function sellFromBag(slotIdx){
   saveToServer();
 }
 
+function dropFromBag(slotIdx){
+  const item=G.inventory[slotIdx];
+  if(!item){return;}
+  // Apply 30% durability loss on drop (item thrown carelessly)
+  const dropped=Object.assign({},item);
+  if(dropped.durability==null) stampDurability(dropped);
+  const lossAmt=Math.max(1,Math.floor((dropped.maxDurability||itemMaxDur(dropped))*0.30));
+  degradeItem(dropped,lossAmt);
+  if(typeof socket!=='undefined'&&socket?.connected&&G.zone&&G.zone!=='battle'){
+    socket.emit('loot_drop',{
+      zone:G.zone,
+      x:Math.round(G.x/TS),
+      y:Math.round(G.y/TS),
+      items:[dropped],
+      currencies:{spacebucks:0,schmeckles:0,alUSD:0},
+      killerType:'drop',
+    });
+    chatLog(`🗑 Dropped ${item.icon} ${item.name} (30% durability lost on impact).`,'#888');
+  } else {
+    chatLog(`🗑 Discarded ${item.icon} ${item.name}.`,'#888');
+  }
+  G.inventory[slotIdx]=null;
+  if(G.paused)renderInventoryScreen();
+  saveToServer();
+}
+
 function renderInventoryScreen(){
   // ── Equipped gear section ──────────────────────────────────────────────────
   const grid=document.getElementById('inv-grid');
@@ -3521,15 +3538,17 @@ function renderInventoryScreen(){
   while(G.inventory.length<G.maxInvSlots)G.inventory.push(null);
   const bagGrid=document.createElement('div');
   bagGrid.style.cssText='display:flex;flex-wrap:wrap;gap:4px;width:100%;';
+  const selIdx=G._bagMenuIdx??null; // currently selected slot index
   for(let i=2;i<G.maxInvSlots;i++){
     const item=G.inventory[i];
+    const isSelected=selIdx===i;
     const s=document.createElement('div');
-    s.style.cssText=`width:44px;height:54px;background:#0d0d1a;border:${rarBorder(item)};border-radius:4px;
+    s.style.cssText=`width:44px;height:54px;background:${isSelected?'#1A1A2E':'#0d0d1a'};
+      border:${isSelected?'2px solid #FFD700':rarBorder(item)};border-radius:4px;
       display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.7rem;
-      color:#ccc;cursor:${item?'pointer':'default'};position:relative;overflow:hidden;padding:2px;`;
+      color:#ccc;cursor:${item?'pointer':'default'};position:relative;overflow:hidden;padding:2px;
+      box-shadow:${isSelected?'0 0 6px #FFD70066':'none'};`;
     if(item){
-      const isGear=item.type==='weapon'||item.type==='shield'||item.type==='armor';
-      const rarCol=RARITY_COLOR[item.rarity||'common'];
       s.innerHTML=`<div style="font-size:.9rem">${item.icon||'?'}</div>
         <div style="font-size:.5rem;text-align:center;color:#ccc;line-height:1.1">${item.name}</div>
         <div style="font-size:.5rem;color:${item.type==='potion'?'#4CAF50':'#8BC34A'}">${
@@ -3537,27 +3556,53 @@ function renderInventoryScreen(){
           item.type==='armor'||item.type==='shield'?`+${item.def}🛡`:
           item.healFull?'Full HP':`+${item.heal||0}♥`}</div>`;
       s.title=`${item.name}${item.rarity?' ('+RARITY_LABEL[item.rarity||'common']+')':''}`;
-      if(isGear&&!G.battle){
-        s.addEventListener('click',()=>equipFromBag(i));
-        // Right-click / long-press to sell
-        s.addEventListener('contextmenu',e=>{e.preventDefault();sellFromBag(i);});
-      } else if(item.type==='potion'&&!G.battle){
-        s.addEventListener('click',()=>usePotion(i));
-        s.addEventListener('contextmenu',e=>{e.preventDefault();sellFromBag(i);});
-      }
+      s.addEventListener('click',()=>{
+        G._bagMenuIdx=(G._bagMenuIdx===i)?null:i; // toggle selection
+        renderInventoryScreen();
+      });
+      s.addEventListener('contextmenu',e=>{e.preventDefault();sellFromBag(i);});
     } else {
       s.innerHTML='<div style="color:#222;font-size:1rem">·</div>';
+      s.addEventListener('click',()=>{G._bagMenuIdx=null;renderInventoryScreen();});
     }
     bagGrid.appendChild(s);
   }
   grid.appendChild(bagGrid);
+
+  // ── Bag item action sheet (appears when a slot is selected) ───────────────
+  const actionSheetEl=document.createElement('div');
+  actionSheetEl.id='bag-action-sheet';
+  const selItem=selIdx!=null?G.inventory[selIdx]:null;
+  if(selItem&&!G.battle){
+    const isGear=selItem.type==='weapon'||selItem.type==='shield'||selItem.type==='armor';
+    const isPotion=selItem.type==='potion';
+    const sellVal=Math.max(1,Math.floor((selItem.cost||10)*0.40));
+    const canAfford=true;
+    actionSheetEl.style.cssText='display:flex;gap:6px;margin:6px 0 2px;flex-wrap:wrap;align-items:center;';
+    const mkBtn=(label,color,border,fn)=>{
+      const b=document.createElement('button');
+      b.textContent=label;
+      b.style.cssText=`flex:1;min-width:60px;padding:5px 4px;background:${color};color:#fff;border:1px solid ${border};
+        border-radius:4px;font-family:monospace;font-size:.72rem;cursor:pointer;`;
+      b.addEventListener('click',fn);
+      return b;
+    };
+    if(isGear) actionSheetEl.appendChild(mkBtn('⚔ EQUIP','#1A3020','#4CAF50',()=>{G._bagMenuIdx=null;equipFromBag(selIdx);}));
+    if(isPotion) actionSheetEl.appendChild(mkBtn('🧪 USE','#1A2030','#4FC3F7',()=>{G._bagMenuIdx=null;usePotion(selIdx);}));
+    actionSheetEl.appendChild(mkBtn(`💰 SELL ${sellVal}${'sb'}`, '#302010','#C09000',()=>{G._bagMenuIdx=null;sellFromBag(selIdx);}));
+    actionSheetEl.appendChild(mkBtn('🗑 DROP','#2A0808','#C04040',()=>{G._bagMenuIdx=null;dropFromBag(selIdx);}));
+    actionSheetEl.appendChild(mkBtn('✕','#181818','#444',()=>{G._bagMenuIdx=null;renderInventoryScreen();}));
+  } else {
+    actionSheetEl.style.display='none';
+  }
+  grid.appendChild(actionSheetEl);
 
   // Capacity line
   const capEl=document.getElementById('inv-capacity');
   if(capEl){
     const maxPossible=12;
     capEl.innerHTML=`Bag: ${G.maxInvSlots-2} slots (${G.inventory.slice(2).filter(Boolean).length} used)`
-      +` &nbsp;·&nbsp; Click gear to equip · Right-click to sell (40%)`
+      +` &nbsp;·&nbsp; Tap item to select → Equip / Sell / Drop`
       +(G.maxInvSlots<maxPossible?' — <span style="color:#B080FF">upgrade at Expansion Vendor</span>':'');
   }
 
