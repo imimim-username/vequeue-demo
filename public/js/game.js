@@ -1648,6 +1648,7 @@ function drawBattleDarkKnight(ctx,S){
 function renderBattleScreen(){
   if(!G.battle)return;
   const bt=G.battle,e=bt.enemy;
+  const active=bt.phase==='player_turn'&&!bt.result; // hoisted — used by loadout AND action buttons
   ctxUI.clearRect(0,0,W,H);
 
   // ── Battle-field background ──
@@ -1790,7 +1791,6 @@ function renderBattleScreen(){
     {id:'potion', label:'🧪  POTION',  bg:'#183040',hi:'#204060'},
     {id:'flee',   label:`💨  FLEE (${fleeChancePct}%)`,bg:'#183018',hi:'#286028'},
   ];
-  const active=bt.phase==='player_turn'&&!bt.result;
   const bX=274,bW=175,bH=28,bGap=7,bStartY=pY+10;
   actions.forEach((a,i)=>{
     const bx=bX,by=bStartY+i*(bH+bGap);
