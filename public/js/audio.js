@@ -68,11 +68,13 @@ function _getWaves(){
   const ctx = getAudioCtx();
   const pw  = (r,i) => ctx.createPeriodicWave(new Float32Array(r), new Float32Array(r.length), {disableNormalization:false});
 
-  // Lead — strong odd harmonics mimic SPC700 BRR guitar sample
-  const leadR=[0, 1.0, 0.38, 0.78, 0.18, 0.52, 0.12, 0.34, 0.08, 0.22, 0.05, 0.14, 0.03];
+  // Lead — warm mellow synth: strong fundamental, gentle 2nd, fast rolloff
+  // (was harsh/buzzy with 3rd=0.78, 5th=0.52 — now pleasant and round)
+  const leadR=[0, 1.0, 0.28, 0.10, 0.038, 0.012, 0.004];
 
-  // Pad — bowed string character: gradual harmonic roll-off, even presence
-  const padR =[0, 1.0, 0.80, 0.58, 0.38, 0.24, 0.14, 0.08, 0.04, 0.02];
+  // Pad — warm string pad: moderate harmonics, smooth rolloff
+  // (was nearly sawtooth with 2nd=0.80 — now genuinely lush and warm)
+  const padR =[0, 1.0, 0.44, 0.18, 0.07, 0.024, 0.007];
 
   // Arp — bright pluck: clean, fast-decaying bell/harp quality
   const arpR =[0, 1.0, 0.45, 0.16, 0.06, 0.02];
@@ -387,14 +389,15 @@ const MUS_TRACKS={
       [N.C3,2],[N.G3,2],
     ],
     arp:[
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],
-      [N.G4,.5],[N.D5,.5],[N.G5,.5],[N.B5,.5],[N.D5,.5],[N.G4,.5],[N.D5,.5],[N.G5,.5],
-      [N.A4,.5],[N.E5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.E5,.5],[N.A4,.5],[N.C5,.5],
-      [N.F4,.5],[N.C5,.5],[N.F5,.5],[N.A5,.5],[N.C5,.5],[N.A4,.5],[N.F4,.5],[N.C5,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],[N.E5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.A4,.5],[N.F4,.5],[N.C5,.5],[N.A4,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.B4,.5],[N.G4,.5],[N.D5,.5],[N.B4,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N._,4],
+      // Quarter-note arp — sweeping chord tones without machine-gun density
+      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,1],
+      [N.G4,1],[N.D5,1],[N.G5,1],[N.B5,1],
+      [N.A4,1],[N.E5,1],[N.A5,1],[N.C6,1],
+      [N.F4,1],[N.C5,1],[N.F5,1],[N.A5,1],
+      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,1],
+      [N.F4,1],[N.A4,1],[N.C5,1],[N.F5,1],
+      [N.G4,1],[N.B4,1],[N.D5,1],[N.G5,1],
+      [N.C5,2],[N.G5,2],
     ],
     pad:[
       [N.C4,4],[N.G3,4],[N.A3,4],[N.F3,4],
@@ -402,36 +405,46 @@ const MUS_TRACKS={
     ],
   },
 
-  // ── Town Square ── C major, 110 BPM, warm and inviting
-  world:{bpm:110, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
-         bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.06,
-         padWave:'pad', padVol:0.04, perc:'rock',
+  // ── Town Square ── C major, 100 BPM, warm and singable (8-bar loop)
+  world:{bpm:100, melWave:'lead', melVol:0.12, harmWave:'pad', harmVol:0.06,
+         bassWave:'bass', bassVol:0.12, arpWave:'arp', arpVol:0.06,
+         padWave:'pad', padVol:0.06, perc:'rock',
     mel:[
-      // Phrase A: warm, singable — gentle ascent then settle
-      [N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.C5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,1],[N.G5,2],
-      // Phrase B: reaches higher, more emotional
-      [N.E5,.5],[N.G5,.5],[N.B5,1],[N.C6,1],[N.B5,1],
-      [N.A5,.5],[N.G5,.5],[N.E5,1],[N.C5,2],
+      // A phrase (bars 1-4): ascending motif — simple, memorable, singable
+      [N.C5,1],[N.E5,1],[N.G5,1],[N.A5,1],
+      [N.G5,2],[N.E5,1],[N.C5,1],
+      [N.F5,1],[N.G5,1],[N.A5,1],[N.B5,1],
+      [N.C6,2],[N._,2],
+      // B phrase (bars 5-8): development — rises, breathes, resolves
+      [N.B5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.G5,1],
+      [N.F5,2],[N.D5,1],[N.E5,1],
+      [N.G5,.5],[N.A5,.5],[N.G5,.5],[N.F5,.5],[N.E5,1],[N.D5,1],
+      [N.C5,2],[N.G4,2],
     ],
     harm:[
+      // Half-note harmony — chords breathe underneath melody
       [N.E5,2],[N.C5,2],
-      [N.D5,2],[N.E5,2],
-      [N.C5,1],[N.E5,1],[N.G5,2],
-      [N.F5,2],[N.C5,2],
+      [N.C5,2],[N.G4,2],
+      [N.D5,2],[N.F5,2],
+      [N.E5,2],[N.G5,2],
     ],
     bass:[
-      // Breathing bass — mix of 8ths and walking quarters
-      [N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.E3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
-      [N.A2,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,1],
+      // Quarter-note walking bass — one note per beat, much more musical
+      [N.C3,1],[N.G3,1],[N.C3,1],[N.E3,1],
+      [N.G2,1],[N.D3,1],[N.G3,1],[N.E3,1],
+      [N.F2,1],[N.C3,1],[N.F3,1],[N.A3,1],
+      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
+      [N.C3,1],[N.G3,1],[N.E3,1],[N.A3,1],
+      [N.G2,1],[N.D3,1],[N.G3,1],[N.F3,1],
+      [N.A2,1],[N.E3,1],[N.F2,1],[N.C3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.C3,1],
     ],
     arp:[
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],[N.E5,.5],
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],[N.G4,.5],[N.D5,.5],[N.G5,.5],[N.D5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N.A4,.5],[N.E5,.5],[N.A5,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],[N.E5,.5],[N.C5,.5],
+      // Quarter-note arp with rests — harp plucks, not a machine gun
+      [N.C5,1],[N._,1],[N.G5,1],[N._,1],
+      [N.E5,1],[N._,1],[N.A4,1],[N._,1],
+      [N.F4,1],[N._,1],[N.C5,1],[N._,1],
+      [N.G4,1],[N._,1],[N.D5,1],[N._,1],
     ],
     pad:[
       [N.C4,4],[N.A3,4],[N.F3,4],[N.G3,4],
@@ -461,43 +474,53 @@ const MUS_TRACKS={
       [N.E2,.5],[N.B2,.5],[N.E3,.5],[N.B2,.5],[N.E2,.5],[N.B2,.5],[N.A2,.5],[N.E3,.5],
     ],
     arp:[
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],[N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],[N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],
+      // Quarter-note arp — one per beat, rest on beat 4 for breathing room
+      [N.A4,1],[N.C5,1],[N.E5,1],[N._,1],
+      [N.G4,1],[N.B4,1],[N.D5,1],[N._,1],
+      [N.F4,1],[N.A4,1],[N.C5,1],[N._,1],
+      [N.E4,1],[N.Ab4,1],[N.B4,1],[N._,1],
     ],
     pad:[
       [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
     ],
   },
 
-  // ── Tavern ── G major, 148 BPM, lively folk with arp shimmer
-  tavern:{bpm:148, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
-          bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.06,
-          padWave:'pad', padVol:0.04, perc:'half',
+  // ── Tavern ── G major, 138 BPM, singable folk melody (8-bar loop)
+  tavern:{bpm:138, melWave:'lead', melVol:0.12, harmWave:'pad', harmVol:0.06,
+          bassWave:'bass', bassVol:0.12, arpWave:'arp', arpVol:0.06,
+          padWave:'pad', padVol:0.05, perc:'half',
     mel:[
-      [N.D5,.5],[N.G5,.5],[N.B5,.5],[N.D6,.5],[N.G5,1],[N.D5,1],
-      [N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,.5],[N.E5,.5],[N.D5,1],
-      [N.B4,.5],[N.D5,.5],[N.G5,.5],[N.B5,.5],[N.A5,1],[N.G5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.B5,.5],[N.G5,2],
+      // A phrase (bars 1-4): joyful opening — stepping up in G major
+      [N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.D5,1],
+      [N.G5,2],[N.D5,2],
+      [N.E5,.5],[N.Gb5,.5],[N.G5,.5],[N.A5,.5],[N.B5,1],[N.A5,1],
+      [N.G5,2],[N._,2],
+      // B phrase (bars 5-8): reach up then resolve home
+      [N.D6,1],[N.C6,.5],[N.B5,.5],[N.A5,1],[N.G5,1],
+      [N.A5,1],[N.B5,1],[N.A5,1],[N.Gb5,1],
+      [N.G5,.5],[N.A5,.5],[N.B5,.5],[N.G5,.5],[N.D5,1],[N.E5,1],
+      [N.G5,2],[N.D5,2],
     ],
     harm:[
-      [N.B4,1],[N.D5,1],[N.G5,1],[N.B5,1],
-      [N.C5,1],[N.E5,1],[N.D5,1],[N.A4,1],
-      [N.G4,1],[N.B4,1],[N.E5,1],[N.D5,1],
-      [N.D5,2],[N.E5,2],
+      // Half-note harmony — chords breathe underneath
+      [N.B4,2],[N.D5,2],
+      [N.G4,2],[N.C5,2],
+      [N.A4,2],[N.D5,2],
+      [N.G4,2],[N.D5,2],
     ],
     bass:[
-      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.B3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C4,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.A3,.5],
-      [N.D3,.5],[N.A3,.5],[N.D4,.5],[N.Gb3,.5],[N.D3,.5],[N.A3,.5],[N.Gb3,.5],[N.D3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.B3,.5],[N.G2,.5],[N.B3,.5],[N.D3,.5],[N.G3,.5],
+      // Quarter-note walking bass — gives dance energy without bustle
+      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
+      [N.C3,1],[N.G3,1],[N.E3,1],[N.C3,1],
+      [N.D3,1],[N.A3,1],[N.Gb3,1],[N.D3,1],
+      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
     ],
     arp:[
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],[N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],
-      [N.D4,.5],[N.Gb4,.5],[N.A4,.5],[N.D5,.5],[N.D4,.5],[N.Gb4,.5],[N.A4,.5],[N.D5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.D4,.5],[N.Gb4,.5],[N.B4,.5],[N.D5,.5],
+      // Quarter-note plucks with rests — sparkle without clutter
+      [N.G4,1],[N._,1],[N.D5,1],[N.B4,1],
+      [N.C4,1],[N._,1],[N.G4,1],[N.E4,1],
+      [N.D4,1],[N._,1],[N.A4,1],[N.Gb4,1],
+      [N.G4,1],[N._,1],[N.B4,1],[N.D5,1],
     ],
     pad:[
       [N.G3,4],[N.C4,4],[N.D3,4],[N.G3,4],
@@ -521,16 +544,18 @@ const MUS_TRACKS={
       [N.F5,2],[N.A4,2],
     ],
     bass:[
-      [N.D3,.5],[N.A3,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],[N.A3,.5],[N.D4,.5],[N.A3,.5],
-      [N.Bb2,.5],[N.F3,.5],[N.Bb2,.5],[N.D3,.5],[N.Bb2,.5],[N.F3,.5],[N.D3,.5],[N.F3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.Bb3,.5],[N.G2,.5],[N.D3,.5],[N.Bb3,.5],[N.D3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],
+      // Quarter-note walking bass — stately, not rushed (D minor)
+      [N.D3,1],[N.A3,1],[N.D3,1],[N.F3,1],
+      [N.Bb2,1],[N.F3,1],[N.Bb2,1],[N.D3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.Bb3,1],
+      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
     ],
     arp:[
-      [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],[N.A4,.5],[N.F4,.5],[N.D4,.5],[N.F4,.5],
-      [N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],[N.F4,.5],[N.D4,.5],[N.Bb3,.5],[N.D4,.5],
-      [N.G3,.5],[N.Bb3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],[N.Bb3,.5],[N.G3,.5],[N.Bb3,.5],
-      [N.A3,.5],[N.C4,.5],[N.E4,.5],[N.A4,.5],[N.E4,.5],[N.C4,.5],[N.A3,.5],[N.C4,.5],
+      // Half-note arp with rests — sparse and dignified
+      [N.D4,2],[N._,2],
+      [N.Bb3,2],[N._,2],
+      [N.G3,2],[N._,2],
+      [N.A3,2],[N._,2],
     ],
     pad:[
       [N.D4,4],[N.Bb3,4],[N.G3,4],[N.A3,4],
@@ -560,10 +585,11 @@ const MUS_TRACKS={
       [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
     ],
     arp:[
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],[N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],
-      [N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],[N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],
-      [N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],[N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],
+      // Syncopated quarter-note arp — rest on beat 3 for funky marketplace feel
+      [N.F4,1],[N.A4,1],[N._,1],[N.C5,1],
+      [N.C4,1],[N.E4,1],[N._,1],[N.G4,1],
+      [N.Bb3,1],[N.D4,1],[N._,1],[N.F4,1],
+      [N.C4,1],[N.G4,1],[N._,1],[N.E4,1],
     ],
     pad:[
       [N.F3,4],[N.C3,4],[N.Bb3,4],[N.C3,4],
@@ -594,10 +620,11 @@ const MUS_TRACKS={
       [N.C3,1],[N.G2,1],[N.Eb3,1],[N.C3,1],
     ],
     arp:[
-      [N.C4,.5],[N.Eb4,.5],[N.G4,.5],[N.C5,.5],[N.G4,.5],[N.Eb4,.5],[N.C4,.5],[N.Eb4,.5],
-      [N.Ab3,.5],[N.C4,.5],[N.Eb4,.5],[N.Ab4,.5],[N.Eb4,.5],[N.C4,.5],[N.Ab3,.5],[N.C4,.5],
-      [N.Eb3,.5],[N.G3,.5],[N.Bb3,.5],[N.Eb4,.5],[N.Bb3,.5],[N.G3,.5],[N.Eb3,.5],[N.G3,.5],
-      [N.G3,.5],[N.Bb3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],[N.Bb3,.5],[N.G3,.5],[N.Bb3,.5],
+      // Sparse half-note arp — the vault has weight, not chatter
+      [N.C4,2],[N._,2],
+      [N.Ab3,2],[N._,2],
+      [N.Eb3,2],[N._,2],
+      [N.G3,2],[N._,2],
     ],
     pad:[
       [N.C3,4],[N.Ab3,4],[N.Eb3,4],[N.G3,4],
@@ -701,10 +728,11 @@ const MUS_TRACKS={
       [N.E3,.5],[N.B3,.5],[N.E3,.5],[N.G3,.5],[N.B3,.5],[N.E3,.5],[N.B2,.5],[N.E3,.5],
     ],
     arp:[
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],[N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
-      [N.G4,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],[N.G4,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],[N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],
+      // Quarter-note arp — urgent but not machine-gun
+      [N.A4,1],[N.C5,1],[N.E5,1],[N._,1],
+      [N.G4,1],[N.C5,1],[N.E5,1],[N._,1],
+      [N.F4,1],[N.A4,1],[N.C5,1],[N._,1],
+      [N.E4,1],[N.Ab4,1],[N.B4,1],[N._,1],
     ],
     pad:[
       [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
