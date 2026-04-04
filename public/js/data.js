@@ -217,6 +217,44 @@ const ENEMIES = {
     physWeakness:0.6, magicWeakness:1.3, holyWeakness:1.6,
     msg:'A Shadow Mage emerges from the dark, eyes burning with void-fire!',
   },
+  // ── Water enemies (rafting rivers and lakes) ─────────────────────────────────
+  riverSprite: {
+    type:'riverSprite', name:'River Sprite', maxHp:10, atk:4, def:0, spd:7,
+    xp:18, drops:{spacebucks:14},
+    physWeakness:0.7, magicWeakness:1.4, holyWeakness:1.0,
+    msg:'A River Sprite leaps from the current, crackling with water-magic!',
+  },
+  murkCrawler: {
+    type:'murkCrawler', name:'Murk Crawler', maxHp:20, atk:6, def:3, spd:2,
+    xp:26, drops:{spacebucks:20},
+    physWeakness:1.3, magicWeakness:0.8, holyWeakness:1.0,
+    msg:'Something enormous lurches from the murky depths!',
+  },
+  serpentine: {
+    type:'serpentine', name:'River Serpent', maxHp:32, atk:9, def:2, spd:4,
+    xp:50, drops:{schmeckles:6, alUSD:10},
+    physWeakness:1.0, magicWeakness:1.2, holyWeakness:1.0,
+    msg:'A massive river serpent uncoils and rears its head!',
+  },
+  // ── Forest enemies (exploring dense wilderness trees) ────────────────────────
+  treeSpirit: {
+    type:'treeSpirit', name:'Tree Spirit', maxHp:18, atk:5, def:4, spd:2,
+    xp:30, drops:{spacebucks:16},
+    physWeakness:0.8, magicWeakness:1.3, holyWeakness:1.2,
+    msg:'An ancient Tree Spirit stirs, bark splitting into a furious face!',
+  },
+  forestWarden: {
+    type:'forestWarden', name:'Forest Warden', maxHp:28, atk:8, def:5, spd:3,
+    xp:48, drops:{schmeckles:5, spacebucks:20},
+    physWeakness:1.2, magicWeakness:0.9, holyWeakness:1.0,
+    msg:'A Forest Warden drops from the canopy, guardian of these ancient woods!',
+  },
+  thornBeast: {
+    type:'thornBeast', name:'Thorn Beast', maxHp:35, atk:10, def:6, spd:2,
+    xp:70, drops:{schmeckles:9, alUSD:15},
+    physWeakness:1.4, magicWeakness:0.6, holyWeakness:1.1,
+    msg:'A Thorn Beast tears through the underbrush, hide bristling with spines!',
+  },
 };
 
 // ── DUNGEON MAP ───────────────────────────────────────────────────────────────
@@ -450,6 +488,12 @@ const SHOP_CATALOG = {
     {name:'Plate Armor',  icon:'🪖', desc:'Full plate protection. Heavy but mighty. +7.',type:'armor',  def:7, rarity:'rare',      cost:500, lvl:5, currency:'alUSD'},
     {name:'Void Robe',    icon:'🟣', desc:'Woven from void-thread. Resists magic. +5.',  type:'armor',  def:5, rarity:'rare',      cost:0.5, lvl:6, currency:'alETH'},
     {name:'Dragon Scale', icon:'🐉', desc:'Shed scale of an ancient drake. +10 DEF.',    type:'armor',  def:10,rarity:'epic',      cost:1.5, lvl:10,currency:'alETH'},
+  ],
+  // ── Exploration gear ────────────────────────────────────────────────────────
+  exploration:[
+    {name:'River Raft',       icon:'🛶', desc:'Cross rivers and lakes freely. Unlock water exploration — but watch for creatures below!', type:'accessory', rarity:'rare',      cost:280,  lvl:3, currency:'alUSD', effect:'raft'},
+    {name:'Pathfinder Boots', icon:'👢', desc:'Ancient ranger boots. Let you walk through forests and discover what lies beyond the roads.', type:'accessory', rarity:'rare',      cost:350,  lvl:5, currency:'alUSD', effect:'forestPass'},
+    {name:'Explorer\'s Pack', icon:'🎒', desc:'River Raft + Pathfinder Boots in one. The ultimate exploration bundle.', type:'accessory', rarity:'epic', cost:0.5, lvl:7, currency:'alETH', effect:'raftAndForest'},
   ],
 };
 

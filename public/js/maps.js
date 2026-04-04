@@ -259,27 +259,33 @@ const WORLD_MAP=(()=>{
 
   // ── WILDERNESS SUB-ZONE ENTRANCES ─────────────────────────────────────────
   // Crystal Cavern entrance (NW danger zone, row 8 col 70)
-  f(7,68,10,73,T.STONE);          // stone outcropping
-  s(9,69,T.WALL);s(9,70,T.WALL);s(9,71,T.WALL); // cave mouth top
+  // Wide stone clearing so player doesn't get stuck (5 tiles clearance each side)
+  f(5,65,12,76,T.GRASS);           // wide approach clearing
+  f(7,67,10,74,T.STONE);           // stone outcropping (wider)
+  s(9,70,T.WALL);                  // single centre wall tile (was 3-wide, caused stuck)
   s(10,69,T.GRATING);s(10,70,T.GRATING);s(10,71,T.GRATING); // entry tiles
   s(6,70,T.SIGN);                  // sign marker
 
   // Bandit Hideout entrance (SW danger zone, row 120 col 40)
-  f(118,37,122,44,T.STONE);        // ruined stone building
-  s(118,39,T.WALL);s(118,40,T.WALL);s(118,41,T.WALL);
-  s(120,39,T.GRATING);s(120,40,T.GRATING);s(120,41,T.GRATING); // entry
+  // Wide clearing added so player can navigate freely around the building
+  f(115,34,124,47,T.GRASS);        // wide approach clearing
+  f(118,36,122,45,T.STONE);        // ruined stone building (wider)
+  s(118,40,T.WALL);                // single centre wall tile (was 3-wide, caused stuck)
+  s(120,38,T.GRATING);s(120,39,T.GRATING);s(120,40,T.GRATING);s(120,41,T.GRATING);s(120,42,T.GRATING); // wider entry
   s(117,40,T.SIGN);
 
   // Ancient Ruins entrance (NE danger zone, row 8 col 185)
-  f(6,182,11,190,T.STONE);         // ruined outer wall
+  f(4,179,12,193,T.GRASS);         // wide approach clearing
+  f(6,181,11,191,T.STONE);         // ruined outer wall (wider)
   s(6,184,T.COLUMN);s(6,188,T.COLUMN);
   s(9,185,T.GRATING);s(9,186,T.GRATING);s(9,187,T.GRATING); // entry
   s(5,185,T.SIGN);
 
   // Abandoned Village entrance (central south, row 106 col 97)
-  f(104,93,108,101,T.DIRT);        // dusty village approach
+  f(102,90,110,103,T.GRASS);       // wide approach clearing
+  f(104,92,108,102,T.DIRT);        // dusty village approach
   s(104,95,T.SIGN);
-  s(106,95,T.GRATING);s(106,96,T.GRATING);s(106,97,T.GRATING); // entry
+  s(106,94,T.GRATING);s(106,95,T.GRATING);s(106,96,T.GRATING);s(106,97,T.GRATING);s(106,98,T.GRATING); // wider entry
 
   // ══════════════════════════════════════════════════════════════════════════
   // ── BIOMES — distinctive terrain per danger quadrant ─────────────────────
@@ -679,6 +685,14 @@ const NPCS = {
     {type:'wizard',face:1,name:'Expansion Vendor',x:12,y:4,
      dialog:['Need more bag space? I can help — for a price.','Inventory can be expanded up to 12 slots total.'],
      invUpgrade:true},
+    { id:'explorer_merchant', x:5, y:10, type:'merchant', face:0, name:'Cartographer Ryn', shop:'exploration',
+      dialog:[
+        "I've mapped every river and forest in this world. For a price, you can too.",
+        "The River Raft lets you cross any water — rivers, lakes, all of it.",
+        "Pathfinder Boots? Ancient ranger craft. Trees become roads when you wear them.",
+        "Fair warning: the deep forest hides things that don't appreciate visitors.",
+      ]
+    },
   ],
   cavern:[
     { id:'miner_gundra', x:11, y:8, type:'merchant', face:2, name:'Miner Gundra', questId:'cavern_quest',
@@ -796,14 +810,14 @@ const ZONE_DOORS = {
   // Crystal Cavern (NW danger, row 10 cols 69-71)
   world_cavern:    {from:'world', tileRows:[10,11], tileCols:[69,70,71], to:'cavern', sx:11, sy:12},
   cavern_exit:     {from:'cavern', tileRows:[14], tileCols:[10,11], to:'world', sx:70, sy:8},
-  // Bandit Hideout (SW danger, row 120 cols 39-41)
-  world_hideout:   {from:'world', tileRows:[120,121], tileCols:[39,40,41], to:'hideout', sx:11, sy:12},
+  // Bandit Hideout (SW danger, row 120 cols 38-42 — widened entry)
+  world_hideout:   {from:'world', tileRows:[120,121], tileCols:[38,39,40,41,42], to:'hideout', sx:11, sy:12},
   hideout_exit:    {from:'hideout', tileRows:[14], tileCols:[10,11], to:'world', sx:40, sy:118},
   // Ancient Ruins (NE danger, row 9 cols 185-187)
   world_ruins:     {from:'world', tileRows:[9,10], tileCols:[185,186,187], to:'ruins', sx:12, sy:13},
   ruins_exit:      {from:'ruins', tileRows:[15], tileCols:[11,12], to:'world', sx:186, sy:7},
-  // Abandoned Village (central south, row 106 cols 95-97)
-  world_village:   {from:'world', tileRows:[106,107], tileCols:[95,96,97], to:'village', sx:11, sy:12},
+  // Abandoned Village (central south, row 106 cols 94-98 — widened entry)
+  world_village:   {from:'world', tileRows:[106,107], tileCols:[94,95,96,97,98], to:'village', sx:11, sy:12},
   village_exit:    {from:'village', tileRows:[14], tileCols:[10,11], to:'world', sx:96, sy:104},
 };
 

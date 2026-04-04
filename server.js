@@ -485,6 +485,21 @@ io.on('connection',socket=>{
     broadcastTreasury();
   });
 
+  // Quest reward grant — client calls this BEFORE save_character so the anti-cheat
+  // guard sees the new value as the prev value and allows it through.
+  socket.on('quest_reward',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const stored=pdb[socket.accountId].data=pdb[socket.accountId].data||{};
+    // Clamp to reasonable per-quest maximums (max possible with level×8% scaling at lvl50)
+    const dAlUSD=Math.max(0,Math.min(Number(data.alUSD)||0, 3000));
+    const dAlETH=Math.max(0,Math.min(Number(data.alETH)||0, 0.5));
+    const dAlcx =Math.max(0,Math.min(Number(data.alcx )||0, 200));
+    if(dAlUSD>0) stored.alUSD =parseFloat(((stored.alUSD||0)+dAlUSD).toFixed(2));
+    if(dAlETH>0) stored.alETH =parseFloat(((stored.alETH||0)+dAlETH).toFixed(4));
+    if(dAlcx >0) stored.alcx  =parseFloat(((stored.alcx ||0)+dAlcx ).toFixed(4));
+    saveDb();
+  });
+
   socket.on('save_character',data=>{
     if(!socket.accountId)return;
     // Sanity-clamp numeric fields to prevent client-side inflation

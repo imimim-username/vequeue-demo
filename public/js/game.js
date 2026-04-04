@@ -323,10 +323,23 @@ function _applyTouchMove(clientX, clientY){
 })();
 
 // ── COLLISION ─────────────────────────────────────────────────────────────────
+// ── Exploration ability helpers ───────────────────────────────────────────────
+function _playerHasEffect(effect){
+  if(G.accessory?.effect===effect||G.accessory?.effect==='raftAndForest')return true;
+  return G.inventory.some(it=>it&&(it.effect===effect||it.effect==='raftAndForest'));
+}
+function hasRaft(){return _playerHasEffect('raft');}
+function hasForestPass(){return _playerHasEffect('forestPass');}
+
 function isSolid(zone,tx,ty){
   const z=ZONES[zone];if(!z)return true;
   if(tx<0||ty<0||tx>=z.w||ty>=z.h)return true;
   const tile=z.map[ty][tx];
+  // Exploration overrides: raft crosses water, forestPass crosses trees (world only)
+  if(zone==='world'){
+    if(tile===T.WATER&&hasRaft())return false;
+    if(tile===T.TREE&&hasForestPass())return false;
+  }
   return z.solid.has(tile);
 }
 
@@ -402,16 +415,22 @@ function handleQuestDialogClose(npc){
   } else if(qs.status==='ready'){
     // Turn in the quest — rewards scale 8% per level above 1 so quests stay worth doing.
     const qScaleMult=1+(G.level-1)*0.08;
+    const _qReward={alUSD:0,alETH:0,alcx:0};
     if(qdef.reward.alUSD){
       const scaled=parseFloat((qdef.reward.alUSD*qScaleMult).toFixed(2));
       G.alUSD=parseFloat((G.alUSD+scaled).toFixed(2));
+      _qReward.alUSD=scaled;
       chatLog(`Quest reward: +${scaled} alUSD (×${qScaleMult.toFixed(2)} level bonus)`,'#FFD700');
     }
     if(qdef.reward.alETH){
       const scaled=parseFloat((qdef.reward.alETH*qScaleMult).toFixed(4));
       G.alETH=parseFloat((G.alETH+scaled).toFixed(4));
+      _qReward.alETH=scaled;
+      chatLog(`Quest reward: +${scaled} alETH (×${qScaleMult.toFixed(2)} level bonus)`,'#7B68EE');
     }
-    if(qdef.reward.alcx)G.alcx=parseFloat((G.alcx+qdef.reward.alcx).toFixed(4));
+    if(qdef.reward.alcx){const scaled=parseFloat((qdef.reward.alcx*qScaleMult).toFixed(4));G.alcx=parseFloat((G.alcx+scaled).toFixed(4));_qReward.alcx=scaled;}
+    // Notify server of currency grants BEFORE saveToServer() so anti-cheat accepts them
+    socket?.emit('quest_reward',_qReward);
     G.xp+=Math.round(qdef.reward.xp*qScaleMult);
     checkLevelUp();
     // Item reward — place in first free inventory slot (2-7)
@@ -927,13 +946,27 @@ function worldDangerDepth(){
   return dx+dy;
 }
 
+// Outpost safe zones — quest-giver buildings in the wilderness. No encounters near them.
+// Format: {tx, ty, r} — tile centre + Manhattan radius
+const OUTPOST_SAFE_ZONES=[
+  {tx:70,  ty:10,  r:9},  // Crystal Cavern outpost (NW)
+  {tx:40,  ty:120, r:9},  // Bandit Hideout outpost (SW)
+  {tx:186, ty:9,   r:9},  // Ancient Ruins outpost (NE)
+  {tx:96,  ty:106, r:9},  // Abandoned Village outpost (S)
+];
+function isNearOutpost(){
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  return OUTPOST_SAFE_ZONES.some(o=>Math.abs(tx-o.tx)+Math.abs(ty-o.ty)<=o.r);
+}
+
 function checkEncounter(){
   if(G.battle)return;
   if(G.zone!=='world')return;
   if(!G.moving)return;
   if(G.tick%50!==0)return;
   const depth=worldDangerDepth();
-  if(depth<8)return;             // safe zone
+  if(depth<8)return;             // safe zone (inside river ring)
+  if(isNearOutpost())return;     // safe near quest outpost buildings
   let encounterRate=0.22;
   if(G.worldEvent?.type==='dark_storm')encounterRate=0.44;
   if(G.worldEvent?.type==='monster_swarm')encounterRate=0.66;
@@ -975,6 +1008,12 @@ function checkSubZoneEncounter(){
   if(G.tick%55!==0)return;
   const enc=SUBZONE_ENCOUNTERS[G.zone];
   if(!enc)return;
+  // Safe zone near the subzone entrance/spawn (where the quest NPC stands)
+  const z=ZONES[G.zone];
+  if(z){
+    const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+    if(Math.abs(tx-z.spawnX)+Math.abs(ty-z.spawnY)<=6)return; // safe near entrance
+  }
   if(Math.random()>enc.rate)return;
   const key=enc.pool[Math.floor(Math.random()*enc.pool.length)];
   triggerBattle(key,enc.depth);
@@ -990,6 +1029,34 @@ function checkSubZoneBoss(){
     chatLog(`★ The ${ENEMIES[bossInfo.enemy]?.name||'creature'} senses an intruder!`,'#AA00FF');
     triggerBattle(bossInfo.enemy,40);
   }
+}
+
+// Water encounter — triggered when rafting across rivers or lakes
+function checkWaterEncounter(){
+  if(G.battle||G.zone!=='world'||!G.moving)return;
+  if(G.tick%65!==0)return;
+  if(!hasRaft())return;
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  if(WORLD_MAP[ty]?.[tx]!==T.WATER)return;
+  if(Math.random()>0.18)return;
+  const pool=['riverSprite','murkCrawler','riverSprite','serpentine'];
+  triggerBattle(pool[Math.floor(Math.random()*pool.length)],18);
+}
+
+// Forest encounter — triggered when walking through trees with Pathfinder Boots
+function checkForestEncounter(){
+  if(G.battle||G.zone!=='world'||!G.moving)return;
+  if(G.tick%58!==0)return;
+  if(!hasForestPass())return;
+  const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
+  if(WORLD_MAP[ty]?.[tx]!==T.TREE)return;
+  const depth=worldDangerDepth();
+  if(depth<5)return; // safe forest near town ring
+  if(Math.random()>0.20)return;
+  const pool=depth<25
+    ? ['treeSpirit','forestWarden','wolf','treeSpirit']
+    : ['forestWarden','thornBeast','treeSpirit','forestWarden'];
+  triggerBattle(pool[Math.floor(Math.random()*pool.length)],depth);
 }
 
 function triggerBattle(key,depth=0){
@@ -4043,9 +4110,19 @@ function gameLoop(ts){
     checkBossEncounter();
     checkSubZoneEncounter();
     checkSubZoneBoss();
+    checkWaterEncounter();
+    checkForestEncounter();
     updateCamera();
-    // Update music: world zone switches between town/wilderness tracks by position
-    if(G.zone==='world'){const _tx=Math.floor(G.x/TS),_ty=Math.floor(G.y/TS);musPlay((_tx>=TOWN_OX&&_tx<TOWN_OX+MAP_W&&_ty>=TOWN_OY&&_ty<TOWN_OY+MAP_H)?'world':'wilderness');}
+    // Update music: world zone switches between town/wilderness/forest/water tracks by position
+    if(G.zone==='world'){
+      const _tx=Math.floor(G.x/TS),_ty=Math.floor(G.y/TS);
+      const _tile=WORLD_MAP[_ty]?.[_tx];
+      let _track='wilderness';
+      if(_tx>=TOWN_OX&&_tx<TOWN_OX+MAP_W&&_ty>=TOWN_OY&&_ty<TOWN_OY+MAP_H) _track='world';
+      else if(_tile===T.WATER&&hasRaft()) _track='wilderness'; // water uses wilderness (aquatic feel)
+      else if(_tile===T.TREE&&hasForestPass()) _track='forest';
+      musPlay(_track);
+    }
     // scroll tile layer when camera moves
     renderTileLayer();
     // render BG

@@ -527,6 +527,46 @@ const MUS_TRACKS={
     ],
   },
 
+  // ── Forest ── D minor, 72 BPM
+  // Ancient primordial woodland. Slow and mysterious.
+  // Hook: D5 falls a 5th to G4, lingers, rises to Bb4 — shadowy and beautiful.
+  // Dm-C-Bb-C (i-VII-bVI-VII). Flute wave for haunting timbre.
+  forest:{bpm:72, melWave:'flute', melVol:0.10, melChorus:false,
+          harmWave:'pad', harmVol:0.05,
+          bassWave:'bass', bassVol:0.11,
+          arpWave:'arp', arpVol:0.03,
+          padWave:'pad', padVol:0.10, perc:'atmo',
+    mel:[
+      // Hook: D5 falls 5th to G4, ornament up to Bb4 — shadowy interval
+      [N.D5,2],[N.G4,1.5],[N.A4,.5],[N.Bb4,2],[N.A4,2],
+      // Climbing phrase with chromatic Eb5 colour
+      [N.F5,1.5],[N.Eb5,.5],[N.D5,2],[N.C5,1],[N.Bb4,1],[N._,2],
+      // Re-enter mid-range: A4 climbs through Bb4 to C5, peak Eb5
+      [N.A4,1],[N.Bb4,1],[N.C5,1.5],[N.D5,.5],[N.Eb5,2],[N.D5,2],
+      // Closing fall: A4, Bb4 dotted, G4 half, rest
+      [N.A4,2],[N.Bb4,1.5],[N.G4,.5],[N.A4,2],[N._,2],
+    ],
+    harm:[
+      [N.A3,4],   // Dm: 5th
+      [N.G3,4],   // C: 5th
+      [N.F3,4],   // Bb: 5th
+      [N.G3,4],   // C: 5th
+    ],
+    bass:[
+      [N.D2,2],[N.A2,2],[N.C3,2],[N.G2,2],
+      [N.Bb2,2],[N.F3,2],[N.C3,2],[N.G2,2],
+    ],
+    arp:[
+      [N.D5,1],[N._,1],[N.F5,1],[N._,1],
+      [N.E5,1],[N._,1],[N.G5,1],[N._,1],
+      [N.Bb4,1],[N._,1],[N.D5,1],[N._,1],
+      [N.E5,1],[N._,1],[N.C5,1],[N._,1],
+    ],
+    pad:[
+      [N.D3,4],[N.C3,4],[N.Bb2,4],[N.C3,4],
+    ],
+  },
+
   // ── Tavern ── G major, 135 BPM
   // Irresistible jig. Hook: G4 bounces up through the G triad to G5 in one bar —
   // like a fist pump. G-C-D-G (I-IV-V-I). Dotted peak on A5 = exciting!
