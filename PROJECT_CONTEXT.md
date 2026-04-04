@@ -178,7 +178,16 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 
 ---
 
-## Recent Changes (This Session — 2026-04-03)
+## Recent Changes (2026-04-04)
+
+| Change | Details |
+|--------|---------|
+| Battle crash fix | `ReferenceError: active before init` — hoisted `const active` to top of `renderBattleScreen()`; combat was completely broken |
+| Version bumped | `v=20260402m` |
+
+---
+
+## Previous Session Changes (2026-04-03)
 
 | Change | Details |
 |--------|---------|
@@ -190,7 +199,7 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 
 ---
 
-## Previous Session Changes (2026-04-02)
+## 2026-04-02
 
 | Change | Details |
 |--------|---------|
