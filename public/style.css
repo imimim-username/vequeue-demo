@@ -227,6 +227,17 @@ body.fullscreen #btn-fullscreen{color:#fff;border-color:#fff;background:#ffffff2
 .bank-bar{background:#1a1a1a;border-radius:4px;height:7px;margin:6px 0}
 .bank-bar-fill{background:linear-gradient(90deg,#388E3C,#81C784);height:7px;border-radius:4px}
 @keyframes fsToastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* ── Transaction confirmation toast ── */
+#tx-toast{display:none;position:fixed;top:54px;left:50%;transform:translateX(-50%);
+  background:#0e1a0e;border:2px solid #4CAF50;color:#fff;padding:10px 20px;
+  border-radius:10px;font-family:monospace;font-size:.88rem;font-weight:bold;
+  text-align:center;z-index:1200;pointer-events:none;white-space:nowrap;
+  max-width:88vw;box-shadow:0 0 18px rgba(76,175,80,0.4);line-height:1.4}
+#tx-toast.show{display:block;animation:txToastIn .2s ease}
+#tx-toast.tx-sell{border-color:#FDD835;background:#1a1500;box-shadow:0 0 18px rgba(253,216,53,0.35)}
+#tx-toast.tx-drop{border-color:#CF6679;background:#1a0808;box-shadow:0 0 18px rgba(207,102,121,0.3)}
+#tx-toast.tx-use{border-color:#4FC3F7;background:#071520;box-shadow:0 0 18px rgba(79,195,247,0.3)}
+@keyframes txToastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 /* Changelog HUD button */
 #hud-changelog{background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 3px;opacity:.8;position:relative;color:inherit}
 #hud-changelog:hover{opacity:1}

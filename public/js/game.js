@@ -2988,11 +2988,14 @@ function buyItem(vendorId,idx){
     if(slotEmpty){
       equipFromBag(slot);
       chatLog(`Bought & equipped ${item.name}! (${statStr})`,'#4CAF50');
+      showTxToast(`✅ Bought & equipped ${item.icon} ${item.name}  ${statStr}`,'buy');
     } else {
       chatLog(`Bought ${item.name}! (${statStr}) — press P → click item to equip`,'#4CAF50');
+      showTxToast(`✅ Bought ${item.icon} ${item.name}  ${statStr}`,'buy');
     }
   } else {
     chatLog(`Bought ${item.name}!`,'#4CAF50');
+    showTxToast(`✅ Bought ${item.icon} ${item.name}`,'buy');
   }
   renderShop();
 }
@@ -3006,6 +3009,7 @@ function usePotion(slotIdx){
   const gained=G.hp-before;
   G.inventory[slotIdx]=null;
   chatLog(`Used ${item.name}! Restored ${gained} HP.`,'#4CAF50');
+  showTxToast(`${item.icon} Used ${item.name}  +${gained} HP`,'use');
   if(G.paused)renderInventoryScreen();
 }
 
@@ -3399,18 +3403,21 @@ function equipFromBag(slotIdx){
     G.inventory[0]=item;
     G.inventory[slotIdx]=old; // swap old weapon back to bag (unless it's also the starting slot)
     chatLog(`Equipped ${item.name}! (+${item.dmg} DMG [${item.dmgType||'physical'}])`,'#4CAF50');
+    showTxToast(`⚔ Equipped ${item.icon} ${item.name}  +${item.dmg} DMG`,'buy');
     SFX.buy();
   } else if(item.type==='shield'){
     const old=G.inventory[1];
     G.inventory[1]=item;
     G.inventory[slotIdx]=old;
     chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
+    showTxToast(`🛡 Equipped ${item.icon} ${item.name}  +${item.def} DEF`,'buy');
     SFX.buy();
   } else if(item.type==='armor'){
     const old=G.equippedArmor;
     G.equippedArmor=item;
     G.inventory[slotIdx]=old; // old armor goes back to bag slot
     chatLog(`Equipped ${item.name}! (+${item.def} DEF)`,'#4CAF50');
+    showTxToast(`🥋 Equipped ${item.icon} ${item.name}  +${item.def} DEF`,'buy');
     SFX.buy();
   }
   if(G.paused)renderInventoryScreen();
@@ -3459,6 +3466,7 @@ function sellFromBag(slotIdx){
   if(cur==='alETH') G.alETH=parseFloat((G.alETH+sellPrice).toFixed(4));
   else              G.alUSD=parseFloat((G.alUSD+sellPrice).toFixed(2));
   chatLog(`Sold ${item.name} for ${sellPrice} ${cur}.`,'#FDD835');
+  showTxToast(`💰 Sold ${item.icon} ${item.name}  +${sellPrice} ${cur}`,'sell');
   SFX.coin();
   if(G.paused)renderInventoryScreen();
   saveToServer();
@@ -3482,8 +3490,10 @@ function dropFromBag(slotIdx){
       killerType:'drop',
     });
     chatLog(`🗑 Dropped ${item.icon} ${item.name} (30% durability lost on impact).`,'#888');
+    showTxToast(`🗑 Dropped ${item.icon} ${item.name}  (−30% dur)`,'drop');
   } else {
     chatLog(`🗑 Discarded ${item.icon} ${item.name}.`,'#888');
+    showTxToast(`🗑 Discarded ${item.icon} ${item.name}`,'drop');
   }
   G.inventory[slotIdx]=null;
   if(G.paused)renderInventoryScreen();
@@ -3667,6 +3677,23 @@ function renderInventoryScreen(){
 }
 
 // ── CHAT ──────────────────────────────────────────────────────────────────────
+// ── Transaction confirmation toast ───────────────────────────────────────────
+// type: 'buy' (green) | 'sell' (gold) | 'drop' (red) | 'use' (blue)
+let _txToastTimer=null;
+function showTxToast(msg,type='buy'){
+  const el=document.getElementById('tx-toast');
+  if(!el)return;
+  if(_txToastTimer){clearTimeout(_txToastTimer);_txToastTimer=null;}
+  el.className='';         // clear old type classes
+  el.textContent=msg;
+  void el.offsetWidth;     // force reflow so animation restarts
+  el.classList.add('show');
+  if(type==='sell') el.classList.add('tx-sell');
+  else if(type==='drop') el.classList.add('tx-drop');
+  else if(type==='use')  el.classList.add('tx-use');
+  _txToastTimer=setTimeout(()=>{el.classList.remove('show','tx-sell','tx-drop','tx-use');},2200);
+}
+
 function chatLog(msg,color='#ccc'){
   const log=document.getElementById('chat-log');
   const div=document.createElement('div');div.className='msg';
