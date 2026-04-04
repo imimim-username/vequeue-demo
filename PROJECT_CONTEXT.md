@@ -182,8 +182,9 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 
 | Change | Details |
 |--------|---------|
+| Transaction toast | `showTxToast(msg, type)` — color-coded popup (green=buy/equip, gold=sell, red=drop, blue=use) at top-center, 2.2s dismiss, CSS animated slide-in. Wired into `buyItem`, `equipFromBag`, `sellFromBag`, `dropFromBag`, `usePotion` |
 | Battle crash fix | `ReferenceError: active before init` — hoisted `const active` to top of `renderBattleScreen()`; combat was completely broken |
-| Version bumped | `v=20260402m` |
+| Version bumped | `v=20260402n` |
 
 ---
 
