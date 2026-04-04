@@ -23,7 +23,7 @@ ssh -i /workspace/group/.ssh/droplet_deploy -o StrictHostKeyChecking=no root@24.
 
 **Full deploy flow:**
 1. Make changes in `/workspace/extra/gits/vequeue-demo/`
-2. Bump asset version in `public/index.html` (all `v=YYYYMMDDX` occurrences, currently `v=20260402l`)
+2. Bump asset version in `public/index.html` (all `v=YYYYMMDDX` occurrences, currently `v=20260402o`)
 3. `git add … && git commit -m "…"`
 4. `GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" git push origin main`
 5. Run the one-liner above to pull + restart on the droplet
@@ -43,7 +43,7 @@ A browser-based **multiplayer educational RPG** teaching the **veQueue protocol*
 
 ## Current Asset Version
 
-`v=20260402l` — set in `public/index.html` for CSS + all JS files. Bump each deploy.
+`v=20260402o` — set in `public/index.html` for CSS + all JS files. Bump each deploy.
 
 ---
 
@@ -182,9 +182,11 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 
 | Change | Details |
 |--------|---------|
+| Music overhaul | Complete rewrite of all 12 zone tracks inspired by atmospheric MP3 reference. Slower tempos, richer pads on every track, new `glass` (crystal shimmer) and `flute` (breathy) wave types. Per-track melody ADSR (`melAtk`/`melSus`). Dungeon/cavern/ruins/village use flute melody + glass arp. Cavern has 8-beat drone pad. Treasury moved to C minor. Dungeon to E Phrygian. All tempos reduced 10–20% for atmosphere |
 | Transaction toast | `showTxToast(msg, type)` — color-coded popup (green=buy/equip, gold=sell, red=drop, blue=use) at top-center, 2.2s dismiss, CSS animated slide-in. Wired into `buyItem`, `equipFromBag`, `sellFromBag`, `dropFromBag`, `usePotion` |
 | Battle crash fix | `ReferenceError: active before init` — hoisted `const active` to top of `renderBattleScreen()`; combat was completely broken |
-| Version bumped | `v=20260402n` |
+| .gitignore | Added `audio-inspiration/` so MP3 reference files aren't committed |
+| Version bumped | `v=20260402o` |
 
 ---
 

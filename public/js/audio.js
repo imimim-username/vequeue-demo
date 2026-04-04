@@ -89,9 +89,15 @@ function _getWaves(){
   // SFX reedy wave
   const sfxR =[0, 0.55, 0.90, 0.50, 0.28, 0.14, 0.06, 0.02];
 
+  // Glass — crystal wine-glass shimmer: strong 3rd & 5th harmonics, fast rolloff
+  const glassR=[0, 1.0, 0.06, 0.58, 0.02, 0.24, 0.01, 0.10, 0.01, 0.04];
+  // Flute — open-pipe breath: fundamental dominant, strong 2nd, smooth rolloff
+  const fluteR=[0, 1.0, 0.56, 0.08, 0.02, 0.005];
+
   const mk = r => ctx.createPeriodicWave(new Float32Array(r), new Float32Array(r.length), {disableNormalization:false});
   _waves = { lead:mk(leadR), pad:mk(padR), arp:mk(arpR), bass:mk(bassR),
-             mel:mk(melR), brass:mk(brR), sfx:mk(sfxR) };
+             mel:mk(melR), brass:mk(brR), sfx:mk(sfxR),
+             glass:mk(glassR), flute:mk(fluteR) };
   return _waves;
 }
 
@@ -340,123 +346,119 @@ const PERC={
 };
 
 // ── Zone music tracks ─────────────────────────────────────────────────────────
-// mel   : lead melody   [[freq, beats], ...]   beats=quarter notes; 0=rest
-// harm  : harmony voice (optional)
-// bass  : bass line
-// arp   : arpeggio / counter-melody (optional)
-// pad   : chord pad (optional, slow attack)
-// perc  : PERC key (optional)
-// *Wave : 'lead'|'pad'|'arp'|'bass'|'mel'|'brass'
+// mel/harm/bass/arp/pad : [[freq, quarterBeats], ...]   N._=0 for rests
+// *Wave : 'lead'|'pad'|'arp'|'bass'|'mel'|'brass'|'glass'|'flute'
 // *Vol  : peak gain for that voice
+// melAtk/melSus : optional per-track melody ADSR overrides
 const MUS_TRACKS={
 
-  // ── Title / character creation ── heroic C-major fanfare, MMX "Title" energy
-  title:{bpm:112, melWave:'brass', melVol:0.10, harmWave:'pad', harmVol:0.06,
-         bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07, perc:'rock',
+  // ── Title / character creation ── C major, 104 BPM, sweeping heroic fanfare
+  title:{bpm:104, melWave:'brass', melVol:0.10, harmWave:'pad', harmVol:0.07,
+         bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.06,
+         padWave:'pad', padVol:0.05, perc:'rock',
     mel:[
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.B5,1],[N.G5,1],
-      [N.A5,.5],[N.C6,.5],[N.B5,.5],[N.A5,.5],[N.G5,2],
-      [N.E5,.5],[N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,1],[N.E6,1],
-      [N.D6,2],[N.C6,2],
-      [N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,.5],[N.D6,1],[N.B5,1],
-      [N.C6,1],[N.A5,1],[N.G5,1],[N.E5,1],
-      [N.F5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.F5,1],[N.D5,1],
+      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
+      [N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,.5],[N.D6,1],[N.C6,1],
+      [N.E6,.5],[N.D6,.5],[N.C6,1],[N.B5,1],[N.G5,1],
+      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,2],
+      [N.G5,.5],[N.C6,.5],[N.B5,.5],[N.A5,.5],[N.G5,1],[N.E5,1],
+      [N.F5,1],[N.A5,1],[N.G5,1],[N.E5,1],
+      [N.D5,.5],[N.F5,.5],[N.G5,.5],[N.A5,.5],[N.G5,1],[N.F5,1],
       [N.C5,2],[N._,2],
     ],
     harm:[
-      [N.E4,1],[N.G4,1],[N.E5,1],[N.G5,1],
-      [N.F5,2],[N.E5,2],
-      [N.C5,2],[N.G5,2],
-      [N.B4,2],[N.G5,2],
-      [N.E5,2],[N.G5,2],
-      [N.A4,2],[N.E5,2],
-      [N.D5,2],[N.B4,2],
-      [N.C5,2],[N._,2],
+      [N.E5,1],[N.G5,1],[N.E5,1],[N.C5,1],
+      [N.G5,2],[N.F5,2],
+      [N.C6,2],[N.G5,2],
+      [N.D5,2],[N.G5,2],
+      [N.E5,2],[N.C5,2],
+      [N.D5,1],[N.F5,1],[N.E5,1],[N.C5,1],
+      [N.B4,2],[N.D5,2],
+      [N.E5,2],[N._,2],
     ],
     bass:[
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.F2,1],[N.C3,1],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.G2,1],[N.D3,1],
-      [N.C3,2],[N._,2],
+      [N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,.5],[N.G3,.5],
+      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],[N.B3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],
+      [N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
+      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.E3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
+      [N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.A2,.5],[N.E3,.5],[N.C3,.5],[N.E3,.5],
+      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.A3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
+      [N.G2,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],
+      [N.C3,2],[N.G3,2],
     ],
     arp:[
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
-      [N._,4],
+      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],
+      [N.G4,.5],[N.D5,.5],[N.G5,.5],[N.B5,.5],[N.D5,.5],[N.G4,.5],[N.D5,.5],[N.G5,.5],
+      [N.A4,.5],[N.E5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.E5,.5],[N.A4,.5],[N.C5,.5],
+      [N.F4,.5],[N.C5,.5],[N.F5,.5],[N.A5,.5],[N.C5,.5],[N.A4,.5],[N.F4,.5],[N.C5,.5],
+      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],[N.E5,.5],
+      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.A4,.5],[N.F4,.5],[N.C5,.5],[N.A4,.5],
+      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.B4,.5],[N.G4,.5],[N.D5,.5],[N.B4,.5],
+      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N._,4],
+    ],
+    pad:[
+      [N.C4,4],[N.G3,4],[N.A3,4],[N.F3,4],
+      [N.C4,4],[N.G3,4],[N.G3,4],[N.C4,4],
     ],
   },
 
-  // ── Town Square ── C major, 126 BPM — MMX "Highway Stage" upbeat energy
-  world:{bpm:126, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
-         bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07, perc:'rock',
+  // ── Town Square ── C major, 110 BPM, warm and inviting
+  world:{bpm:110, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
+         bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.06,
+         padWave:'pad', padVol:0.04, perc:'rock',
     mel:[
-      // Phrase A (4 bars) — ascending hook
-      [N.G5,.5],[N.E5,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],[N.A5,.5],[N.G5,1],
-      [N.A5,.5],[N.G5,.5],[N.F5,.5],[N.E5,.5],[N.D5,2],
-      [N.E5,.5],[N.G5,.5],[N.B5,.5],[N.D6,.5],[N.C6,1],[N.B5,.5],[N.A5,.5],
-      [N.G5,2],[N.C5,2],
+      // Phrase A: warm, singable — gentle ascent then settle
+      [N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.C5,1],
+      [N.F5,.5],[N.G5,.5],[N.A5,1],[N.G5,2],
+      // Phrase B: reaches higher, more emotional
+      [N.E5,.5],[N.G5,.5],[N.B5,1],[N.C6,1],[N.B5,1],
+      [N.A5,.5],[N.G5,.5],[N.E5,1],[N.C5,2],
     ],
     harm:[
-      [N.E5,1],[N.C5,1],[N.E5,1],[N.F5,1],
-      [N.F5,2],[N.B4,2],
-      [N.C5,1],[N.E5,1],[N.G5,1],[N.F5,1],
-      [N.E5,2],[N.G4,2],
-    ],
-    bass:[
-      // Driving 8th-note bass: I-vi-IV-V in C
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],[N.C3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-    ],
-    arp:[
-      // 8th-note chord arpeggios following I-vi-IV-V
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],[N.E5,.5],
-      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.C5,.5],[N.A4,.5],[N.C5,.5],[N.E5,.5],[N.C5,.5],
-      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.A4,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.A4,.5],
-      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.B4,.5],[N.G4,.5],[N.B4,.5],[N.D5,.5],[N.B4,.5],
-    ],
-  },
-
-  // ── Wilderness ── A minor, 140 BPM — MMX "Storm Eagle" driving intensity
-  wilderness:{bpm:140, melWave:'lead', melVol:0.12, harmWave:'lead', harmVol:0.07,
-               bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.07, perc:'drive',
-    mel:[
-      // Phrase A — tight, fast, minor key aggression
-      [N.A5,.5],[N.C6,.5],[N.B5,.5],[N.A5,.5],[N.G5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],
-      [N.G5,.5],[N.A5,.5],[N.G5,1],[N.E5,1],[N.D5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.Bb5,.5],[N.A5,1],[N.G5,1],
-      [N.E5,.5],[N.G5,.5],[N.Ab5,.5],[N.G5,.5],[N.E5,2],
-    ],
-    harm:[
-      [N.C5,1],[N.E5,1],[N.D5,1],[N.C5,1],
-      [N.B4,1],[N.C5,1],[N.B4,2],
+      [N.E5,2],[N.C5,2],
       [N.D5,2],[N.E5,2],
-      [N.C5,1],[N.B4,1],[N.C5,2],
+      [N.C5,1],[N.E5,1],[N.G5,2],
+      [N.F5,2],[N.C5,2],
     ],
     bass:[
-      // Heavy 8th-note bass in A minor, Phrygian inflection at end
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.E3,.5],[N.A2,.5],[N.E3,.5],[N.G3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.C3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],
-      [N.E2,.5],[N.B2,.5],[N.E3,.5],[N.G2,.5],[N.B2,.5],[N.E2,.5],[N.B2,.5],[N.E3,.5],
+      // Breathing bass — mix of 8ths and walking quarters
+      [N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
+      [N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
+      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.E3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
+      [N.A2,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,1],
+    ],
+    arp:[
+      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],[N.E5,.5],
+      [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],[N.G4,.5],[N.D5,.5],[N.G5,.5],[N.D5,.5],
+      [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],
+      [N.A4,.5],[N.E5,.5],[N.A5,.5],[N.E5,.5],[N.C5,.5],[N.G4,.5],[N.E5,.5],[N.C5,.5],
+    ],
+    pad:[
+      [N.C4,4],[N.A3,4],[N.F3,4],[N.G3,4],
+    ],
+  },
+
+  // ── Wilderness ── A minor, 132 BPM, dark and driving with Phrygian inflection
+  wilderness:{bpm:132, melWave:'lead', melVol:0.12, harmWave:'lead', harmVol:0.06,
+               bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.07,
+               padWave:'pad', padVol:0.05, perc:'drive',
+    mel:[
+      [N.A5,.5],[N.G5,.5],[N.A5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
+      [N.G5,.5],[N.F5,.5],[N.G5,.5],[N.A5,.5],[N.G5,1],[N.E5,1],
+      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.Bb5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.F5,.5],
+      [N.E5,2],[N.A4,2],
+    ],
+    harm:[
+      [N.C5,1],[N.E5,1],[N.D5,2],
+      [N.B4,1],[N.C5,1],[N.B4,2],
+      [N.D5,2],[N.C5,2],
+      [N.C5,2],[N.A4,2],
+    ],
+    bass:[
+      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.E3,.5],[N.A2,.5],[N.E3,.5],[N.C3,.5],
+      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],[N.B2,.5],[N.D3,.5],
+      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.F2,.5],[N.C3,.5],[N.A2,.5],[N.C3,.5],
+      [N.E2,.5],[N.B2,.5],[N.E3,.5],[N.B2,.5],[N.E2,.5],[N.B2,.5],[N.A2,.5],[N.E3,.5],
     ],
     arp:[
       [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],[N.A4,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
@@ -464,34 +466,48 @@ const MUS_TRACKS={
       [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
       [N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],[N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],
     ],
+    pad:[
+      [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
+    ],
   },
 
-  // ── Tavern ── G major, 162 BPM — upbeat, folk-rock, MMX "Armadillo" energy
-  tavern:{bpm:162, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
-          bassWave:'bass', bassVol:0.14, perc:'half',
+  // ── Tavern ── G major, 148 BPM, lively folk with arp shimmer
+  tavern:{bpm:148, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
+          bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.06,
+          padWave:'pad', padVol:0.04, perc:'half',
     mel:[
       [N.D5,.5],[N.G5,.5],[N.B5,.5],[N.D6,.5],[N.G5,1],[N.D5,1],
       [N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,.5],[N.E5,.5],[N.D5,1],
       [N.B4,.5],[N.D5,.5],[N.G5,.5],[N.B5,.5],[N.A5,1],[N.G5,1],
-      [N.G5,2],[N.D5,.5],[N.E5,.5],[N.G5,1],
+      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.B5,.5],[N.G5,2],
     ],
     harm:[
       [N.B4,1],[N.D5,1],[N.G5,1],[N.B5,1],
       [N.C5,1],[N.E5,1],[N.D5,1],[N.A4,1],
       [N.G4,1],[N.B4,1],[N.E5,1],[N.D5,1],
-      [N.E5,2],[N.B4,2],
+      [N.D5,2],[N.E5,2],
     ],
     bass:[
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.D3,.5],[N.A3,.5],[N.D3,.5],[N.Gb3,.5],[N.D3,.5],[N.A3,.5],[N.Gb3,.5],[N.A3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.B3,.5],[N.G2,.5],[N.B3,.5],[N.D3,.5],[N.G3,.5],
+      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.B3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
+      [N.C3,.5],[N.G3,.5],[N.C4,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.A3,.5],
+      [N.D3,.5],[N.A3,.5],[N.D4,.5],[N.Gb3,.5],[N.D3,.5],[N.A3,.5],[N.Gb3,.5],[N.D3,.5],
+      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.B3,.5],[N.G2,.5],[N.B3,.5],[N.D3,.5],[N.G3,.5],
+    ],
+    arp:[
+      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],
+      [N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],[N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],
+      [N.D4,.5],[N.Gb4,.5],[N.A4,.5],[N.D5,.5],[N.D4,.5],[N.Gb4,.5],[N.A4,.5],[N.D5,.5],
+      [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.G5,.5],[N.D4,.5],[N.Gb4,.5],[N.B4,.5],[N.D5,.5],
+    ],
+    pad:[
+      [N.G3,4],[N.C4,4],[N.D3,4],[N.G3,4],
     ],
   },
 
-  // ── Governance Hall ── D minor, 100 BPM — stately, Zero's Theme gravitas
-  governance:{bpm:100, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
-               bassWave:'bass', bassVol:0.13, padWave:'pad', padVol:0.05, perc:'atmo',
+  // ── Governance Hall ── D minor, 88 BPM, stately and authoritative
+  governance:{bpm:88, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
+               bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.05,
+               padWave:'pad', padVol:0.06, perc:'atmo',
     mel:[
       [N.D5,.5],[N.F5,.5],[N.A5,.5],[N.F5,.5],[N.D5,1],[N.E5,1],
       [N.F5,1],[N.E5,.5],[N.D5,.5],[N.C5,1],[N.A4,1],
@@ -499,7 +515,7 @@ const MUS_TRACKS={
       [N.A5,2],[N.D5,2],
     ],
     harm:[
-      [N.A4,2],[N.Bb4,2],
+      [N.A4,2],[N.F4,2],
       [N.D5,2],[N.F4,2],
       [N.G4,2],[N.D5,2],
       [N.F5,2],[N.A4,2],
@@ -510,14 +526,21 @@ const MUS_TRACKS={
       [N.G2,.5],[N.D3,.5],[N.G2,.5],[N.Bb3,.5],[N.G2,.5],[N.D3,.5],[N.Bb3,.5],[N.D3,.5],
       [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],
     ],
+    arp:[
+      [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],[N.A4,.5],[N.F4,.5],[N.D4,.5],[N.F4,.5],
+      [N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],[N.F4,.5],[N.D4,.5],[N.Bb3,.5],[N.D4,.5],
+      [N.G3,.5],[N.Bb3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],[N.Bb3,.5],[N.G3,.5],[N.Bb3,.5],
+      [N.A3,.5],[N.C4,.5],[N.E4,.5],[N.A4,.5],[N.E4,.5],[N.C4,.5],[N.A3,.5],[N.C4,.5],
+    ],
     pad:[
       [N.D4,4],[N.Bb3,4],[N.G3,4],[N.A3,4],
     ],
   },
 
-  // ── Marketplace ── F major, 144 BPM — lively, syncopated, merchant bustle
-  marketplace:{bpm:144, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
-                bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07, perc:'funk',
+  // ── Marketplace ── F major, 132 BPM, bustling merchant energy
+  marketplace:{bpm:132, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
+                bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07,
+                padWave:'pad', padVol:0.04, perc:'funk',
     mel:[
       [N.F5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.F5,1],[N.G5,1],
       [N.A5,.5],[N.Bb5,.5],[N.A5,.5],[N.G5,.5],[N.F5,1],[N.E5,1],
@@ -531,7 +554,7 @@ const MUS_TRACKS={
       [N.E5,2],[N.C5,2],
     ],
     bass:[
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],[N.C3,.5],
+      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.A3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],[N.C3,.5],
       [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
       [N.Bb2,.5],[N.F3,.5],[N.Bb2,.5],[N.D3,.5],[N.Bb2,.5],[N.F3,.5],[N.D3,.5],[N.F3,.5],
       [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
@@ -542,16 +565,20 @@ const MUS_TRACKS={
       [N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],[N.Bb3,.5],[N.D4,.5],[N.F4,.5],[N.Bb4,.5],
       [N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],[N.C4,.5],[N.E4,.5],[N.G4,.5],[N.C5,.5],
     ],
+    pad:[
+      [N.F3,4],[N.C3,4],[N.Bb3,4],[N.C3,4],
+    ],
   },
 
-  // ── Treasury ── Eb major, 95 BPM — weighty, vault authority
-  treasury:{bpm:95, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
-             bassWave:'bass', bassVol:0.14, padWave:'pad', padVol:0.05, perc:'atmo',
+  // ── Treasury ── C minor, 80 BPM, heavy vault authority (darker than Eb major)
+  treasury:{bpm:80, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
+             bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.05,
+             padWave:'pad', padVol:0.07, perc:'atmo',
     mel:[
-      [N.Eb5,.5],[N.G5,.5],[N.Bb5,.5],[N.G5,.5],[N.Eb5,1],[N.F5,1],
-      [N.G5,1],[N.F5,.5],[N.Eb5,.5],[N.D5,1],[N.Bb4,1],
-      [N.C5,.5],[N.Eb5,.5],[N.G5,.5],[N.Ab5,.5],[N.Bb5,1],[N.G5,1],
-      [N.Eb5,2],[N.Bb4,2],
+      [N.C5,.5],[N.Eb5,.5],[N.G5,.5],[N.Eb5,.5],[N.C5,1],[N.D5,1],
+      [N.Eb5,1],[N.D5,.5],[N.C5,.5],[N.Bb4,1],[N.G4,1],
+      [N.Ab4,.5],[N.C5,.5],[N.Eb5,.5],[N.F5,.5],[N.G5,1],[N.Ab5,1],
+      [N.G5,2],[N.C5,2],
     ],
     harm:[
       [N.G4,2],[N.Bb4,2],
@@ -560,71 +587,101 @@ const MUS_TRACKS={
       [N.Bb4,2],[N.G4,2],
     ],
     bass:[
-      [N.Eb3,.5],[N.Bb3,.5],[N.Eb3,.5],[N.G3,.5],[N.Eb3,.5],[N.Bb3,.5],[N.G3,.5],[N.Bb3,.5],
-      [N.Bb2,.5],[N.F3,.5],[N.Bb2,.5],[N.D3,.5],[N.Bb2,.5],[N.F3,.5],[N.D3,.5],[N.F3,.5],
-      [N.Ab2,.5],[N.Eb3,.5],[N.Ab2,.5],[N.C3,.5],[N.Ab2,.5],[N.Eb3,.5],[N.C3,.5],[N.Eb3,.5],
-      [N.Eb3,.5],[N.Bb3,.5],[N.Eb3,.5],[N.G3,.5],[N.Eb3,.5],[N.Bb2,.5],[N.G2,.5],[N.Bb2,.5],
+      // Powerful — mix of sustained and walking
+      [N.C3,1],[N.G3,1],[N.C3,1],[N.Eb3,1],
+      [N.Ab2,1],[N.Eb3,1],[N.Ab2,1],[N.Bb2,1],
+      [N.Eb2,.5],[N.Bb2,.5],[N.Eb3,.5],[N.G3,.5],[N.Eb2,.5],[N.Bb2,.5],[N.G2,.5],[N.Bb2,.5],
+      [N.C3,1],[N.G2,1],[N.Eb3,1],[N.C3,1],
+    ],
+    arp:[
+      [N.C4,.5],[N.Eb4,.5],[N.G4,.5],[N.C5,.5],[N.G4,.5],[N.Eb4,.5],[N.C4,.5],[N.Eb4,.5],
+      [N.Ab3,.5],[N.C4,.5],[N.Eb4,.5],[N.Ab4,.5],[N.Eb4,.5],[N.C4,.5],[N.Ab3,.5],[N.C4,.5],
+      [N.Eb3,.5],[N.G3,.5],[N.Bb3,.5],[N.Eb4,.5],[N.Bb3,.5],[N.G3,.5],[N.Eb3,.5],[N.G3,.5],
+      [N.G3,.5],[N.Bb3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],[N.Bb3,.5],[N.G3,.5],[N.Bb3,.5],
     ],
     pad:[
-      [N.Eb4,4],[N.Bb3,4],[N.Ab3,4],[N.Eb3,4],
+      [N.C3,4],[N.Ab3,4],[N.Eb3,4],[N.G3,4],
     ],
   },
 
-  // ── Ancient Dungeon ── E minor, 82 BPM — dark, Sigma Stage menace
-  dungeon:{bpm:82, melWave:'lead', melVol:0.10, harmWave:'pad', harmVol:0.05,
-            bassWave:'bass', bassVol:0.13, padWave:'pad', padVol:0.05, perc:'atmo',
+  // ── Ancient Dungeon ── E Phrygian, 70 BPM, sparse and ominous
+  // E Phrygian: E-F-G-A-B-C-D. The bII (F) gives a distinctly dark, ancient flavor.
+  dungeon:{bpm:70, melWave:'lead', melVol:0.09, harmWave:'pad', harmVol:0.06,
+            bassWave:'bass', bassVol:0.13, arpWave:'glass', arpVol:0.05,
+            padWave:'pad', padVol:0.08, perc:'atmo',
     mel:[
+      // Very sparse — long rests let the room breathe
       [N.E5,.5],[N.D5,.5],[N.B4,.5],[N.D5,.5],[N.E5,1],[N._,1],
       [N.G5,.5],[N.F5,.5],[N.E5,1],[N.D5,1],[N.B4,1],
-      [N.A4,.5],[N.B4,.5],[N.C5,.5],[N.B4,.5],[N.A4,1],[N.G4,1],
-      [N.E4,2],[N.B3,2],
+      [N.C5,.5],[N.B4,.5],[N.A4,1],[N.G4,1],[N._,1],
+      [N.B4,2],[N.E4,2],
     ],
     harm:[
       [N.B4,2],[N.G4,2],
-      [N.B4,2],[N.G4,2],
-      [N.E4,2],[N.D4,2],
-      [N.E4,2],[N.B3,2],
+      [N.C5,2],[N.G4,2],
+      [N.A4,2],[N.E4,2],
+      [N.G4,2],[N.E4,2],
     ],
     bass:[
-      [N.E3,.5],[N.B3,.5],[N.E3,.5],[N.G3,.5],[N.E3,.5],[N.B3,.5],[N.E3,.5],[N.B2,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G2,.5],[N.C3,.5],[N.G3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.A2,.5],[N.E3,.5],[N.A2,.5],[N.E3,.5],
+      // Pedal E with slow, deliberate movement
+      [N.E3,1],[N.B3,1],[N.E3,1],[N.G3,1],
+      [N.C3,1],[N.G3,1],[N.F3,1],[N.G3,1],
+      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
       [N.E3,2],[N.B2,2],
     ],
+    arp:[
+      // Crystal glass arp — sparse shimmers in the silence
+      [N.E5,2],[N._,2],
+      [N.B5,2],[N._,2],
+      [N.G4,2],[N._,2],
+      [N.D5,2],[N._,2],
+    ],
     pad:[
-      [N.E3,4],[N.C3,4],[N.A2,4],[N.E3,4],
+      // Heavy, slow-attack pad — the dungeon breathes
+      [N.E3,4],[N.C3,4],[N.A2,4],[N.B2,4],
     ],
   },
 
-  // ── Crystal Cavern ── D minor, 72 BPM — mysterious, Sting Chameleon vibe
-  cavern:{bpm:72, melWave:'lead', melVol:0.09, harmWave:'pad', harmVol:0.05,
-           bassWave:'bass', bassVol:0.12, padWave:'pad', padVol:0.06, perc:'none',
+  // ── Crystal Cavern ── D minor, 58 BPM, near-ambient and mysterious
+  // Almost no melody — just a drone, glass drops, and ghost flute notes
+  cavern:{bpm:58, melWave:'flute', melVol:0.08, harmWave:'pad', harmVol:0.06,
+           bassWave:'bass', bassVol:0.11, arpWave:'glass', arpVol:0.07,
+           padWave:'pad', padVol:0.08, perc:'none',
+           melAtk:0.025, melSus:0.82,
     mel:[
-      [N.D5,1],[N.A4,1],[N.Bb4,1],[N.A4,1],
-      [N.G4,.5],[N.A4,.5],[N.Bb4,1],[N.A4,1],[N.G4,1],
-      [N.F4,1],[N.G4,.5],[N.A4,.5],[N.F4,1],[N.D4,1],
-      [N.E4,2],[N.A4,2],
+      // Ghost flute — sparse, floating
+      [N.D5,2],[N._,2],
+      [N.A4,2],[N._,2],
+      [N.Bb4,2],[N._,2],
+      [N.A4,4],
     ],
     harm:[
-      [N.F4,2],[N.D4,2],
-      [N.Eb4,2],[N.F4,2],
-      [N.D4,2],[N.C4,2],
-      [N.C4,2],[N.E4,2],
+      [N.F4,4],[N.D4,4],
+      [N.Eb4,4],[N.F4,4],
     ],
     bass:[
-      [N.D3,1],[N.A3,1],[N.D3,1],[N.F3,1],
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.Bb3,1],
-      [N.F2,1],[N.C3,1],[N.F2,1],[N.A3,1],
+      [N.D3,2],[N.A3,2],
+      [N.G2,2],[N.D3,2],
+      [N.F2,2],[N.C3,2],
       [N.A2,2],[N.E3,2],
     ],
+    arp:[
+      // Crystal drops — occasional glints
+      [N.D5,.5],[N._,1.5],[N.F5,.5],[N._,1.5],
+      [N.A5,.5],[N._,1.5],[N.D5,.5],[N._,1.5],
+      [N.Bb4,.5],[N._,1.5],[N.F5,.5],[N._,1.5],
+      [N.A4,.5],[N._,3.5],
+    ],
     pad:[
-      [N.D3,4],[N.G2,4],[N.F2,4],[N.A2,4],
+      // Long sustained drone — 8-beat notes
+      [N.D3,8],[N.G2,8],
     ],
   },
 
-  // ── Bandit Hideout ── A minor, 112 BPM — tense, Boomer Kuwanger danger
-  hideout:{bpm:112, melWave:'lead', melVol:0.11, harmWave:'lead', harmVol:0.06,
-            bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07, perc:'drive',
+  // ── Bandit Hideout ── A minor, 116 BPM, tense and urgent
+  hideout:{bpm:116, melWave:'lead', melVol:0.12, harmWave:'lead', harmVol:0.06,
+            bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.07,
+            padWave:'pad', padVol:0.05, perc:'drive',
     mel:[
       [N.A5,.5],[N.G5,.5],[N.A5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
       [N.G5,.5],[N.E5,.5],[N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],
@@ -649,11 +706,16 @@ const MUS_TRACKS={
       [N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],[N.F5,.5],
       [N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],[N.E4,.5],[N.Ab4,.5],[N.B4,.5],[N.E5,.5],
     ],
+    pad:[
+      [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
+    ],
   },
 
-  // ── Ancient Ruins ── G minor, 78 BPM — ancient, Specter haunting
-  ruins:{bpm:78, melWave:'lead', melVol:0.09, harmWave:'pad', harmVol:0.05,
-          bassWave:'bass', bassVol:0.12, padWave:'pad', padVol:0.05, perc:'atmo',
+  // ── Ancient Ruins ── G minor, 70 BPM, haunted and modal (Dorian flavor)
+  ruins:{bpm:70, melWave:'flute', melVol:0.09, harmWave:'pad', harmVol:0.05,
+          bassWave:'bass', bassVol:0.12, arpWave:'glass', arpVol:0.05,
+          padWave:'pad', padVol:0.06, perc:'atmo',
+          melAtk:0.020, melSus:0.78,
     mel:[
       [N.G5,1],[N.F5,.5],[N.Eb5,.5],[N.D5,1],[N.G4,1],
       [N.Bb4,.5],[N.C5,.5],[N.D5,1],[N.Eb5,.5],[N.D5,.5],[N.C5,1],
@@ -661,7 +723,7 @@ const MUS_TRACKS={
       [N.C5,2],[N.G4,2],
     ],
     harm:[
-      [N.Bb4,2],[N.D4,2],
+      [N.D5,2],[N.Bb4,2],
       [N.G4,2],[N.Eb4,2],
       [N.Bb4,2],[N.G4,2],
       [N.Eb4,2],[N.D4,2],
@@ -672,14 +734,22 @@ const MUS_TRACKS={
       [N.D3,.5],[N.A3,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],[N.A2,.5],[N.D3,.5],[N.A3,.5],
       [N.Eb3,2],[N.G2,2],
     ],
+    arp:[
+      // Sparse glass shimmer — haunted echoes
+      [N.G4,2],[N._,2],
+      [N.Bb4,2],[N._,2],
+      [N.D5,2],[N._,2],
+      [N.C5,2],[N._,2],
+    ],
     pad:[
       [N.G3,4],[N.C3,4],[N.D3,4],[N.Eb3,4],
     ],
   },
 
-  // ── Abandoned Village ── C minor, 74 BPM — melancholic, lonely, haunted
-  village:{bpm:74, melWave:'lead', melVol:0.09, harmWave:'pad', harmVol:0.06,
-            bassWave:'bass', bassVol:0.11, padWave:'pad', padVol:0.06, perc:'none',
+  // ── Abandoned Village ── C minor, 66 BPM, melancholic and heartbreaking
+  village:{bpm:66, melWave:'flute', melVol:0.09, harmWave:'pad', harmVol:0.06,
+            bassWave:'bass', bassVol:0.11, padWave:'pad', padVol:0.07, perc:'none',
+            melAtk:0.025, melSus:0.82,
     mel:[
       [N.G5,1],[N.Eb5,1],[N.F5,.5],[N.G5,.5],[N.Ab5,1],
       [N.G5,1],[N.F5,1],[N.Eb5,2],
@@ -756,12 +826,14 @@ function _musSched(){
   const bWave=track.bassWave ||'bass'; const bVol=track.bassVol ||0.14;
   const aWave=track.arpWave  ||'arp';  const aVol=track.arpVol  ||0.07;
   const pWave=track.padWave  ||'pad';  const pVol=track.padVol  ||0.05;
+  // Per-track melody ADSR — atmospheric tracks use slower attack/higher sustain
+  const mAtk=track.melAtk||0.010; const mSus=track.melSus||0.72;
 
   // Lead melody — with vibrato on long notes
   while(_musMel.next<now+LA){
     const [f,b]=track.mel[_musMel.idx%track.mel.length];
     const dur=spb*b*0.90;
-    _musNoteV(f,_musMel.next,dur,mWave,mVol, b>=1.5, 0.010, 0.72);
+    _musNoteV(f,_musMel.next,dur,mWave,mVol, b>=1.5, mAtk, mSus);
     _musMel.next+=spb*b; _musMel.idx++;
   }
 
