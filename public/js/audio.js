@@ -349,371 +349,363 @@ const PERC={
 
 // ── Zone music tracks ─────────────────────────────────────────────────────────
 // mel/harm/bass/arp/pad : [[freq, quarterBeats], ...]   N._=0 for rests
-// *Wave : 'lead'|'pad'|'arp'|'bass'|'mel'|'brass'|'glass'|'flute'
-// *Vol  : peak gain for that voice
+// *Wave   : 'lead'|'pad'|'arp'|'bass'|'mel'|'brass'|'glass'|'flute'
+// *Vol    : peak gain for that voice
+// melChorus : false to disable unison chorus (default true — adds richness)
 // melAtk/melSus : optional per-track melody ADSR overrides
 const MUS_TRACKS={
 
-  // ── Title / character creation ── C major, 104 BPM, sweeping heroic fanfare
-  title:{bpm:104, melWave:'brass', melVol:0.10, harmWave:'pad', harmVol:0.07,
-         bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.06,
-         padWave:'pad', padVol:0.05, perc:'rock',
+  // ── Title / character creation ── C major, 100 BPM, heroic fanfare
+  // melChorus:false — brass wave already thick, no need to layer
+  title:{bpm:100, melWave:'brass', melVol:0.11, melChorus:false,
+         harmWave:'pad', harmVol:0.07,
+         bassWave:'bass', bassVol:0.13,
+         padWave:'pad', padVol:0.10, perc:'rock',
     mel:[
-      [N.C5,.5],[N.E5,.5],[N.G5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
-      [N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,.5],[N.D6,1],[N.C6,1],
-      [N.E6,.5],[N.D6,.5],[N.C6,1],[N.B5,1],[N.G5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.B5,.5],[N.C6,2],
-      [N.G5,.5],[N.C6,.5],[N.B5,.5],[N.A5,.5],[N.G5,1],[N.E5,1],
-      [N.F5,1],[N.A5,1],[N.G5,1],[N.E5,1],
-      [N.D5,.5],[N.F5,.5],[N.G5,.5],[N.A5,.5],[N.G5,1],[N.F5,1],
+      // Simple, memorable rising fanfare — stepwise with leaps
+      [N.C5,1],[N.E5,1],[N.G5,2],
+      [N.A5,1],[N.G5,1],[N.E5,2],
+      [N.D5,1],[N.E5,1],[N.G5,1],[N.A5,1],
+      [N.G5,2],[N.E5,2],
+      [N.C6,1],[N.B5,1],[N.A5,1],[N.G5,1],
+      [N.E5,2],[N.G5,1],[N.E5,1],
+      [N.D5,1],[N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,1],
       [N.C5,2],[N._,2],
     ],
     harm:[
-      [N.E5,1],[N.G5,1],[N.E5,1],[N.C5,1],
-      [N.G5,2],[N.F5,2],
-      [N.C6,2],[N.G5,2],
-      [N.D5,2],[N.G5,2],
       [N.E5,2],[N.C5,2],
-      [N.D5,1],[N.F5,1],[N.E5,1],[N.C5,1],
-      [N.B4,2],[N.D5,2],
-      [N.E5,2],[N._,2],
+      [N.C5,2],[N.G4,2],
+      [N.G4,2],[N.C5,2],
+      [N.E5,4],
     ],
     bass:[
-      [N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.C3,.5],[N.G3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],[N.B3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],
-      [N.A2,.5],[N.E3,.5],[N.A3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.E3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
-      [N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],[N.A2,.5],[N.E3,.5],[N.C3,.5],[N.E3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.A3,.5],[N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],
-      [N.G2,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],
       [N.C3,2],[N.G3,2],
-    ],
-    arp:[
-      // Quarter-note arp — sweeping chord tones without machine-gun density
-      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,1],
-      [N.G4,1],[N.D5,1],[N.G5,1],[N.B5,1],
-      [N.A4,1],[N.E5,1],[N.A5,1],[N.C6,1],
-      [N.F4,1],[N.C5,1],[N.F5,1],[N.A5,1],
-      [N.C5,1],[N.E5,1],[N.G5,1],[N.C6,1],
-      [N.F4,1],[N.A4,1],[N.C5,1],[N.F5,1],
-      [N.G4,1],[N.B4,1],[N.D5,1],[N.G5,1],
-      [N.C5,2],[N.G5,2],
-    ],
-    pad:[
-      [N.C4,4],[N.G3,4],[N.A3,4],[N.F3,4],
-      [N.C4,4],[N.G3,4],[N.G3,4],[N.C4,4],
-    ],
-  },
-
-  // ── Town Square ── C major, 100 BPM, warm and singable (8-bar loop)
-  world:{bpm:100, melWave:'lead', melVol:0.12, harmWave:'pad', harmVol:0.06,
-         bassWave:'bass', bassVol:0.12, arpWave:'arp', arpVol:0.06,
-         padWave:'pad', padVol:0.06, perc:'rock',
-    mel:[
-      // A phrase (bars 1-4): ascending motif — simple, memorable, singable
-      [N.C5,1],[N.E5,1],[N.G5,1],[N.A5,1],
-      [N.G5,2],[N.E5,1],[N.C5,1],
-      [N.F5,1],[N.G5,1],[N.A5,1],[N.B5,1],
-      [N.C6,2],[N._,2],
-      // B phrase (bars 5-8): development — rises, breathes, resolves
-      [N.B5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.G5,1],
-      [N.F5,2],[N.D5,1],[N.E5,1],
-      [N.G5,.5],[N.A5,.5],[N.G5,.5],[N.F5,.5],[N.E5,1],[N.D5,1],
-      [N.C5,2],[N.G4,2],
-    ],
-    harm:[
-      // Half-note harmony — chords breathe underneath melody
-      [N.E5,2],[N.C5,2],
-      [N.C5,2],[N.G4,2],
-      [N.D5,2],[N.F5,2],
-      [N.E5,2],[N.G5,2],
-    ],
-    bass:[
-      // Quarter-note walking bass — one note per beat, much more musical
-      [N.C3,1],[N.G3,1],[N.C3,1],[N.E3,1],
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.E3,1],
-      [N.F2,1],[N.C3,1],[N.F3,1],[N.A3,1],
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
-      [N.C3,1],[N.G3,1],[N.E3,1],[N.A3,1],
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.F3,1],
-      [N.A2,1],[N.E3,1],[N.F2,1],[N.C3,1],
-      [N.G2,1],[N.D3,1],[N.G2,1],[N.C3,1],
-    ],
-    arp:[
-      // Quarter-note arp with rests — harp plucks, not a machine gun
-      [N.C5,1],[N._,1],[N.G5,1],[N._,1],
-      [N.E5,1],[N._,1],[N.A4,1],[N._,1],
-      [N.F4,1],[N._,1],[N.C5,1],[N._,1],
-      [N.G4,1],[N._,1],[N.D5,1],[N._,1],
+      [N.A2,2],[N.E3,2],
+      [N.F2,2],[N.C3,2],
+      [N.G2,2],[N.D3,2],
     ],
     pad:[
       [N.C4,4],[N.A3,4],[N.F3,4],[N.G3,4],
     ],
   },
 
-  // ── Wilderness ── A minor, 132 BPM, dark and driving with Phrygian inflection
-  wilderness:{bpm:132, melWave:'lead', melVol:0.12, harmWave:'lead', harmVol:0.06,
-               bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.07,
-               padWave:'pad', padVol:0.05, perc:'drive',
+  // ── Town Square ── F major, 95 BPM, warm and singable
+  // Chorus on: melody sounds like a full warm synth, not a single thin oscillator
+  world:{bpm:95, melWave:'lead', melVol:0.10,
+         harmWave:'pad', harmVol:0.06,
+         bassWave:'bass', bassVol:0.12,
+         padWave:'pad', padVol:0.11, perc:'rock',
     mel:[
-      [N.A5,.5],[N.G5,.5],[N.A5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
-      [N.G5,.5],[N.F5,.5],[N.G5,.5],[N.A5,.5],[N.G5,1],[N.E5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.Bb5,.5],[N.A5,.5],[N.G5,.5],[N.E5,.5],[N.F5,.5],
-      [N.E5,2],[N.A4,2],
-    ],
-    harm:[
-      [N.C5,1],[N.E5,1],[N.D5,2],
-      [N.B4,1],[N.C5,1],[N.B4,2],
-      [N.D5,2],[N.C5,2],
-      [N.C5,2],[N.A4,2],
-    ],
-    bass:[
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.E3,.5],[N.A2,.5],[N.E3,.5],[N.C3,.5],
-      [N.G2,.5],[N.D3,.5],[N.G3,.5],[N.D3,.5],[N.G2,.5],[N.D3,.5],[N.B2,.5],[N.D3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.C3,.5],[N.F2,.5],[N.C3,.5],[N.A2,.5],[N.C3,.5],
-      [N.E2,.5],[N.B2,.5],[N.E3,.5],[N.B2,.5],[N.E2,.5],[N.B2,.5],[N.A2,.5],[N.E3,.5],
-    ],
-    arp:[
-      // Quarter-note arp — one per beat, rest on beat 4 for breathing room
-      [N.A4,1],[N.C5,1],[N.E5,1],[N._,1],
-      [N.G4,1],[N.B4,1],[N.D5,1],[N._,1],
-      [N.F4,1],[N.A4,1],[N.C5,1],[N._,1],
-      [N.E4,1],[N.Ab4,1],[N.B4,1],[N._,1],
-    ],
-    pad:[
-      [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
-    ],
-  },
-
-  // ── Tavern ── G major, 138 BPM, singable folk melody (8-bar loop)
-  tavern:{bpm:138, melWave:'lead', melVol:0.12, harmWave:'pad', harmVol:0.06,
-          bassWave:'bass', bassVol:0.12, arpWave:'arp', arpVol:0.06,
-          padWave:'pad', padVol:0.05, perc:'half',
-    mel:[
-      // A phrase (bars 1-4): joyful opening — stepping up in G major
-      [N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],[N.D5,1],
-      [N.G5,2],[N.D5,2],
-      [N.E5,.5],[N.Gb5,.5],[N.G5,.5],[N.A5,.5],[N.B5,1],[N.A5,1],
-      [N.G5,2],[N._,2],
-      // B phrase (bars 5-8): reach up then resolve home
-      [N.D6,1],[N.C6,.5],[N.B5,.5],[N.A5,1],[N.G5,1],
-      [N.A5,1],[N.B5,1],[N.A5,1],[N.Gb5,1],
-      [N.G5,.5],[N.A5,.5],[N.B5,.5],[N.G5,.5],[N.D5,1],[N.E5,1],
-      [N.G5,2],[N.D5,2],
-    ],
-    harm:[
-      // Half-note harmony — chords breathe underneath
-      [N.B4,2],[N.D5,2],
-      [N.G4,2],[N.C5,2],
-      [N.A4,2],[N.D5,2],
-      [N.G4,2],[N.D5,2],
-    ],
-    bass:[
-      // Quarter-note walking bass — gives dance energy without bustle
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
-      [N.C3,1],[N.G3,1],[N.E3,1],[N.C3,1],
-      [N.D3,1],[N.A3,1],[N.Gb3,1],[N.D3,1],
-      [N.G2,1],[N.D3,1],[N.G3,1],[N.B3,1],
-    ],
-    arp:[
-      // Quarter-note plucks with rests — sparkle without clutter
-      [N.G4,1],[N._,1],[N.D5,1],[N.B4,1],
-      [N.C4,1],[N._,1],[N.G4,1],[N.E4,1],
-      [N.D4,1],[N._,1],[N.A4,1],[N.Gb4,1],
-      [N.G4,1],[N._,1],[N.B4,1],[N.D5,1],
-    ],
-    pad:[
-      [N.G3,4],[N.C4,4],[N.D3,4],[N.G3,4],
-    ],
-  },
-
-  // ── Governance Hall ── D minor, 88 BPM, stately and authoritative
-  governance:{bpm:88, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
-               bassWave:'bass', bassVol:0.13, arpWave:'arp', arpVol:0.05,
-               padWave:'pad', padVol:0.06, perc:'atmo',
-    mel:[
-      [N.D5,.5],[N.F5,.5],[N.A5,.5],[N.F5,.5],[N.D5,1],[N.E5,1],
-      [N.F5,1],[N.E5,.5],[N.D5,.5],[N.C5,1],[N.A4,1],
-      [N.Bb4,.5],[N.D5,.5],[N.F5,.5],[N.G5,.5],[N.A5,1],[N.Bb5,1],
-      [N.A5,2],[N.D5,2],
-    ],
-    harm:[
+      // A phrase: simple, singable, F pentatonic (F G A C D)
+      [N.A4,1],[N.C5,1],[N.A4,.5],[N.G4,.5],[N.F4,1],
+      [N.G4,2],[N.A4,2],
+      [N.C5,1],[N.A4,.5],[N.G4,.5],[N.F4,2],
+      [N.G4,2],[N.F4,1],[N._,1],
+      // B phrase: development — reaches up, comes home
+      [N.C5,1],[N.D5,1],[N.C5,1],[N.A4,1],
+      [N.G4,2],[N.A4,1],[N.C5,1],
+      [N.D5,1],[N.C5,.5],[N.A4,.5],[N.G4,1],[N.F4,1],
       [N.A4,2],[N.F4,2],
-      [N.D5,2],[N.F4,2],
-      [N.G4,2],[N.D5,2],
-      [N.F5,2],[N.A4,2],
-    ],
-    bass:[
-      // Quarter-note walking bass — stately, not rushed (D minor)
-      [N.D3,1],[N.A3,1],[N.D3,1],[N.F3,1],
-      [N.Bb2,1],[N.F3,1],[N.Bb2,1],[N.D3,1],
-      [N.G2,1],[N.D3,1],[N.G2,1],[N.Bb3,1],
-      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
-    ],
-    arp:[
-      // Half-note arp with rests — sparse and dignified
-      [N.D4,2],[N._,2],
-      [N.Bb3,2],[N._,2],
-      [N.G3,2],[N._,2],
-      [N.A3,2],[N._,2],
-    ],
-    pad:[
-      [N.D4,4],[N.Bb3,4],[N.G3,4],[N.A3,4],
-    ],
-  },
-
-  // ── Marketplace ── F major, 132 BPM, bustling merchant energy
-  marketplace:{bpm:132, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.06,
-                bassWave:'bass', bassVol:0.14, arpWave:'arp', arpVol:0.07,
-                padWave:'pad', padVol:0.04, perc:'funk',
-    mel:[
-      [N.F5,.5],[N.A5,.5],[N.C6,.5],[N.A5,.5],[N.F5,1],[N.G5,1],
-      [N.A5,.5],[N.Bb5,.5],[N.A5,.5],[N.G5,.5],[N.F5,1],[N.E5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.C6,.5],[N.Bb5,1],[N.A5,1],
-      [N.G5,2],[N.F5,2],
     ],
     harm:[
-      [N.C5,2],[N.E5,2],
-      [N.F5,2],[N.C5,2],
-      [N.D5,2],[N.F5,2],
-      [N.E5,2],[N.C5,2],
+      [N.F4,2],[N.C4,2],
+      [N.E4,2],[N.C4,2],
+      [N.C4,2],[N.A3,2],
+      [N.G3,2],[N.C4,2],
     ],
     bass:[
-      [N.F2,.5],[N.C3,.5],[N.F3,.5],[N.A3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],[N.C3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],[N.G3,.5],
-      [N.Bb2,.5],[N.F3,.5],[N.Bb2,.5],[N.D3,.5],[N.Bb2,.5],[N.F3,.5],[N.D3,.5],[N.F3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.C3,.5],[N.G3,.5],[N.C4,.5],[N.G3,.5],
-    ],
-    arp:[
-      // Syncopated quarter-note arp — rest on beat 3 for funky marketplace feel
-      [N.F4,1],[N.A4,1],[N._,1],[N.C5,1],
-      [N.C4,1],[N.E4,1],[N._,1],[N.G4,1],
-      [N.Bb3,1],[N.D4,1],[N._,1],[N.F4,1],
-      [N.C4,1],[N.G4,1],[N._,1],[N.E4,1],
+      [N.F2,2],[N.C3,2],
+      [N.G2,2],[N.D3,2],
+      [N.Bb2,2],[N.F3,2],
+      [N.C3,2],[N.G3,2],
     ],
     pad:[
       [N.F3,4],[N.C3,4],[N.Bb3,4],[N.C3,4],
     ],
   },
 
-  // ── Treasury ── C minor, 80 BPM, heavy vault authority (darker than Eb major)
-  treasury:{bpm:80, melWave:'lead', melVol:0.11, harmWave:'pad', harmVol:0.07,
-             bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.05,
-             padWave:'pad', padVol:0.07, perc:'atmo',
+  // ── Wilderness ── A minor, 125 BPM, urgent and dangerous
+  // A minor pentatonic: A C D E G — always sounds good, always sounds tense
+  wilderness:{bpm:125, melWave:'lead', melVol:0.11,
+               harmWave:'lead', harmVol:0.05,
+               bassWave:'bass', bassVol:0.14,
+               arpWave:'arp', arpVol:0.04,
+               padWave:'pad', padVol:0.09, perc:'drive',
     mel:[
-      [N.C5,.5],[N.Eb5,.5],[N.G5,.5],[N.Eb5,.5],[N.C5,1],[N.D5,1],
-      [N.Eb5,1],[N.D5,.5],[N.C5,.5],[N.Bb4,1],[N.G4,1],
-      [N.Ab4,.5],[N.C5,.5],[N.Eb5,.5],[N.F5,.5],[N.G5,1],[N.Ab5,1],
-      [N.G5,2],[N.C5,2],
+      [N.E5,1],[N.D5,.5],[N.C5,.5],[N.A4,1],[N.E4,1],
+      [N.G4,2],[N.A4,2],
+      [N.C5,1],[N.D5,1],[N.E5,1],[N.G5,1],
+      [N.E5,1],[N.D5,1],[N.C5,2],
+      [N.A4,1],[N.C5,1],[N.D5,1],[N.E5,1],
+      [N.G5,2],[N.E5,1],[N.D5,1],
+      [N.A4,.5],[N.C5,.5],[N.D5,.5],[N.E5,.5],[N.G5,1],[N.A5,1],
+      [N.E5,2],[N.A4,2],
     ],
     harm:[
-      [N.G4,2],[N.Bb4,2],
-      [N.Eb5,2],[N.G4,2],
-      [N.Eb4,2],[N.G4,2],
-      [N.Bb4,2],[N.G4,2],
+      [N.A4,2],[N.E4,2],
+      [N.D4,2],[N.A4,2],
+      [N.F4,2],[N.C5,2],
+      [N.E4,2],[N.A4,2],
     ],
     bass:[
-      // Powerful — mix of sustained and walking
-      [N.C3,1],[N.G3,1],[N.C3,1],[N.Eb3,1],
-      [N.Ab2,1],[N.Eb3,1],[N.Ab2,1],[N.Bb2,1],
-      [N.Eb2,.5],[N.Bb2,.5],[N.Eb3,.5],[N.G3,.5],[N.Eb2,.5],[N.Bb2,.5],[N.G2,.5],[N.Bb2,.5],
-      [N.C3,1],[N.G2,1],[N.Eb3,1],[N.C3,1],
+      [N.A2,2],[N.E3,2],
+      [N.G2,2],[N.D3,2],
+      [N.F2,2],[N.C3,2],
+      [N.E2,2],[N.B2,2],
     ],
     arp:[
-      // Sparse half-note arp — the vault has weight, not chatter
-      [N.C4,2],[N._,2],
-      [N.Ab3,2],[N._,2],
-      [N.Eb3,2],[N._,2],
-      [N.G3,2],[N._,2],
+      [N.A4,1],[N._,1],[N.E5,1],[N._,1],
+      [N.G4,1],[N._,1],[N.D5,1],[N._,1],
+      [N.F4,1],[N._,1],[N.C5,1],[N._,1],
+      [N.E4,1],[N._,1],[N.B4,1],[N._,1],
+    ],
+    pad:[
+      [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
+    ],
+  },
+
+  // ── Tavern ── G major, 130 BPM, lively folk song
+  // G pentatonic (G A B D E) — instantly sounds warm and dance-ready
+  tavern:{bpm:130, melWave:'lead', melVol:0.12,
+          harmWave:'pad', harmVol:0.06,
+          bassWave:'bass', bassVol:0.12,
+          padWave:'pad', padVol:0.10, perc:'half',
+    mel:[
+      [N.G4,1],[N.B4,1],[N.D5,1],[N.G5,1],
+      [N.E5,2],[N.D5,1],[N.B4,1],
+      [N.A4,1],[N.B4,1],[N.D5,1],[N.E5,1],
+      [N.D5,2],[N.G4,2],
+      [N.B4,1],[N.D5,1],[N.G5,.5],[N.A5,.5],[N.G5,1],
+      [N.E5,2],[N.B4,2],
+      [N.G4,.5],[N.A4,.5],[N.B4,1],[N.D5,1],[N.E5,1],
+      [N.G5,2],[N._,2],
+    ],
+    harm:[
+      [N.G4,2],[N.B4,2],
+      [N.C4,2],[N.G4,2],
+      [N.D4,2],[N.A4,2],
+      [N.G4,2],[N.D4,2],
+    ],
+    bass:[
+      [N.G2,2],[N.D3,2],
+      [N.C3,2],[N.G3,2],
+      [N.D3,2],[N.A3,2],
+      [N.G2,2],[N.D3,2],
+    ],
+    pad:[
+      [N.G3,4],[N.C4,4],[N.D3,4],[N.G3,4],
+    ],
+  },
+
+  // ── Governance Hall ── D minor, 82 BPM, stately authority
+  // melChorus:false — governance should feel singular and official, not lush
+  governance:{bpm:82, melWave:'lead', melVol:0.11, melChorus:false,
+               harmWave:'pad', harmVol:0.06,
+               bassWave:'bass', bassVol:0.12,
+               padWave:'pad', padVol:0.11, perc:'atmo',
+    mel:[
+      [N.D5,2],[N.A4,2],
+      [N.F5,1],[N.E5,1],[N.D5,2],
+      [N.G5,2],[N.F5,1],[N.E5,1],
+      [N.A5,1],[N.F5,1],[N.E5,1],[N.D5,1],
+      [N.D5,1],[N.F5,1],[N.A5,1],[N.F5,1],
+      [N.E5,2],[N.D5,2],
+      [N.Bb4,1],[N.D5,1],[N.C5,1],[N.A4,1],
+      [N.D5,2],[N._,2],
+    ],
+    harm:[
+      [N.D4,4],
+      [N.Bb3,4],
+      [N.G3,4],
+      [N.A3,4],
+    ],
+    bass:[
+      [N.D3,4],
+      [N.Bb2,4],
+      [N.G2,4],
+      [N.A2,4],
+    ],
+    pad:[
+      [N.D4,4],[N.Bb3,4],[N.G3,4],[N.A3,4],
+    ],
+  },
+
+  // ── Marketplace ── Bb major, 128 BPM, bustling merchant energy
+  // Bb major pentatonic (Bb C D F G) — has a warm commercial energy
+  marketplace:{bpm:128, melWave:'lead', melVol:0.11,
+                harmWave:'pad', harmVol:0.06,
+                bassWave:'bass', bassVol:0.13,
+                arpWave:'arp', arpVol:0.04,
+                padWave:'pad', padVol:0.09, perc:'funk',
+    mel:[
+      [N.F4,1],[N.Bb4,1],[N.C5,1],[N.D5,1],
+      [N.C5,2],[N.Bb4,2],
+      [N.G4,1],[N.Bb4,1],[N.D5,1],[N.F5,1],
+      [N.D5,2],[N.Bb4,1],[N._,1],
+      [N.C5,1],[N.D5,1],[N.F5,1],[N.D5,1],
+      [N.Bb4,2],[N.G4,2],
+      [N.C5,.5],[N.D5,.5],[N.F5,1],[N.D5,1],[N.C5,1],
+      [N.Bb4,2],[N._,2],
+    ],
+    harm:[
+      [N.Bb3,2],[N.F4,2],
+      [N.G3,2],[N.D4,2],
+      [N.Bb3,2],[N.F4,2],
+      [N.C4,2],[N.G3,2],
+    ],
+    bass:[
+      [N.Bb2,2],[N.F3,2],
+      [N.C3,2],[N.G3,2],
+      [N.D3,2],[N.A3,2],
+      [N.F3,2],[N.C3,2],
+    ],
+    arp:[
+      [N.Bb4,1],[N._,1],[N.F4,1],[N._,1],
+      [N.C4,1],[N._,1],[N.G4,1],[N._,1],
+      [N.D4,1],[N._,1],[N.F4,1],[N._,1],
+      [N.Bb3,1],[N._,1],[N.F4,1],[N._,1],
+    ],
+    pad:[
+      [N.Bb3,4],[N.C4,4],[N.D3,4],[N.F3,4],
+    ],
+  },
+
+  // ── Treasury ── C minor, 78 BPM, weighty vault authority
+  // melChorus:false — should feel singular and imposing
+  treasury:{bpm:78, melWave:'lead', melVol:0.11, melChorus:false,
+             harmWave:'pad', harmVol:0.07,
+             bassWave:'bass', bassVol:0.14,
+             padWave:'pad', padVol:0.11, perc:'atmo',
+    mel:[
+      [N.C5,2],[N.G4,2],
+      [N.Eb5,1],[N.D5,1],[N.C5,2],
+      [N.F5,2],[N.Eb5,1],[N.D5,1],
+      [N.G5,1],[N.Eb5,1],[N.D5,1],[N.C5,1],
+      [N.Ab4,2],[N.Eb5,2],
+      [N.G4,1],[N.Bb4,1],[N.C5,1],[N.D5,1],
+      [N.Eb5,2],[N.D5,1],[N.C5,1],
+      [N.G4,2],[N.C4,2],
+    ],
+    harm:[
+      [N.G3,4],
+      [N.Eb3,4],
+      [N.F3,4],
+      [N.C3,4],
+    ],
+    bass:[
+      [N.C3,4],
+      [N.Ab2,4],
+      [N.Eb3,4],
+      [N.G2,4],
     ],
     pad:[
       [N.C3,4],[N.Ab3,4],[N.Eb3,4],[N.G3,4],
     ],
   },
 
-  // ── Ancient Dungeon ── E Phrygian, 70 BPM, sparse and ominous
-  // E Phrygian: E-F-G-A-B-C-D. The bII (F) gives a distinctly dark, ancient flavor.
-  dungeon:{bpm:70, melWave:'lead', melVol:0.09, harmWave:'pad', harmVol:0.06,
-            bassWave:'bass', bassVol:0.13, arpWave:'glass', arpVol:0.05,
+  // ── Ancient Dungeon ── E minor, 65 BPM, ominous and oppressive
+  // E minor pentatonic (E G A B D) — simple, always dark, never dissonant
+  // melChorus:false — solo flute feels more menacing than a lush ensemble
+  dungeon:{bpm:65, melWave:'flute', melVol:0.09, melChorus:false,
+            harmWave:'pad', harmVol:0.05,
+            bassWave:'bass', bassVol:0.12,
+            arpWave:'glass', arpVol:0.05,
             padWave:'pad', padVol:0.08, perc:'atmo',
+            melAtk:0.025, melSus:0.80,
     mel:[
-      // Very sparse — long rests let the room breathe
-      [N.E5,.5],[N.D5,.5],[N.B4,.5],[N.D5,.5],[N.E5,1],[N._,1],
-      [N.G5,.5],[N.F5,.5],[N.E5,1],[N.D5,1],[N.B4,1],
-      [N.C5,.5],[N.B4,.5],[N.A4,1],[N.G4,1],[N._,1],
-      [N.B4,2],[N.E4,2],
+      // Sparse, haunting — long held notes and deliberate rests
+      [N.E5,2],[N.G5,2],
+      [N.D5,2],[N._,2],
+      [N.B4,2],[N.A4,2],
+      [N.E5,4],
+      [N.G5,2],[N.B5,2],
+      [N.A5,2],[N._,2],
+      [N.G5,1],[N.E5,1],[N.D5,2],
+      [N.E5,2],[N._,2],
     ],
     harm:[
-      [N.B4,2],[N.G4,2],
-      [N.C5,2],[N.G4,2],
-      [N.A4,2],[N.E4,2],
-      [N.G4,2],[N.E4,2],
+      [N.E4,4],
+      [N.G3,4],
+      [N.A3,4],
+      [N.B3,4],
     ],
     bass:[
-      // Pedal E with slow, deliberate movement
-      [N.E3,1],[N.B3,1],[N.E3,1],[N.G3,1],
-      [N.C3,1],[N.G3,1],[N.F3,1],[N.G3,1],
-      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
-      [N.E3,2],[N.B2,2],
+      [N.E2,4],
+      [N.C3,4],
+      [N.A2,4],
+      [N.B2,4],
     ],
     arp:[
-      // Crystal glass arp — sparse shimmers in the silence
       [N.E5,2],[N._,2],
-      [N.B5,2],[N._,2],
+      [N.B4,2],[N._,2],
       [N.G4,2],[N._,2],
       [N.D5,2],[N._,2],
     ],
     pad:[
-      // Heavy, slow-attack pad — the dungeon breathes
       [N.E3,4],[N.C3,4],[N.A2,4],[N.B2,4],
     ],
   },
 
-  // ── Crystal Cavern ── D minor, 58 BPM, near-ambient and mysterious
-  // Almost no melody — just a drone, glass drops, and ghost flute notes
-  cavern:{bpm:58, melWave:'flute', melVol:0.08, harmWave:'pad', harmVol:0.06,
-           bassWave:'bass', bassVol:0.11, arpWave:'glass', arpVol:0.07,
+  // ── Crystal Cavern ── D minor, 55 BPM, near-ambient and mysterious
+  // Solo flute ghost notes — sparse and haunting, mostly silence
+  // melChorus:false — the point is the lone voice in the dark
+  cavern:{bpm:55, melWave:'flute', melVol:0.08, melChorus:false,
+           harmWave:'pad', harmVol:0.05,
+           bassWave:'bass', bassVol:0.10,
+           arpWave:'glass', arpVol:0.06,
            padWave:'pad', padVol:0.08, perc:'none',
-           melAtk:0.025, melSus:0.82,
+           melAtk:0.030, melSus:0.83,
     mel:[
-      // Ghost flute — sparse, floating
+      // Ghost flute — sparse, floating, mostly silence
       [N.D5,2],[N._,2],
       [N.A4,2],[N._,2],
-      [N.Bb4,2],[N._,2],
-      [N.A4,4],
+      [N.F5,2],[N._,2],
+      [N.E5,4],
+      [N.D5,2],[N._,2],
+      [N.C5,2],[N._,2],
+      [N.A4,2],[N._,2],
+      [N.D5,4],
     ],
     harm:[
-      [N.F4,4],[N.D4,4],
-      [N.Eb4,4],[N.F4,4],
+      [N.F4,4],
+      [N.D4,4],
+      [N.G3,4],
+      [N.A3,4],
     ],
     bass:[
-      [N.D3,2],[N.A3,2],
-      [N.G2,2],[N.D3,2],
-      [N.F2,2],[N.C3,2],
-      [N.A2,2],[N.E3,2],
+      [N.D3,4],
+      [N.G2,4],
+      [N.F2,4],
+      [N.A2,4],
     ],
     arp:[
-      // Crystal drops — occasional glints
-      [N.D5,.5],[N._,1.5],[N.F5,.5],[N._,1.5],
-      [N.A5,.5],[N._,1.5],[N.D5,.5],[N._,1.5],
-      [N.Bb4,.5],[N._,1.5],[N.F5,.5],[N._,1.5],
-      [N.A4,.5],[N._,3.5],
+      // Crystal drops — very occasional glints
+      [N.D5,.5],[N._,3.5],
+      [N.F5,.5],[N._,3.5],
+      [N.A5,.5],[N._,3.5],
+      [N.D5,.5],[N._,3.5],
     ],
     pad:[
-      // Long sustained drone — 8-beat notes
-      [N.D3,8],[N.G2,8],
+      // Long sustained drone
+      [N.D3,8],[N.A2,8],
     ],
   },
 
-  // ── Bandit Hideout ── A minor, 116 BPM, tense and urgent
-  hideout:{bpm:116, melWave:'lead', melVol:0.12, harmWave:'lead', harmVol:0.06,
-            bassWave:'bass', bassVol:0.15, arpWave:'arp', arpVol:0.07,
-            padWave:'pad', padVol:0.05, perc:'drive',
+  // ── Bandit Hideout ── A minor, 112 BPM, tense and urgent
+  hideout:{bpm:112, melWave:'lead', melVol:0.12,
+            harmWave:'lead', harmVol:0.05,
+            bassWave:'bass', bassVol:0.14,
+            arpWave:'arp', arpVol:0.04,
+            padWave:'pad', padVol:0.09, perc:'drive',
     mel:[
-      [N.A5,.5],[N.G5,.5],[N.A5,.5],[N.C6,.5],[N.B5,1],[N.A5,1],
-      [N.G5,.5],[N.E5,.5],[N.G5,1],[N.A5,.5],[N.G5,.5],[N.E5,1],
-      [N.F5,.5],[N.G5,.5],[N.A5,.5],[N.Bb5,.5],[N.A5,.5],[N.G5,.5],[N.F5,.5],[N.E5,.5],
+      [N.A4,1],[N.E5,1],[N.G5,1],[N.E5,1],
+      [N.D5,2],[N.A4,2],
+      [N.C5,1],[N.E5,1],[N.F5,1],[N.E5,1],
       [N.A5,2],[N.E5,2],
+      [N.G5,1],[N.E5,.5],[N.D5,.5],[N.C5,1],[N.A4,1],
+      [N.E5,2],[N.D5,2],
+      [N.C5,.5],[N.D5,.5],[N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,1],
+      [N.E5,2],[N.A4,2],
     ],
     harm:[
       [N.E5,1],[N.C5,1],[N.D5,2],
@@ -722,33 +714,39 @@ const MUS_TRACKS={
       [N.E5,2],[N.C5,2],
     ],
     bass:[
-      [N.A2,.5],[N.E3,.5],[N.A2,.5],[N.C3,.5],[N.E3,.5],[N.A2,.5],[N.E3,.5],[N.G3,.5],
-      [N.C3,.5],[N.G3,.5],[N.C3,.5],[N.E3,.5],[N.G3,.5],[N.C3,.5],[N.G3,.5],[N.E3,.5],
-      [N.F2,.5],[N.C3,.5],[N.F2,.5],[N.A3,.5],[N.C3,.5],[N.F2,.5],[N.C3,.5],[N.A3,.5],
-      [N.E3,.5],[N.B3,.5],[N.E3,.5],[N.G3,.5],[N.B3,.5],[N.E3,.5],[N.B2,.5],[N.E3,.5],
+      [N.A2,2],[N.E3,2],
+      [N.G2,2],[N.D3,2],
+      [N.F2,2],[N.C3,2],
+      [N.E2,2],[N.B2,2],
     ],
     arp:[
-      // Quarter-note arp — urgent but not machine-gun
-      [N.A4,1],[N.C5,1],[N.E5,1],[N._,1],
-      [N.G4,1],[N.C5,1],[N.E5,1],[N._,1],
-      [N.F4,1],[N.A4,1],[N.C5,1],[N._,1],
-      [N.E4,1],[N.Ab4,1],[N.B4,1],[N._,1],
+      [N.A4,1],[N._,1],[N.E5,1],[N._,1],
+      [N.G4,1],[N._,1],[N.D5,1],[N._,1],
+      [N.F4,1],[N._,1],[N.C5,1],[N._,1],
+      [N.E4,1],[N._,1],[N.B4,1],[N._,1],
     ],
     pad:[
       [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
     ],
   },
 
-  // ── Ancient Ruins ── G minor, 70 BPM, haunted and modal (Dorian flavor)
-  ruins:{bpm:70, melWave:'flute', melVol:0.09, harmWave:'pad', harmVol:0.05,
-          bassWave:'bass', bassVol:0.12, arpWave:'glass', arpVol:0.05,
-          padWave:'pad', padVol:0.06, perc:'atmo',
-          melAtk:0.020, melSus:0.78,
+  // ── Ancient Ruins ── G minor, 68 BPM, haunted Dorian melody (flute)
+  // melChorus:false — flute is already breathy and atmospheric, chorus muddies it
+  ruins:{bpm:68, melWave:'flute', melVol:0.09, melChorus:false,
+          harmWave:'pad', harmVol:0.05,
+          bassWave:'bass', bassVol:0.12,
+          arpWave:'glass', arpVol:0.05,
+          padWave:'pad', padVol:0.07, perc:'atmo',
+          melAtk:0.025, melSus:0.80,
     mel:[
-      [N.G5,1],[N.F5,.5],[N.Eb5,.5],[N.D5,1],[N.G4,1],
-      [N.Bb4,.5],[N.C5,.5],[N.D5,1],[N.Eb5,.5],[N.D5,.5],[N.C5,1],
-      [N.D5,1],[N.Eb5,.5],[N.F5,.5],[N.G5,.5],[N.F5,.5],[N.Eb5,.5],[N.D5,.5],
-      [N.C5,2],[N.G4,2],
+      [N.G4,2],[N.D5,2],
+      [N.Eb5,1],[N.D5,1],[N.C5,2],
+      [N.Bb4,2],[N.G4,2],
+      [N.A4,2],[N._,2],
+      [N.C5,2],[N.D5,2],
+      [N.Eb5,1],[N.F5,1],[N.D5,2],
+      [N.C5,2],[N.Bb4,1],[N.G4,1],
+      [N.D5,2],[N.G4,2],
     ],
     harm:[
       [N.D5,2],[N.Bb4,2],
@@ -757,13 +755,12 @@ const MUS_TRACKS={
       [N.Eb4,2],[N.D4,2],
     ],
     bass:[
-      [N.G2,1],[N.D3,1],[N.G2,1],[N.Bb3,1],
-      [N.C3,1],[N.G3,1],[N.Eb3,1],[N.G3,1],
-      [N.D3,.5],[N.A3,.5],[N.D3,.5],[N.F3,.5],[N.D3,.5],[N.A2,.5],[N.D3,.5],[N.A3,.5],
-      [N.Eb3,2],[N.G2,2],
+      [N.G2,4],
+      [N.Eb3,4],
+      [N.C3,4],
+      [N.D3,4],
     ],
     arp:[
-      // Sparse glass shimmer — haunted echoes
       [N.G4,2],[N._,2],
       [N.Bb4,2],[N._,2],
       [N.D5,2],[N._,2],
@@ -774,15 +771,22 @@ const MUS_TRACKS={
     ],
   },
 
-  // ── Abandoned Village ── C minor, 66 BPM, melancholic and heartbreaking
-  village:{bpm:66, melWave:'flute', melVol:0.09, harmWave:'pad', harmVol:0.06,
-            bassWave:'bass', bassVol:0.11, padWave:'pad', padVol:0.07, perc:'none',
-            melAtk:0.025, melSus:0.82,
+  // ── Abandoned Village ── C minor, 62 BPM, melancholic and tender (flute)
+  // melChorus:false — solo flute is the point; it's supposed to feel lonely
+  village:{bpm:62, melWave:'flute', melVol:0.09, melChorus:false,
+            harmWave:'pad', harmVol:0.06,
+            bassWave:'bass', bassVol:0.11,
+            padWave:'pad', padVol:0.08, perc:'none',
+            melAtk:0.030, melSus:0.83,
     mel:[
-      [N.G5,1],[N.Eb5,1],[N.F5,.5],[N.G5,.5],[N.Ab5,1],
-      [N.G5,1],[N.F5,1],[N.Eb5,2],
-      [N.F5,1],[N.D5,1],[N.Eb5,.5],[N.F5,.5],[N.G5,1],
-      [N.Eb5,2],[N.C5,2],
+      [N.G4,2],[N.Eb5,2],
+      [N.D5,1],[N.Eb5,1],[N.G5,2],
+      [N.F5,2],[N.Eb5,1],[N.D5,1],
+      [N.C5,2],[N._,2],
+      [N.G4,2],[N.Ab4,2],
+      [N.Bb4,1],[N.C5,1],[N.D5,1],[N.Eb5,1],
+      [N.D5,2],[N.Bb4,2],
+      [N.G4,2],[N._,2],
     ],
     harm:[
       [N.Eb5,2],[N.C5,2],
@@ -791,10 +795,10 @@ const MUS_TRACKS={
       [N.G4,2],[N.Ab4,2],
     ],
     bass:[
-      [N.C3,1],[N.G3,1],[N.C3,1],[N.Ab3,1],
-      [N.Eb3,1],[N.Bb3,1],[N.Eb3,2],
-      [N.Bb2,1],[N.F3,1],[N.Bb2,1],[N.D3,1],
-      [N.Ab2,2],[N.Eb3,2],
+      [N.C3,4],
+      [N.G2,4],
+      [N.Ab2,4],
+      [N.Eb3,4],
     ],
     pad:[
       [N.C3,4],[N.Eb3,4],[N.Bb2,4],[N.Ab2,4],
@@ -812,36 +816,44 @@ let _musPad ={idx:0,next:0};
 let _musPerc={idx:0,next:0};
 
 // ── Per-voice note scheduler ──────────────────────────────────────────────────
-// waveKey : one of 'lead','pad','arp','bass','mel','brass'
-// vib     : whether to apply LFO vibrato (only on lead, only long notes)
-// atk/sus : override ADSR per timbre
-function _musNoteV(freq, start, dur, waveKey, vol, vib=false, atk=0.010, sus=0.72){
+// chorus=true: 3 slightly-detuned oscillators — transforms thin digital tone into
+// a rich, full synthesizer sound (like the difference between 1 violin and an ensemble)
+function _musNoteV(freq, start, dur, waveKey, vol, vib=false, atk=0.010, sus=0.72, chorus=false){
   if(!freq||!_musGain) return;
   const w=_getWaves(), ctx=getAudioCtx();
   const wave=w[waveKey]||w.lead;
-  const o=ctx.createOscillator(), g=ctx.createGain();
-  o.setPeriodicWave(wave);
-  o.frequency.value=freq;
   const dec=Math.min(dur*0.20, 0.09);
   const rel=Math.min(dur*0.08, 0.05);
-  g.gain.setValueAtTime(0.0001, start);
-  g.gain.linearRampToValueAtTime(vol,      start+atk);
-  g.gain.exponentialRampToValueAtTime(vol*sus, start+atk+dec);
-  g.gain.setValueAtTime(vol*sus, start+dur-rel);
-  g.gain.exponentialRampToValueAtTime(0.0001, start+dur);
 
-  // LFO vibrato — kicks in after 0.25 s on notes longer than 0.35 s
-  if(vib && dur>0.35){
-    const lfo=ctx.createOscillator(), lfoG=ctx.createGain();
-    lfo.frequency.value=5.5;
-    lfoG.gain.setValueAtTime(0, start);
-    lfoG.gain.linearRampToValueAtTime(freq*0.013, start+Math.min(0.28, dur*0.45));
-    lfo.connect(lfoG); lfoG.connect(o.frequency);
-    lfo.start(start); lfo.stop(start+dur+0.05);
+  function _osc(f, v){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.setPeriodicWave(wave);
+    o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.linearRampToValueAtTime(v,       start+atk);
+    g.gain.exponentialRampToValueAtTime(v*sus, start+atk+dec);
+    g.gain.setValueAtTime(v*sus, start+dur-rel);
+    g.gain.exponentialRampToValueAtTime(0.0001, start+dur);
+    if(vib && dur>0.35){
+      const lfo=ctx.createOscillator(), lfoG=ctx.createGain();
+      lfo.frequency.value=5.5;
+      lfoG.gain.setValueAtTime(0, start);
+      lfoG.gain.linearRampToValueAtTime(f*0.012, start+Math.min(0.28, dur*0.45));
+      lfo.connect(lfoG); lfoG.connect(o.frequency);
+      lfo.start(start); lfo.stop(start+dur+0.05);
+    }
+    o.connect(g); g.connect(_musGain);
+    o.start(start); o.stop(start+dur+0.05);
   }
 
-  o.connect(g); g.connect(_musGain);
-  o.start(start); o.stop(start+dur+0.05);
+  if(chorus){
+    // Centre + ±6 cents detuned copies — creates the lush unison/chorus effect
+    _osc(freq,        vol*0.55);
+    _osc(freq*1.0035, vol*0.28);
+    _osc(freq*0.9965, vol*0.28);
+  } else {
+    _osc(freq, vol);
+  }
 }
 
 // ── Main scheduling loop (runs every 50 ms, look-ahead 220 ms) ───────────────
@@ -857,11 +869,12 @@ function _musSched(){
   // Per-track melody ADSR — atmospheric tracks use slower attack/higher sustain
   const mAtk=track.melAtk||0.010; const mSus=track.melSus||0.72;
 
-  // Lead melody — with vibrato on long notes
+  // Lead melody — chorus on by default (melChorus:false opts out)
+  const mChorus = track.melChorus !== false;
   while(_musMel.next<now+LA){
     const [f,b]=track.mel[_musMel.idx%track.mel.length];
     const dur=spb*b*0.90;
-    _musNoteV(f,_musMel.next,dur,mWave,mVol, b>=1.5, mAtk, mSus);
+    _musNoteV(f,_musMel.next,dur,mWave,mVol, b>=1.5, mAtk, mSus, mChorus);
     _musMel.next+=spb*b; _musMel.idx++;
   }
 
