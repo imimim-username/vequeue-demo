@@ -1020,6 +1020,7 @@ function triggerBattle(key,depth=0){
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
   SFX.battleStart();
+  musPlay('battle');
   runPixelTransition('in',()=>{G.battle.phase='player_turn';});
 }
 
@@ -1053,6 +1054,7 @@ function triggerSnowballBattle(se){
   G.paused=true;
   document.getElementById('cv-ui').style.pointerEvents='auto';
   SFX.battleStart();
+  musPlay('battle');
   runPixelTransition('in',()=>{G.battle.phase='player_turn';});
 }
 
@@ -2122,7 +2124,7 @@ function doBattleAction(action){
     bt.enemy.currentHp=0;
     bt.log.push(`${bt.enemy.name} is defeated!`);
     SFX.enemyDeath();
-    setTimeout(()=>SFX.victory(),500);
+    setTimeout(()=>SFX.victoryFanfare?SFX.victoryFanfare():SFX.victory(),500);
     btAnim('enemy_dissolve',{});
     btAnim('screen_flash',{color:'rgba(255,215,0,0.22)'});
     bt.result='win';
@@ -2256,6 +2258,7 @@ function endBattle(){
     runPixelTransition('out',()=>{
       G.battle=null;G.paused=false;ctxUI.clearRect(0,0,W,H);
       changeZone('world',RESPAWN_TX,RESPAWN_TY);
+      musPlay('world');
       const lostStr=[sbDrop&&`${sbDrop}🪙`,smDrop&&`${smDrop}💀`,auDrop&&`${auDrop}$`].filter(Boolean).join(' ');
       chatLog(`Defeated! Dropped: ${lostStr||'nothing'}. Respawned in town.`,'#FF4040');
     });
@@ -2270,6 +2273,7 @@ function endBattle(){
       } else {
         G.x=sx;G.y=sy;
       }
+      musPlay(G.zone);
     });
   }
 }

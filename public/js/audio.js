@@ -304,6 +304,34 @@ const SFX={
     [523,784,1047,1568].forEach((f,i)=>
       setTimeout(()=>_snesNote(f,w.mel,ctx.currentTime,0.32,0.22,0.01,0.07,0.70,0.06),i*80));
   },
+  // Final Fantasy-style victory fanfare: ta-ta-ta-TAAAA ta-ta-ta-DAAAA!
+  // Classic ascending pattern: 3 quick stabs, step up, 3 quick stabs, triumphant hold
+  victoryFanfare(){
+    const w=_getWaves(), ctx=getAudioCtx(), t0=ctx.currentTime+0.05;
+    const br=w.brass, bs=w.bass, pd=w.pad;
+    // Melody: A4 A4 A4 B4 — C5 D5 E5 — A5 (long)
+    const phrase=[
+      {f:N.A4,  d:0.13, t:0.00},
+      {f:N.A4,  d:0.13, t:0.15},
+      {f:N.A4,  d:0.13, t:0.30},
+      {f:N.B4,  d:0.22, t:0.46},
+      {f:N.C5,  d:0.13, t:0.72},
+      {f:N.D5,  d:0.13, t:0.87},
+      {f:N.E5,  d:0.13, t:1.02},
+      {f:N.A5,  d:0.90, t:1.18},
+    ];
+    phrase.forEach(({f,d,t})=>{
+      _snesNote(f, br, t0+t, d, 0.22, 0.008, d*0.18, 0.75, Math.min(d*0.10,0.04));
+    });
+    // Bass harmony: A3-E4 on the three stabs, then A3+E4 chord on big note
+    [0.00,0.15,0.30].forEach(t=>{
+      _snesNote(N.A3, bs, t0+t, 0.13, 0.20, 0.006, 0.06, 0.68, 0.03);
+    });
+    // Chord swell on the final A5
+    _snesNote(N.A3, bs, t0+1.18, 0.90, 0.22, 0.010, 0.10, 0.72, 0.06);
+    _snesNote(N.E4, pd, t0+1.18, 0.90, 0.14, 0.020, 0.12, 0.80, 0.08);
+    _snesNote(N.A4, pd, t0+1.18, 0.90, 0.10, 0.020, 0.12, 0.80, 0.08);
+  },
 };
 
 // ── Note frequency table (all semitones, 3 usable octaves) ───────────────────
@@ -343,11 +371,23 @@ const PERC={
     {k:.60},{},{s:.45},{},
     {k:.40},{},{s:.42},{},
   ],
+  // Intense battle: thick kick+snare, 8th-note hats throughout, double kick on beat 3+
+  battle:[
+    {k:.92,h:.60},{h:.42},{s:.80,h:.52},{h:.42},
+    {k:.72,h:.58},{k:.62,h:.42},{s:.80,h:.52},{h:.42},
+  ],
   // No drums (cavern, village ambience)
   none:[],
 };
 
 // ── Zone music tracks ─────────────────────────────────────────────────────────
+// Composed using SNES SPC700 principles:
+//  • 8-bar loops (32 quarter beats), singable hook in first 2 bars
+//  • Chord progressions: I-vi-IV-V (major), i-VII-VI-VII (minor)
+//  • Bass: quarter-note walking root↔fifth for drive; half/whole for atmosphere
+//  • Arp: quarter-note with rests — sparkle without clutter
+//  • Pad: whole-note sustains — harmonic bed
+//  • All melodies in A4–E5 range (warm "vocal" register, never shrill)
 // mel/harm/bass/arp/pad : [[freq, quarterBeats], ...]   N._=0 for rests
 // *Wave   : 'lead'|'pad'|'arp'|'bass'|'mel'|'brass'|'glass'|'flute'
 // *Vol    : peak gain for that voice
@@ -355,136 +395,165 @@ const PERC={
 // melAtk/melSus : optional per-track melody ADSR overrides
 const MUS_TRACKS={
 
-  // ── Title / character creation ── C major, 100 BPM, heroic fanfare
-  // melChorus:false — brass wave already thick, no need to layer
-  title:{bpm:100, melWave:'brass', melVol:0.11, melChorus:false,
+  // ── Title / Character Creation ── C major, 100 BPM
+  // Heroic brass fanfare. Hook: C5 leap up to G5, then fanfare descent.
+  // I-IV-V-I with suspended 4th approach. melChorus:false (brass is already thick).
+  title:{bpm:100, melWave:'brass', melVol:0.12, melChorus:false,
          harmWave:'pad', harmVol:0.07,
          bassWave:'bass', bassVol:0.13,
-         padWave:'pad', padVol:0.10, perc:'rock',
+         padWave:'pad', padVol:0.09, perc:'rock',
     mel:[
-      // Simple, memorable rising fanfare — stepwise with leaps
-      [N.C5,1],[N.E5,1],[N.G5,2],
-      [N.A5,1],[N.G5,1],[N.E5,2],
-      [N.D5,1],[N.E5,1],[N.G5,1],[N.A5,1],
+      // Hook (2 bars): C leap to G, then sweeping descent
+      [N.C5,1],[N.G5,2],[N.E5,1],
+      [N.F5,1],[N.E5,1],[N.D5,2],
+      // Development: step up to A5, then big resolution
+      [N.E5,1],[N.G5,1],[N.A5,2],
       [N.G5,2],[N.E5,2],
-      [N.C6,1],[N.B5,1],[N.A5,1],[N.G5,1],
-      [N.E5,2],[N.G5,1],[N.E5,1],
-      [N.D5,1],[N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,1],
+      // Repeat hook with variation — longer held notes
+      [N.C5,2],[N.G5,2],
+      [N.F5,1],[N.E5,1],[N.D5,2],
+      // Grand finish: rise and hold
+      [N.G5,1],[N.A5,1],[N.G5,1],[N.E5,1],
       [N.C5,2],[N._,2],
     ],
     harm:[
-      [N.E5,2],[N.C5,2],
-      [N.C5,2],[N.G4,2],
-      [N.G4,2],[N.C5,2],
-      [N.E5,4],
-    ],
-    bass:[
-      [N.C3,2],[N.G3,2],
-      [N.A2,2],[N.E3,2],
-      [N.F2,2],[N.C3,2],
-      [N.G2,2],[N.D3,2],
-    ],
-    pad:[
-      [N.C4,4],[N.A3,4],[N.F3,4],[N.G3,4],
-    ],
-  },
-
-  // ── Town Square ── F major, 95 BPM, warm and singable
-  // Chorus on: melody sounds like a full warm synth, not a single thin oscillator
-  world:{bpm:95, melWave:'lead', melVol:0.10,
-         harmWave:'pad', harmVol:0.06,
-         bassWave:'bass', bassVol:0.12,
-         padWave:'pad', padVol:0.11, perc:'rock',
-    mel:[
-      // A phrase: simple, singable, F pentatonic (F G A C D)
-      [N.A4,1],[N.C5,1],[N.A4,.5],[N.G4,.5],[N.F4,1],
-      [N.G4,2],[N.A4,2],
-      [N.C5,1],[N.A4,.5],[N.G4,.5],[N.F4,2],
-      [N.G4,2],[N.F4,1],[N._,1],
-      // B phrase: development — reaches up, comes home
-      [N.C5,1],[N.D5,1],[N.C5,1],[N.A4,1],
-      [N.G4,2],[N.A4,1],[N.C5,1],
-      [N.D5,1],[N.C5,.5],[N.A4,.5],[N.G4,1],[N.F4,1],
-      [N.A4,2],[N.F4,2],
-    ],
-    harm:[
+      [N.E4,2],[N.G4,2],
       [N.F4,2],[N.C4,2],
-      [N.E4,2],[N.C4,2],
-      [N.C4,2],[N.A3,2],
+      [N.C4,2],[N.E4,2],
       [N.G3,2],[N.C4,2],
     ],
     bass:[
-      [N.F2,2],[N.C3,2],
-      [N.G2,2],[N.D3,2],
-      [N.Bb2,2],[N.F3,2],
       [N.C3,2],[N.G3,2],
-    ],
-    pad:[
-      [N.F3,4],[N.C3,4],[N.Bb3,4],[N.C3,4],
-    ],
-  },
-
-  // ── Wilderness ── A minor, 125 BPM, urgent and dangerous
-  // A minor pentatonic: A C D E G — always sounds good, always sounds tense
-  wilderness:{bpm:125, melWave:'lead', melVol:0.11,
-               harmWave:'lead', harmVol:0.05,
-               bassWave:'bass', bassVol:0.14,
-               arpWave:'arp', arpVol:0.04,
-               padWave:'pad', padVol:0.09, perc:'drive',
-    mel:[
-      [N.E5,1],[N.D5,.5],[N.C5,.5],[N.A4,1],[N.E4,1],
-      [N.G4,2],[N.A4,2],
-      [N.C5,1],[N.D5,1],[N.E5,1],[N.G5,1],
-      [N.E5,1],[N.D5,1],[N.C5,2],
-      [N.A4,1],[N.C5,1],[N.D5,1],[N.E5,1],
-      [N.G5,2],[N.E5,1],[N.D5,1],
-      [N.A4,.5],[N.C5,.5],[N.D5,.5],[N.E5,.5],[N.G5,1],[N.A5,1],
-      [N.E5,2],[N.A4,2],
-    ],
-    harm:[
-      [N.A4,2],[N.E4,2],
-      [N.D4,2],[N.A4,2],
-      [N.F4,2],[N.C5,2],
-      [N.E4,2],[N.A4,2],
-    ],
-    bass:[
+      [N.F2,2],[N.C3,2],
       [N.A2,2],[N.E3,2],
       [N.G2,2],[N.D3,2],
-      [N.F2,2],[N.C3,2],
-      [N.E2,2],[N.B2,2],
     ],
     arp:[
-      [N.A4,1],[N._,1],[N.E5,1],[N._,1],
-      [N.G4,1],[N._,1],[N.D5,1],[N._,1],
+      [N.G4,1],[N._,1],[N.E5,1],[N._,1],
       [N.F4,1],[N._,1],[N.C5,1],[N._,1],
-      [N.E4,1],[N._,1],[N.B4,1],[N._,1],
+      [N.A4,1],[N._,1],[N.E4,1],[N._,1],
+      [N.G4,1],[N._,1],[N.D4,1],[N._,1],
     ],
     pad:[
-      [N.A3,4],[N.G3,4],[N.F3,4],[N.E3,4],
+      [N.C4,4],[N.F3,4],[N.A3,4],[N.G3,4],
     ],
   },
 
-  // ── Tavern ── G major, 130 BPM, lively folk song
-  // G pentatonic (G A B D E) — instantly sounds warm and dance-ready
-  tavern:{bpm:130, melWave:'lead', melVol:0.12,
-          harmWave:'pad', harmVol:0.06,
-          bassWave:'bass', bassVol:0.12,
-          padWave:'pad', padVol:0.10, perc:'half',
+  // ── Town Square ── C major, 88 BPM
+  // Warm and inviting. Hook: E5-G5 major third leap, then home.
+  // I-vi-IV-V (the most universally pleasant RPG progression).
+  world:{bpm:88, melWave:'lead', melVol:0.11,
+         harmWave:'pad', harmVol:0.06,
+         bassWave:'bass', bassVol:0.12,
+         arpWave:'arp', arpVol:0.04,
+         padWave:'pad', padVol:0.10, perc:'rock',
     mel:[
-      [N.G4,1],[N.B4,1],[N.D5,1],[N.G5,1],
-      [N.E5,2],[N.D5,1],[N.B4,1],
-      [N.A4,1],[N.B4,1],[N.D5,1],[N.E5,1],
-      [N.D5,2],[N.G4,2],
-      [N.B4,1],[N.D5,1],[N.G5,.5],[N.A5,.5],[N.G5,1],
-      [N.E5,2],[N.B4,2],
-      [N.G4,.5],[N.A4,.5],[N.B4,1],[N.D5,1],[N.E5,1],
-      [N.G5,2],[N._,2],
+      // Hook (2 bars): E5 jumps to G5 — immediately warm
+      [N.E5,1],[N.G5,1],[N.E5,1],[N.C5,1],
+      [N.D5,2],[N.B4,2],
+      // Response: climb with color note (A5), settle on F5
+      [N.C5,1],[N.E5,1],[N.A5,1],[N.G5,1],
+      [N.F5,2],[N.E5,2],
+      // B phrase: step down, then bounce back up
+      [N.D5,1],[N.C5,1],[N.B4,1],[N.A4,1],
+      [N.G4,2],[N.A4,1],[N.C5,1],
+      [N.D5,1],[N.E5,1],[N.D5,1],[N.C5,1],
+      [N.G4,2],[N._,2],
     ],
     harm:[
-      [N.G4,2],[N.B4,2],
-      [N.C4,2],[N.G4,2],
-      [N.D4,2],[N.A4,2],
-      [N.G4,2],[N.D4,2],
+      [N.E4,4],
+      [N.D4,4],
+      [N.C4,4],
+      [N.A3,4],
+    ],
+    bass:[
+      [N.C3,2],[N.G3,2],
+      [N.A2,2],[N.E3,2],
+      [N.F2,2],[N.C3,2],
+      [N.G2,2],[N.D3,2],
+    ],
+    arp:[
+      [N.G4,1],[N._,1],[N.E5,1],[N._,1],
+      [N.D4,1],[N._,1],[N.B4,1],[N._,1],
+      [N.E4,1],[N._,1],[N.A4,1],[N._,1],
+      [N.F4,1],[N._,1],[N.C5,1],[N._,1],
+    ],
+    pad:[
+      [N.C3,4],[N.A3,4],[N.F3,4],[N.G3,4],
+    ],
+  },
+
+  // ── Wilderness ── A minor, 128 BPM
+  // Urgent, dangerous. Hook: A4 leaps to E5 — instant tension.
+  // i-VII-VI-VII (classic RPG minor chase progression).
+  wilderness:{bpm:128, melWave:'lead', melVol:0.12,
+               harmWave:'pad', harmVol:0.05,
+               bassWave:'bass', bassVol:0.14,
+               arpWave:'arp', arpVol:0.05,
+               padWave:'pad', padVol:0.08, perc:'drive',
+    mel:[
+      // Hook: A4 to E5 (perfect fifth leap), then urgently descends
+      [N.A4,1],[N.E5,1],[N.G5,1],[N.E5,1],
+      [N.D5,2],[N.C5,2],
+      // Response: F5 color note (bVI) lends dark flavor
+      [N.F5,1],[N.E5,1],[N.D5,1],[N.C5,1],
+      [N.E5,2],[N.A4,2],
+      // B phrase: climbing run to peak, then land
+      [N.A4,1],[N.B4,1],[N.C5,1],[N.E5,1],
+      [N.G5,2],[N.E5,2],
+      [N.D5,1],[N.C5,1],[N.B4,1],[N.A4,1],
+      [N.E5,2],[N._,2],
+    ],
+    harm:[
+      [N.A3,4],
+      [N.G3,4],
+      [N.F3,4],
+      [N.G3,4],
+    ],
+    bass:[
+      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.B2,1],
+      [N.F2,1],[N.C3,1],[N.F2,1],[N.A2,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.E3,1],
+    ],
+    arp:[
+      [N.E5,1],[N._,1],[N.A5,1],[N._,1],
+      [N.D5,1],[N._,1],[N.G5,1],[N._,1],
+      [N.F5,1],[N._,1],[N.C5,1],[N._,1],
+      [N.D5,1],[N._,1],[N.B4,1],[N._,1],
+    ],
+    pad:[
+      [N.A3,4],[N.G3,4],[N.F3,4],[N.G3,4],
+    ],
+  },
+
+  // ── Tavern ── G major, 132 BPM
+  // Lively dance. Hook: G4 stepping up to D5 then leaping to G5.
+  // I-IV-V-I jig feel. Bright arp drives the dance energy.
+  tavern:{bpm:132, melWave:'lead', melVol:0.12,
+          harmWave:'pad', harmVol:0.06,
+          bassWave:'bass', bassVol:0.12,
+          arpWave:'arp', arpVol:0.05,
+          padWave:'pad', padVol:0.09, perc:'half',
+    mel:[
+      // Hook: stepwise rise G-A-B-D then leap to G5
+      [N.G4,1],[N.A4,1],[N.B4,1],[N.D5,1],
+      [N.G5,2],[N.E5,2],
+      // Response: descend B-A-G, nice and resolved
+      [N.D5,1],[N.B4,1],[N.A4,1],[N.G4,1],
+      [N.A4,2],[N.D4,2],
+      // B phrase: C chord color (bVII), rise back to G5
+      [N.C5,1],[N.D5,1],[N.E5,1],[N.G5,1],
+      [N.F5,1],[N.E5,1],[N.D5,2],
+      // Finish: ornament and close
+      [N.G5,1],[N.E5,1],[N.D5,1],[N.B4,1],
+      [N.G4,2],[N._,2],
+    ],
+    harm:[
+      [N.G3,4],
+      [N.C4,4],
+      [N.D3,4],
+      [N.G3,4],
     ],
     bass:[
       [N.G2,2],[N.D3,2],
@@ -492,232 +561,257 @@ const MUS_TRACKS={
       [N.D3,2],[N.A3,2],
       [N.G2,2],[N.D3,2],
     ],
+    arp:[
+      [N.D4,1],[N._,1],[N.B4,1],[N._,1],
+      [N.E4,1],[N._,1],[N.G4,1],[N._,1],
+      [N.F4,1],[N._,1],[N.A4,1],[N._,1],
+      [N.D4,1],[N._,1],[N.G4,1],[N._,1],
+    ],
     pad:[
-      [N.G3,4],[N.C4,4],[N.D3,4],[N.G3,4],
+      [N.G3,4],[N.C3,4],[N.D3,4],[N.G3,4],
     ],
   },
 
-  // ── Governance Hall ── D minor, 82 BPM, stately authority
-  // melChorus:false — governance should feel singular and official, not lush
-  governance:{bpm:82, melWave:'lead', melVol:0.11, melChorus:false,
-               harmWave:'pad', harmVol:0.06,
-               bassWave:'bass', bassVol:0.12,
+  // ── Governance Hall ── D minor, 80 BPM
+  // Stately authority. Hook: D5 descends, then climbs with characteristic E5 (Dorian).
+  // i-III-VII-i, slow and deliberate. melChorus:false — singular, official.
+  governance:{bpm:80, melWave:'lead', melVol:0.11, melChorus:false,
+               harmWave:'pad', harmVol:0.07,
+               bassWave:'bass', bassVol:0.13,
                padWave:'pad', padVol:0.11, perc:'atmo',
     mel:[
+      // Hook: D5 down to A4, then up with strength
       [N.D5,2],[N.A4,2],
       [N.F5,1],[N.E5,1],[N.D5,2],
-      [N.G5,2],[N.F5,1],[N.E5,1],
-      [N.A5,1],[N.F5,1],[N.E5,1],[N.D5,1],
-      [N.D5,1],[N.F5,1],[N.A5,1],[N.F5,1],
-      [N.E5,2],[N.D5,2],
-      [N.Bb4,1],[N.D5,1],[N.C5,1],[N.A4,1],
+      // Development: step up to G5, come home via E5 (Dorian 6th = character)
+      [N.G5,2],[N.E5,2],
+      [N.F5,1],[N.D5,1],[N.A4,2],
+      // B phrase: Bb (bVI) gives noble gravity
+      [N.Bb4,2],[N.D5,2],
+      [N.C5,1],[N.Bb4,1],[N.A4,2],
+      [N.F5,1],[N.E5,1],[N.D5,1],[N.C5,1],
       [N.D5,2],[N._,2],
     ],
     harm:[
       [N.D4,4],
-      [N.Bb3,4],
+      [N.F3,4],
       [N.G3,4],
       [N.A3,4],
     ],
     bass:[
-      [N.D3,4],
-      [N.Bb2,4],
-      [N.G2,4],
-      [N.A2,4],
+      [N.D3,2],[N.A3,2],
+      [N.F2,2],[N.C3,2],
+      [N.G2,2],[N.D3,2],
+      [N.A2,2],[N.E3,2],
     ],
     pad:[
-      [N.D4,4],[N.Bb3,4],[N.G3,4],[N.A3,4],
+      [N.D3,4],[N.F3,4],[N.G3,4],[N.A3,4],
     ],
   },
 
-  // ── Marketplace ── Bb major, 128 BPM, bustling merchant energy
-  // Bb major pentatonic (Bb C D F G) — has a warm commercial energy
-  marketplace:{bpm:128, melWave:'lead', melVol:0.11,
+  // ── Marketplace ── F major, 126 BPM
+  // Bustling energy. Hook: F4-A4-C5 triad arpeggio, then quick turnaround.
+  // I-IV-ii-V, syncopated kick. Bright arp adds chatter of commerce.
+  marketplace:{bpm:126, melWave:'lead', melVol:0.11,
                 harmWave:'pad', harmVol:0.06,
                 bassWave:'bass', bassVol:0.13,
-                arpWave:'arp', arpVol:0.04,
+                arpWave:'arp', arpVol:0.05,
                 padWave:'pad', padVol:0.09, perc:'funk',
     mel:[
-      [N.F4,1],[N.Bb4,1],[N.C5,1],[N.D5,1],
-      [N.C5,2],[N.Bb4,2],
-      [N.G4,1],[N.Bb4,1],[N.D5,1],[N.F5,1],
-      [N.D5,2],[N.Bb4,1],[N._,1],
-      [N.C5,1],[N.D5,1],[N.F5,1],[N.D5,1],
+      // Hook: F triad arp up, then step down
+      [N.F4,1],[N.A4,1],[N.C5,1],[N.A4,1],
       [N.Bb4,2],[N.G4,2],
-      [N.C5,.5],[N.D5,.5],[N.F5,1],[N.D5,1],[N.C5,1],
-      [N.Bb4,2],[N._,2],
+      // Response: descend and twist with G minor color
+      [N.A4,1],[N.G4,1],[N.F4,1],[N.G4,1],
+      [N.C5,2],[N.F5,2],
+      // B phrase: reach up to F5 then elegant descent
+      [N.F5,1],[N.E5,1],[N.D5,1],[N.C5,1],
+      [N.Bb4,2],[N.C5,2],
+      [N.D5,1],[N.C5,1],[N.Bb4,1],[N.A4,1],
+      [N.F4,2],[N._,2],
     ],
     harm:[
-      [N.Bb3,2],[N.F4,2],
-      [N.G3,2],[N.D4,2],
-      [N.Bb3,2],[N.F4,2],
-      [N.C4,2],[N.G3,2],
+      [N.A3,4],
+      [N.D4,4],
+      [N.C4,4],
+      [N.G3,4],
     ],
     bass:[
-      [N.Bb2,2],[N.F3,2],
-      [N.C3,2],[N.G3,2],
-      [N.D3,2],[N.A3,2],
-      [N.F3,2],[N.C3,2],
+      [N.F2,1],[N.C3,1],[N.F2,1],[N.A2,1],
+      [N.Bb2,1],[N.F3,1],[N.Bb2,1],[N.D3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.Bb2,1],
+      [N.C3,1],[N.G3,1],[N.C3,1],[N.E3,1],
     ],
     arp:[
-      [N.Bb4,1],[N._,1],[N.F4,1],[N._,1],
-      [N.C4,1],[N._,1],[N.G4,1],[N._,1],
+      [N.C4,1],[N._,1],[N.F4,1],[N._,1],
       [N.D4,1],[N._,1],[N.F4,1],[N._,1],
-      [N.Bb3,1],[N._,1],[N.F4,1],[N._,1],
+      [N.G3,1],[N._,1],[N.D4,1],[N._,1],
+      [N.E4,1],[N._,1],[N.G4,1],[N._,1],
     ],
     pad:[
-      [N.Bb3,4],[N.C4,4],[N.D3,4],[N.F3,4],
+      [N.F3,4],[N.Bb2,4],[N.G3,4],[N.C3,4],
     ],
   },
 
-  // ── Treasury ── C minor, 78 BPM, weighty vault authority
-  // melChorus:false — should feel singular and imposing
-  treasury:{bpm:78, melWave:'lead', melVol:0.11, melChorus:false,
+  // ── Treasury ── C minor, 76 BPM
+  // Vault weight. Hook: C5 to Eb5 (the minor third) — heavy and cold.
+  // i-VI-III-VII. melChorus:false — imposing singular authority.
+  treasury:{bpm:76, melWave:'lead', melVol:0.11, melChorus:false,
              harmWave:'pad', harmVol:0.07,
              bassWave:'bass', bassVol:0.14,
              padWave:'pad', padVol:0.11, perc:'atmo',
     mel:[
-      [N.C5,2],[N.G4,2],
+      // Hook: C5 open, rise to Eb5 (minor third = weight)
+      [N.C5,2],[N.Eb5,2],
+      [N.D5,1],[N.C5,1],[N.Bb4,2],
+      // Ab (bVI) gives cold, imposing gravity
+      [N.Ab4,2],[N.G4,2],
+      [N.F4,1],[N.G4,1],[N.Ab4,2],
+      // B phrase: reach up to Eb5 then controlled descent
       [N.Eb5,1],[N.D5,1],[N.C5,2],
-      [N.F5,2],[N.Eb5,1],[N.D5,1],
-      [N.G5,1],[N.Eb5,1],[N.D5,1],[N.C5,1],
-      [N.Ab4,2],[N.Eb5,2],
-      [N.G4,1],[N.Bb4,1],[N.C5,1],[N.D5,1],
-      [N.Eb5,2],[N.D5,1],[N.C5,1],
-      [N.G4,2],[N.C4,2],
+      [N.G4,2],[N.Bb4,2],
+      [N.C5,1],[N.D5,1],[N.Eb5,1],[N.G5,1],
+      [N.C5,2],[N._,2],
     ],
     harm:[
+      [N.Eb4,4],
+      [N.Ab3,4],
+      [N.Bb3,4],
       [N.G3,4],
-      [N.Eb3,4],
-      [N.F3,4],
-      [N.C3,4],
     ],
     bass:[
-      [N.C3,4],
-      [N.Ab2,4],
-      [N.Eb3,4],
-      [N.G2,4],
+      [N.C3,2],[N.G3,2],
+      [N.Ab2,2],[N.Eb3,2],
+      [N.Bb2,2],[N.F3,2],
+      [N.G2,2],[N.D3,2],
     ],
     pad:[
-      [N.C3,4],[N.Ab3,4],[N.Eb3,4],[N.G3,4],
+      [N.C3,4],[N.Ab2,4],[N.Bb2,4],[N.G3,4],
     ],
   },
 
-  // ── Ancient Dungeon ── E minor, 65 BPM, ominous and oppressive
-  // E minor pentatonic (E G A B D) — simple, always dark, never dissonant
-  // melChorus:false — solo flute feels more menacing than a lush ensemble
-  dungeon:{bpm:65, melWave:'flute', melVol:0.09, melChorus:false,
+  // ── Ancient Dungeon ── E minor, 65 BPM
+  // Ominous and slow. Flute solo, melChorus:false.
+  // Hook: E4 rises slowly to G4 — low, dark, deliberate.
+  // i-VII-VI-i (Aeolian). Very sparse melody, rests let the dungeon breathe.
+  dungeon:{bpm:65, melWave:'flute', melVol:0.10, melChorus:false,
             harmWave:'pad', harmVol:0.05,
             bassWave:'bass', bassVol:0.12,
             arpWave:'glass', arpVol:0.05,
             padWave:'pad', padVol:0.08, perc:'atmo',
-            melAtk:0.025, melSus:0.80,
+            melAtk:0.030, melSus:0.80,
     mel:[
-      // Sparse, haunting — long held notes and deliberate rests
-      [N.E5,2],[N.G5,2],
-      [N.D5,2],[N._,2],
-      [N.B4,2],[N.A4,2],
-      [N.E5,4],
-      [N.G5,2],[N.B5,2],
-      [N.A5,2],[N._,2],
-      [N.G5,1],[N.E5,1],[N.D5,2],
-      [N.E5,2],[N._,2],
+      // Start low, rise slowly — each long note carries weight
+      [N.E4,2],[N.G4,2],
+      [N.A4,2],[N.D5,2],
+      // High point: C5-B4 step, then fall back
+      [N.C5,1],[N.B4,1],[N.G4,2],
+      [N.B4,2],[N._,2],
+      // Second phrase: climb to E5 — haunting peak
+      [N.E5,2],[N.D5,2],
+      [N.C5,1],[N.A4,1],[N.G4,2],
+      [N.A4,2],[N.B4,2],
+      [N.E4,2],[N._,2],
     ],
     harm:[
-      [N.E4,4],
       [N.G3,4],
-      [N.A3,4],
-      [N.B3,4],
+      [N.D4,4],
+      [N.C4,4],
+      [N.D4,4],
     ],
     bass:[
-      [N.E2,4],
-      [N.C3,4],
-      [N.A2,4],
-      [N.B2,4],
+      [N.E2,2],[N.B2,2],
+      [N.D3,2],[N.A2,2],
+      [N.C3,2],[N.G2,2],
+      [N.D3,2],[N.A2,2],
     ],
     arp:[
       [N.E5,2],[N._,2],
-      [N.B4,2],[N._,2],
-      [N.G4,2],[N._,2],
       [N.D5,2],[N._,2],
+      [N.G4,2],[N._,2],
+      [N.B4,2],[N._,2],
     ],
     pad:[
-      [N.E3,4],[N.C3,4],[N.A2,4],[N.B2,4],
+      [N.E3,4],[N.D3,4],[N.C3,4],[N.D3,4],
     ],
   },
 
-  // ── Crystal Cavern ── D minor, 55 BPM, near-ambient and mysterious
-  // Solo flute ghost notes — sparse and haunting, mostly silence
-  // melChorus:false — the point is the lone voice in the dark
-  cavern:{bpm:55, melWave:'flute', melVol:0.08, melChorus:false,
+  // ── Crystal Cavern ── D minor, 55 BPM
+  // Near-ambient. Ghost flute over drone. melChorus:false.
+  // Melody is mostly silence — each note appears and vanishes.
+  cavern:{bpm:55, melWave:'flute', melVol:0.09, melChorus:false,
            harmWave:'pad', harmVol:0.05,
            bassWave:'bass', bassVol:0.10,
            arpWave:'glass', arpVol:0.06,
            padWave:'pad', padVol:0.08, perc:'none',
-           melAtk:0.030, melSus:0.83,
+           melAtk:0.040, melSus:0.85,
     mel:[
-      // Ghost flute — sparse, floating, mostly silence
-      [N.D5,2],[N._,2],
-      [N.A4,2],[N._,2],
-      [N.F5,2],[N._,2],
-      [N.E5,4],
+      // Each note is an event — surrounded by silence
       [N.D5,2],[N._,2],
       [N.C5,2],[N._,2],
-      [N.A4,2],[N._,2],
+      [N.Bb4,2],[N._,2],
+      [N.A4,4],
+      [N.F5,2],[N._,2],
+      [N.Eb5,2],[N._,2],
+      [N.D5,2],[N.C5,2],
       [N.D5,4],
     ],
     harm:[
       [N.F4,4],
-      [N.D4,4],
-      [N.G3,4],
+      [N.C4,4],
+      [N.Bb3,4],
       [N.A3,4],
     ],
     bass:[
       [N.D3,4],
-      [N.G2,4],
-      [N.F2,4],
+      [N.C3,4],
+      [N.Bb2,4],
       [N.A2,4],
     ],
     arp:[
-      // Crystal drops — very occasional glints
       [N.D5,.5],[N._,3.5],
       [N.F5,.5],[N._,3.5],
       [N.A5,.5],[N._,3.5],
       [N.D5,.5],[N._,3.5],
     ],
     pad:[
-      // Long sustained drone
-      [N.D3,8],[N.A2,8],
+      // Long sustained drone fills the silence
+      [N.D3,8],[N.C3,8],
     ],
   },
 
-  // ── Bandit Hideout ── A minor, 112 BPM, tense and urgent
+  // ── Bandit Hideout ── A minor, 112 BPM
+  // Tense and urgent. Hook: A4 leaps to E5 then G5 — dramatic, dangerous.
+  // i-VII-VI-V, fast bass walking. Arp adds anxious chatter.
   hideout:{bpm:112, melWave:'lead', melVol:0.12,
-            harmWave:'lead', harmVol:0.05,
+            harmWave:'pad', harmVol:0.05,
             bassWave:'bass', bassVol:0.14,
-            arpWave:'arp', arpVol:0.04,
+            arpWave:'arp', arpVol:0.05,
             padWave:'pad', padVol:0.09, perc:'drive',
     mel:[
+      // Hook: A4 to E5 to G5 — three-note dramatic leap
       [N.A4,1],[N.E5,1],[N.G5,1],[N.E5,1],
-      [N.D5,2],[N.A4,2],
-      [N.C5,1],[N.E5,1],[N.F5,1],[N.E5,1],
+      [N.D5,2],[N.B4,2],
+      // Response: F chord color (bVI), dark and tense
+      [N.C5,1],[N.D5,1],[N.F5,1],[N.E5,1],
       [N.A5,2],[N.E5,2],
-      [N.G5,1],[N.E5,.5],[N.D5,.5],[N.C5,1],[N.A4,1],
-      [N.E5,2],[N.D5,2],
-      [N.C5,.5],[N.D5,.5],[N.E5,.5],[N.G5,.5],[N.A5,1],[N.G5,1],
-      [N.E5,2],[N.A4,2],
+      // B phrase: surge up then controlled fall
+      [N.G5,1],[N.F5,1],[N.E5,1],[N.D5,1],
+      [N.C5,2],[N.B4,2],
+      [N.A4,1],[N.C5,1],[N.E5,1],[N.G5,1],
+      [N.E5,2],[N._,2],
     ],
     harm:[
-      [N.E5,1],[N.C5,1],[N.D5,2],
-      [N.B4,1],[N.C5,1],[N.B4,2],
-      [N.D5,2],[N.E5,2],
-      [N.E5,2],[N.C5,2],
+      [N.E4,4],
+      [N.D4,4],
+      [N.C4,4],
+      [N.E4,4],
     ],
     bass:[
-      [N.A2,2],[N.E3,2],
-      [N.G2,2],[N.D3,2],
-      [N.F2,2],[N.C3,2],
-      [N.E2,2],[N.B2,2],
+      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.B2,1],
+      [N.F2,1],[N.C3,1],[N.F2,1],[N.A2,1],
+      [N.E2,1],[N.B2,1],[N.E2,1],[N.G2,1],
     ],
     arp:[
       [N.A4,1],[N._,1],[N.E5,1],[N._,1],
@@ -730,78 +824,132 @@ const MUS_TRACKS={
     ],
   },
 
-  // ── Ancient Ruins ── G minor, 68 BPM, haunted Dorian melody (flute)
-  // melChorus:false — flute is already breathy and atmospheric, chorus muddies it
-  ruins:{bpm:68, melWave:'flute', melVol:0.09, melChorus:false,
+  // ── Ancient Ruins ── G minor, 68 BPM
+  // Haunted and melancholic. Flute solo melody, melChorus:false.
+  // Hook: G4 to D5 (fifth) — open and distant. i-III-VII-VI.
+  ruins:{bpm:68, melWave:'flute', melVol:0.10, melChorus:false,
           harmWave:'pad', harmVol:0.05,
-          bassWave:'bass', bassVol:0.12,
+          bassWave:'bass', bassVol:0.11,
           arpWave:'glass', arpVol:0.05,
           padWave:'pad', padVol:0.07, perc:'atmo',
-          melAtk:0.025, melSus:0.80,
+          melAtk:0.030, melSus:0.82,
     mel:[
+      // Hook: G4 to D5 (open fifth) — lonely, distant
       [N.G4,2],[N.D5,2],
       [N.Eb5,1],[N.D5,1],[N.C5,2],
+      // Response: Bb4 (minor 3rd) gives sadness, rest lets wind blow
       [N.Bb4,2],[N.G4,2],
       [N.A4,2],[N._,2],
-      [N.C5,2],[N.D5,2],
-      [N.Eb5,1],[N.F5,1],[N.D5,2],
-      [N.C5,2],[N.Bb4,1],[N.G4,1],
-      [N.D5,2],[N.G4,2],
+      // Second phrase: rise to Eb5, then descent to close
+      [N.C5,2],[N.Eb5,2],
+      [N.D5,1],[N.C5,1],[N.Bb4,2],
+      [N.C5,1],[N.D5,1],[N.G4,2],
+      [N.D5,2],[N._,2],
     ],
     harm:[
-      [N.D5,2],[N.Bb4,2],
-      [N.G4,2],[N.Eb4,2],
-      [N.Bb4,2],[N.G4,2],
-      [N.Eb4,2],[N.D4,2],
+      [N.G3,4],
+      [N.Bb3,4],
+      [N.F3,4],
+      [N.Eb3,4],
     ],
     bass:[
-      [N.G2,4],
-      [N.Eb3,4],
-      [N.C3,4],
-      [N.D3,4],
+      [N.G2,2],[N.D3,2],
+      [N.Bb2,2],[N.F3,2],
+      [N.F2,2],[N.C3,2],
+      [N.Eb3,2],[N.Bb2,2],
     ],
     arp:[
       [N.G4,2],[N._,2],
       [N.Bb4,2],[N._,2],
-      [N.D5,2],[N._,2],
-      [N.C5,2],[N._,2],
+      [N.F4,2],[N._,2],
+      [N.Eb4,2],[N._,2],
     ],
     pad:[
-      [N.G3,4],[N.C3,4],[N.D3,4],[N.Eb3,4],
+      [N.G3,4],[N.Bb2,4],[N.F3,4],[N.Eb3,4],
     ],
   },
 
-  // ── Abandoned Village ── C minor, 62 BPM, melancholic and tender (flute)
-  // melChorus:false — solo flute is the point; it's supposed to feel lonely
-  village:{bpm:62, melWave:'flute', melVol:0.09, melChorus:false,
+  // ── Abandoned Village ── C minor, 62 BPM
+  // Melancholic and lonely. Solo flute, no drums. melChorus:false.
+  // Hook: C5 falls to G4 — immediately sad. i-VII-VI-i.
+  village:{bpm:62, melWave:'flute', melVol:0.10, melChorus:false,
             harmWave:'pad', harmVol:0.06,
             bassWave:'bass', bassVol:0.11,
             padWave:'pad', padVol:0.08, perc:'none',
-            melAtk:0.030, melSus:0.83,
+            melAtk:0.035, melSus:0.84,
     mel:[
-      [N.G4,2],[N.Eb5,2],
-      [N.D5,1],[N.Eb5,1],[N.G5,2],
-      [N.F5,2],[N.Eb5,1],[N.D5,1],
-      [N.C5,2],[N._,2],
-      [N.G4,2],[N.Ab4,2],
-      [N.Bb4,1],[N.C5,1],[N.D5,1],[N.Eb5,1],
-      [N.D5,2],[N.Bb4,2],
+      // Hook: C5 falls to G4, then rises back through Eb5 — melancholy arc
+      [N.C5,2],[N.G4,2],
+      [N.Eb5,1],[N.D5,1],[N.C5,2],
+      // Bb (minor VII) color — nostalgic, tender
+      [N.Bb4,2],[N.Ab4,2],
       [N.G4,2],[N._,2],
+      // Second phrase: answer the hook — rises higher, different ending
+      [N.C5,2],[N.Eb5,2],
+      [N.D5,1],[N.C5,1],[N.Bb4,2],
+      [N.Ab4,1],[N.Bb4,1],[N.C5,1],[N.G4,1],
+      [N.C5,2],[N._,2],
     ],
     harm:[
-      [N.Eb5,2],[N.C5,2],
-      [N.Eb5,2],[N.Bb4,2],
-      [N.D5,2],[N.C5,2],
-      [N.G4,2],[N.Ab4,2],
+      [N.Eb4,4],
+      [N.D4,4],
+      [N.C4,4],
+      [N.G3,4],
     ],
     bass:[
       [N.C3,4],
-      [N.G2,4],
+      [N.Bb2,4],
       [N.Ab2,4],
-      [N.Eb3,4],
+      [N.G2,4],
     ],
     pad:[
-      [N.C3,4],[N.Eb3,4],[N.Bb2,4],[N.Ab2,4],
+      [N.C3,4],[N.Bb2,4],[N.Ab3,4],[N.Eb3,4],
+    ],
+  },
+
+  // ── Battle ── A minor, 155 BPM
+  // Intense combat music. Hook: E5 leaps to A5 — maximum urgency.
+  // i-VII-VI-VII at full speed. Chorus on for full thick battle sound.
+  // Quarter-note walking bass, fast arp, battle percussion.
+  battle:{bpm:155, melWave:'lead', melVol:0.13,
+           harmWave:'pad', harmVol:0.05,
+           bassWave:'bass', bassVol:0.15,
+           arpWave:'arp', arpVol:0.06,
+           padWave:'pad', padVol:0.07, perc:'battle',
+    mel:[
+      // Hook: E5 leaps up to A5 — AGGRESSIVE
+      [N.E5,1],[N.A5,1],[N.G5,1],[N.E5,1],
+      [N.D5,2],[N.G5,2],
+      // Response: F5 (bVI dark color) then run down
+      [N.F5,1],[N.E5,1],[N.D5,1],[N.C5,1],
+      [N.E5,2],[N.A4,2],
+      // B phrase: ascending arpeggio to peak
+      [N.A4,1],[N.C5,1],[N.E5,1],[N.A5,1],
+      [N.B5,2],[N.G5,2],
+      // Final run: step up and hold triumphant
+      [N.C5,1],[N.D5,1],[N.E5,1],[N.G5,1],
+      [N.A5,2],[N._,2],
+    ],
+    harm:[
+      [N.A4,2],[N.E4,2],
+      [N.G4,2],[N.D4,2],
+      [N.F4,2],[N.C4,2],
+      [N.G4,2],[N.D4,2],
+    ],
+    bass:[
+      [N.A2,1],[N.E3,1],[N.A2,1],[N.C3,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.B2,1],
+      [N.F2,1],[N.C3,1],[N.F2,1],[N.A2,1],
+      [N.G2,1],[N.D3,1],[N.G2,1],[N.E3,1],
+    ],
+    arp:[
+      [N.E5,1],[N.A5,1],[N.G5,1],[N.E5,1],
+      [N.D5,1],[N.G5,1],[N.B5,1],[N.D5,1],
+      [N.C5,1],[N.F5,1],[N.A5,1],[N.C5,1],
+      [N.D5,1],[N.G5,1],[N.B5,1],[N.E5,1],
+    ],
+    pad:[
+      [N.A3,4],[N.G3,4],[N.F3,4],[N.G3,4],
     ],
   },
 };
