@@ -41,6 +41,8 @@ const G = {
   zoneSeniority:0,      // 5-min intervals spent in marketplace/treasury without leaving
   govProposals:[],      // active governance proposals
   earmarkRate:0.005,    // current earmark rate (from server)
+  alcxVoteLock:0,       // ALCX locked in active governance vote (inaccessible)
+  govQuorum:50,         // quorum required for a valid proposal result
   battle:null,          // active battle state or null
   showMinimap:false,
   npcDialog:null,       // {npc, lineIdx} — active NPC conversation
@@ -2356,35 +2358,61 @@ function closeGovernance(){G.paused=false;document.getElementById('governance-ui
 function renderGovernanceUI(){
   const el=document.getElementById('gov-content');if(!el)return;
   const rate=(G.earmarkRate||0.005)*100;
+  const quorum=G.govQuorum||50;
   const prop=G.govProposals.find(p=>p.passed===null);
-  let html=`<div style="color:#FFD700;margin-bottom:8px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
-  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:12px">% of debt redeemed every 5 min. Higher = faster repayment & more transmuter yield.</div>`;
+  const freeAlcx=parseFloat((G.alcx-(G.alcxVoteLock||0)).toFixed(4));
+  let html=`<div style="color:#FFD700;margin-bottom:6px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
+  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:8px">% of debt redeemed per 5-min tick. Higher = faster repayment & more transmuter yield.</div>`;
+  if(G.alcxVoteLock>0){
+    html+=`<div style="background:#1A1030;border:1px solid #9C27B0;border-radius:4px;padding:6px;margin-bottom:8px;font-size:.75rem">`;
+    html+=`🗳 <b>${G.alcxVoteLock.toFixed(1)} ALCX locked in active vote</b> — inaccessible until proposal settles.<br>`;
+    html+=`<span style="color:#aaa">Free ALCX: ${freeAlcx.toFixed(1)}</span></div>`;
+  }
   if(prop){
     const msLeft=Math.max(0,prop.endsAt-Date.now());
-    const mLeft=Math.ceil(msLeft/60000);
-    const total=prop.yesWeight+prop.noWeight||1;
-    const yesPct=Math.round(prop.yesWeight/total*100);
+    const hLeft=Math.floor(msLeft/3600000);
+    const mLeft=Math.floor((msLeft%3600000)/60000);
+    const timeStr=hLeft>0?`${hLeft}h ${mLeft}m`:`${mLeft}m`;
+    const total=prop.yesWeight+prop.noWeight;
+    const yesPct=total>0?Math.round(prop.yesWeight/total*100):0;
+    const quorumPct=Math.min(100,Math.round(total/quorum*100));
+    const alreadyVoted=!!(prop.votes&&prop.votes[G_accountId]);
     html+=`<div style="border:1px solid #5A3A80;border-radius:6px;padding:10px;margin-bottom:10px">`;
-    html+=`<div style="color:#B080FF;font-weight:bold">📜 Active Proposal #${prop.id}</div>`;
-    html+=`<div style="margin:4px 0">Proposer: ${prop.proposerName}</div>`;
-    html+=`<div>New rate: <b>${(prop.value*100).toFixed(2)}%</b></div>`;
-    html+=`<div style="color:#aaa;font-size:.72rem">${mLeft}m remaining</div>`;
-    html+=`<div style="margin:6px 0;font-size:.75rem">`;
-    html+=`<span style="color:#4CAF50">✅ YES ${prop.yesWeight.toFixed(1)} ALCX (${yesPct}%)</span> `;
+    html+=`<div style="color:#B080FF;font-weight:bold;margin-bottom:4px">📜 Active Proposal #${prop.id}</div>`;
+    html+=`<div style="font-size:.75rem;color:#ccc">Proposer: ${prop.proposerName}</div>`;
+    html+=`<div style="font-size:.8rem;margin:4px 0">New earmark rate: <b style="color:#FFD700">${(prop.value*100).toFixed(2)}%</b></div>`;
+    html+=`<div style="color:#aaa;font-size:.72rem;margin-bottom:6px">⏱ ${timeStr} remaining (24h epoch)</div>`;
+    // Vote weight bars
+    html+=`<div style="font-size:.72rem;margin-bottom:4px">`;
+    html+=`<span style="color:#4CAF50">✅ YES ${prop.yesWeight.toFixed(1)} ALCX (${yesPct}%)</span>&nbsp;&nbsp;`;
     html+=`<span style="color:#FF4444">❌ NO ${prop.noWeight.toFixed(1)} ALCX (${100-yesPct}%)</span>`;
     html+=`</div>`;
-    html+=`<div style="display:flex;gap:6px;margin-top:8px">`;
-    html+=`<button onclick="govVote(${prop.id},'yes')" style="flex:1;padding:5px;background:#1A3A1A;border:1px solid #4CAF50;color:#4CAF50;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">✅ Vote YES</button>`;
-    html+=`<button onclick="govVote(${prop.id},'no')" style="flex:1;padding:5px;background:#3A1A1A;border:1px solid #FF4444;color:#FF4444;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">❌ Vote NO</button>`;
-    html+=`</div></div>`;
+    // Vote bar
+    html+=`<div style="background:#222;border-radius:3px;height:8px;margin-bottom:6px;overflow:hidden">`;
+    html+=`<div style="background:#4CAF50;height:100%;width:${yesPct}%;float:left"></div>`;
+    html+=`<div style="background:#FF4444;height:100%;width:${100-yesPct}%;float:left"></div></div>`;
+    // Quorum bar
+    html+=`<div style="font-size:.7rem;color:#888;margin-bottom:2px">Quorum: ${total.toFixed(1)} / ${quorum} ALCX (${quorumPct}%)</div>`;
+    html+=`<div style="background:#222;border-radius:3px;height:5px;margin-bottom:8px;overflow:hidden">`;
+    html+=`<div style="background:${quorumPct>=100?'#FFD700':'#555'};height:100%;width:${quorumPct}%"></div></div>`;
+    if(alreadyVoted){
+      html+=`<div style="color:#888;font-size:.75rem;text-align:center;padding:6px">✔ You have voted — ALCX locked until proposal settles.</div>`;
+    }else{
+      html+=`<div style="display:flex;gap:6px;margin-top:4px">`;
+      html+=`<button onclick="govVote(${prop.id},'yes')" style="flex:1;padding:5px;background:#1A3A1A;border:1px solid #4CAF50;color:#4CAF50;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">✅ Vote YES (lock ${freeAlcx.toFixed(1)} ALCX)</button>`;
+      html+=`<button onclick="govVote(${prop.id},'no')" style="flex:1;padding:5px;background:#3A1A1A;border:1px solid #FF4444;color:#FF4444;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">❌ Vote NO (lock ${freeAlcx.toFixed(1)} ALCX)</button>`;
+      html+=`</div>`;
+      html+=`<div style="color:#666;font-size:.68rem;margin-top:4px">Voting locks your free ALCX until the proposal settles.</div>`;
+    }
+    html+=`</div>`;
   }else{
-    html+=`<div style="color:#888;margin-bottom:8px">No active proposal. Propose a new earmark rate:</div>`;
+    html+=`<div style="color:#888;margin-bottom:8px;font-size:.75rem">No active proposal. Propose a new earmark rate:</div>`;
     html+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">`;
     html+=`<span style="color:#aaa;font-size:.8rem">Rate (%):</span>`;
     html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${rate.toFixed(2)}" style="width:70px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
     html+=`<button onclick="govPropose()" style="padding:4px 10px;background:#1A1030;border:1px solid #9C27B0;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">📜 Propose</button>`;
     html+=`</div>`;
-    html+=`<div style="color:#666;font-size:.7rem">Requires ≥10 ALCX · You auto-vote YES · 5-minute voting window</div>`;
+    html+=`<div style="color:#666;font-size:.7rem">Requires ≥10 free ALCX · Auto-votes YES · Locks your ALCX for 24h · Needs ${quorum} ALCX quorum to pass</div>`;
   }
   el.innerHTML=html;
 }
@@ -2398,7 +2426,8 @@ function doAuctionBid(){
   if(!G.queueState||G.queueState.served)return;
   const amt=parseFloat(document.getElementById('queue-bid-amt')?.value||0);
   if(isNaN(amt)||amt<1){chatLog('Enter a valid ALCX bid (min 1).','#FF4444');return;}
-  if(G.alcx<amt){chatLog(`Not enough ALCX! (have ${G.alcx})`, '#FF4444');SFX.error();return;}
+  const freeAlcx=parseFloat((G.alcx-G.alcxVoteLock).toFixed(4));
+  if(freeAlcx<amt){chatLog(`Not enough free ALCX! (${freeAlcx.toFixed(1)} available, ${G.alcxVoteLock.toFixed(1)} locked in vote)`,'#FF4444');SFX.error();return;}
   G.alcx=parseFloat((G.alcx-amt).toFixed(4));
   renderHUD();
   socket?.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
@@ -2407,7 +2436,8 @@ function doAuctionBid(){
 
 function doFastExit(fee){
   if(!G.queueState||G.queueState.type!=='exit'||G.queueState.served)return;
-  if((G.alcx||0)<fee){chatLog('Not enough ALCX for fast exit.','#FF5722');SFX.error();return;}
+  const freeAlcx=parseFloat((G.alcx-G.alcxVoteLock).toFixed(4));
+  if(freeAlcx<fee){chatLog(`Not enough free ALCX for fast exit (${freeAlcx.toFixed(1)} available, ${G.alcxVoteLock.toFixed(1)} locked in vote).`,'#FF5722');SFX.error();return;}
   G.alcx=parseFloat((G.alcx-fee).toFixed(4));
   renderHUD();
   chatLog(`⚡ Fast exit: ${fee} ALCX paid — skipping the exit queue! Fee goes to treasury.`,'#FFD700');
@@ -3444,7 +3474,8 @@ function renderHUD(){
   }
   document.getElementById('hud-spacebucks').textContent = `🪙${G.spacebucks}`;
   document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
-  const alcxTxt = G.lockedAlcx>0 ? `⚗${G.alcx} 🔒${G.lockedAlcx}` : `⚗${G.alcx}`;
+  const alcxTxt = (G.lockedAlcx>0||G.alcxVoteLock>0)
+    ? `⚗${G.alcx}${G.lockedAlcx>0?` 🔒${G.lockedAlcx}`:''}${G.alcxVoteLock>0?` 🗳${G.alcxVoteLock.toFixed(1)}`:''}` : `⚗${G.alcx}`;
   document.getElementById('hud-alcx').textContent = alcxTxt;
   // Level display — badge for unspent stat points or ready quests
   const hasReady=Object.values(G.quests).some(q=>q.status==='ready');
@@ -3767,7 +3798,7 @@ function renderInventoryScreen(){
     <div class="stat-line" style="color:#888"><span>💀 Schmeckles</span><span>${G.schmeckles}</span></div>
     <div class="stat-line" style="color:#4CAF50"><span>$ alUSD</span><span>${G.alUSD.toFixed(2)}</span></div>
     <div class="stat-line" style="color:#7B68EE"><span>⟠ alETH</span><span>${G.alETH.toFixed(4)}</span></div>
-    <div class="stat-line" style="color:#9C27B0"><span>⚗ ALCX${G.lockedAlcx>0?' (🔒'+G.lockedAlcx+' locked)':''}</span><span>${G.alcx}</span></div>
+    <div class="stat-line" style="color:#9C27B0"><span>⚗ ALCX${G.lockedAlcx>0?' (🔒'+G.lockedAlcx+' queue)':''}${G.alcxVoteLock>0?' (🗳'+G.alcxVoteLock.toFixed(1)+' vote)':''}</span><span>${G.alcx}</span></div>
   `;
   // Quest log
   const qBox=document.getElementById('quest-log-box');
@@ -4640,13 +4671,34 @@ function initSocket(){
     socket.on('gov_state',data=>{
       G.govProposals=data.proposals||[];
       G.earmarkRate=data.earmarkRate||0.005;
+      if(data.quorum!=null)G.govQuorum=data.quorum;
+      // Sync server-reported vote lock on reconnect/join
+      if(data.myLockedAlcx!=null)G.alcxVoteLock=data.myLockedAlcx;
+      renderHUD();
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
     socket.on('gov_result',data=>{
       if(data.ok){
-        if(data.choice)chatLog(`✅ Vote cast: ${data.choice.toUpperCase()} (${data.weight?.toFixed(1)} ALCX weight, ${data.timeLeft}m left)`,'#9C27B0');
-        else chatLog('📜 Governance proposal submitted!','#9C27B0');
+        if(data.lockedAlcx!=null){G.alcxVoteLock=data.lockedAlcx;renderHUD();}
+        if(data.choice){
+          const hLeft=data.hoursLeft||0;
+          chatLog(`🗳 Vote cast: ${data.choice.toUpperCase()} (${data.weight?.toFixed(1)} ALCX locked for ~${hLeft}h)`,'#9C27B0');
+        }else if(data.proposed){
+          chatLog('📜 Governance proposal submitted! Your ALCX is locked for 24h.','#9C27B0');
+        }
       }else chatLog('Gov: '+data.error,'#FF4444');
+      if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
+    });
+    socket.on('gov_vote_released',data=>{
+      // Vote locks released after proposal settles
+      G.alcxVoteLock=Math.max(0,(data.availableAlcx!=null)?0:G.alcxVoteLock);
+      if(data.availableAlcx!=null){
+        // availableAlcx is the new free amount; alcxVoteLock = total - available
+        // But we don't want to change G.alcx; just zero out the lock
+        G.alcxVoteLock=0;
+      }
+      renderHUD();
+      chatLog('🔓 Your governance vote lock has been released! ALCX is free again.','#9C27B0');
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
 
