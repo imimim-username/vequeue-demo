@@ -1,6 +1,6 @@
 # Governance Town / veQueue Demo — Project Context
 
-_Last updated: 2026-04-03_
+_Last updated: 2026-04-05_
 
 ---
 
@@ -43,7 +43,7 @@ A browser-based **multiplayer educational RPG** teaching the **veQueue protocol*
 
 ## Current Asset Version
 
-`v=20260402p` — set in `public/index.html` for CSS + all JS files. Bump each deploy.
+`v=20260402u` — set in `public/index.html` for CSS + all JS files. Bump each deploy.
 
 ---
 
@@ -178,16 +178,49 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 
 ---
 
-## Recent Changes (2026-04-04)
+## Recent Changes (2026-04-05) — `v=20260402u`
 
 | Change | Details |
 |--------|---------|
-| Music v2 — listenable | Lead wave completely rebuilt (harsh 3rd harmonic 0.78→0.10, warm round timbre). Pad wave softened (2nd harmonic 0.80→0.44, no longer sawtooth-like). All arps redesigned: quarter notes with rests instead of 32 machine-gun 8ths. World+tavern: 8-bar singable melodies, quarter-note walking bass. Governance: quarter-note stately bass. Marketplace: syncopated arp. Treasury: sparse half-note arp. Version bumped `v=20260402p` |
+| **Mobile battle buttons fixed** | Root cause: `setupTapMove` `touchstart` handler consumed all canvas touches (calling `preventDefault()`), killing the `click` event before battle buttons fired. Fix: added `G.battle` guard so tap-to-move ignores touches during combat. Added dedicated `touchstart` listener on `cv-ui` that calls `stopPropagation()` and immediately processes hit-testing via new shared `_handleBattleUIPoint()` helper — no 300ms delay |
+| **Mobile audio fixed** | iOS Safari / Android Chrome suspend `AudioContext` on creation and only allow `resume()` inside a direct user-gesture handler. Added one-time capture-phase `touchstart`+`click` listener that creates the context, calls `resume()`, and plays a 1-sample silent buffer — the only reliable iOS unlock sequence |
+| **Building name signs** | Floating banner labels rendered above each main building whenever player is in world zone: 🍺 The Tavern, 🏛 Governance Hall, 🏪 Marketplace, 💰 Treasury, 💱 Currency Exchange. Always visible from a distance so new players know what each building is |
+| **`renderBuildingSigns(ctx)`** | New render function; `_BUILDING_SIGNS` constant array drives positions, labels, and colours. Called in game loop after `renderSpriteLayer()` |
+
+## 2026-04-04 (continued) — `v=20260402t`
+
+| Change | Details |
+|--------|---------|
+| **alETH/alUSD lost on refresh — fixed** | Server anti-cheat guard blocked all client-side currency increases, including legitimate quest rewards. Added `quest_reward` socket event on server that updates `pdb` before `save_character` so the guard sees the new value as baseline. Client now emits `quest_reward` after awarding quest loot, before calling `saveToServer()`. Also added missing alETH chatLog on quest turn-in |
+| **Character stuck near outpost — fixed** | Outpost buildings had a 3-tile-wide WALL at the top, leaving only a 1-tile gap on each side — too narrow given the 20px player hitbox. Narrowed to single centre WALL tile and carved wider GRASS clearings around all four outposts. Widened GRATING (zone-entry trigger) columns from 3 to 5 tiles |
+| **Quest outpost safe zones** | No random encounters within Manhattan radius 9 of any wilderness outpost building. No encounters within radius 6 of subzone spawn point (where quest NPC stands) |
+| **River Raft** (280 alUSD, lvl 3) | Bought from Cartographer Ryn in Marketplace. Equip as accessory or keep in bag — crosses any WATER tile. `isSolid()` checks `hasRaft()` helper; 3 new water enemies: River Sprite, Murk Crawler, River Serpent |
+| **Pathfinder Boots** (350 alUSD, lvl 5) | Unlocks TREE tile traversal — entire world map becomes explorable off-road. `isSolid()` checks `hasForestPass()`. 3 new forest enemies: Tree Spirit, Forest Warden, Thorn Beast. Music switches to Forest track when in TREE tiles |
+| **Explorer's Pack** (0.5 alETH, lvl 7) | Bundle: raft + forest pass, `effect:'raftAndForest'` |
+| **Cartographer Ryn** | New NPC in Marketplace selling exploration gear (`shop:'exploration'`) |
+| **Forest music track** | D minor, 72 BPM, flute wave, `perc:'atmo'`. Haunting melody with Eb5 chromatic colour note. Plays when in TREE tiles with Pathfinder Boots |
+| **6 new enemies** | `riverSprite`, `murkCrawler`, `serpentine` (water); `treeSpirit`, `forestWarden`, `thornBeast` (forest) |
+| **`checkWaterEncounter()`** | 18% encounter rate on WATER tiles when rafting |
+| **`checkForestEncounter()`** | 20% rate on TREE tiles with boots, scales by danger depth; two difficulty tiers |
+
+## 2026-04-04 — `v=20260402s`
+
+| Change | Details |
+|--------|---------|
+| **Music v6 — complete rewrite** | 13 tracks (12 zones + battle) rebuilt from scratch with SNES composition craft. Every track has a 2-bar singable hook with a characteristic interval leap, dotted rhythms for swing, proper chord progressions, walking bass, continuous texture. Beat-verified: all melodies sum to 32 quarter beats |
+| **Battle music** | New `battle` track (A minor, 155 BPM, battle perc). `musPlay('battle')` called in `triggerBattle()` |
+| **Victory fanfare** | `SFX.victoryFanfare()` — FF-style ascending phrase (A4×3 B4 C5 D5 E5 A5) with bass/pad harmony |
+| **Battle music routing** | `musPlay('world')` on defeat/respawn; `musPlay(G.zone)` on victory return |
+
+## Recent Changes (2026-04-04) — `v=20260402r` and earlier
+
+| Change | Details |
+|--------|---------|
+| Music v2 — listenable | Lead wave completely rebuilt (harsh 3rd harmonic 0.78→0.10, warm round timbre). Pad wave softened. All arps redesigned: quarter notes with rests. World+tavern: 8-bar singable melodies, quarter-note walking bass. Version bumped `v=20260402p` |
 | Music v1 | Complete rewrite of all 12 zone tracks: new `glass`/`flute` wave types, per-track ADSR, slower tempos, pads everywhere, Treasury→C minor, Dungeon→E Phrygian |
-| Transaction toast | `showTxToast(msg, type)` — color-coded popup (green=buy/equip, gold=sell, red=drop, blue=use) at top-center, 2.2s dismiss, CSS animated slide-in. Wired into `buyItem`, `equipFromBag`, `sellFromBag`, `dropFromBag`, `usePotion` |
-| Battle crash fix | `ReferenceError: active before init` — hoisted `const active` to top of `renderBattleScreen()`; combat was completely broken |
+| Transaction toast | `showTxToast(msg, type)` — color-coded popup (green=buy/equip, gold=sell, red=drop, blue=use) at top-center, 2.2s dismiss, CSS animated slide-in |
+| Battle crash fix | `ReferenceError: active before init` — hoisted `const active` to top of `renderBattleScreen()` |
 | .gitignore | Added `audio-inspiration/` so MP3 reference files aren't committed |
-| Version bumped | `v=20260402o` |
 
 ---
 
@@ -223,11 +256,14 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 - [ ] NPC quest chain tied deeper into veQueue lore
 - [ ] Auction mechanic for marketplace listings
 - [ ] vqShares / ERC-6909 position NFT visualization
-- [ ] Governance proposal voting mini-game
 - [ ] Discord role reward on quest completion
-- [ ] Mobile layout polish (D-pad, action sheet sizing)
 - [ ] Sound effects expansion (currently sparse)
 - [ ] World loot cleanup (server-side expiry for dropped items)
+- [ ] Raft/forest biome expansion (new map areas reachable only by water/forest)
+- [ ] Mobile HUD sizing pass (action sheet, shop, inventory on small screens)
+- [x] ~~Governance proposal voting mini-game~~ (implemented: ALCX-weighted vote, earmark rate proposals)
+- [x] ~~Mobile layout polish~~ (battle buttons fixed, audio unlock fixed, Apr 2026)
+- [x] ~~Currency exchange~~ (implemented: Exchanger Rex, 0.3% fee, all token pairs)
 
 ---
 
