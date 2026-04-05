@@ -135,14 +135,17 @@ setInterval(()=>{
       p.passed=false;
       io.emit('chat',{nickname:'⚗ Governance',text:`❌ Proposal #${p.id} FAILED (${p.yesWeight.toFixed(1)} YES vs ${p.noWeight.toFixed(1)} NO). Earmark rate stays at ${(EARMARK_RATE_LIVE*100).toFixed(2)}%.`});
     }
-    // Release vote locks for this proposal from all accounts
+    // Release vote locks: refund committed ALCX back to wallet (it was a subset of lockedAlcx)
     Object.entries(pdb).forEach(([id,acct])=>{
       if(!acct.data?.alcxVoteLocks)return;
-      if(acct.data.alcxVoteLocks[p.id]!==undefined){
-        delete acct.data.alcxVoteLocks[p.id];
-        const sid=socketsByAccount[id];
-        if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id});
-      }
+      const voteAmt=acct.data.alcxVoteLocks[p.id];
+      if(voteAmt===undefined)return;
+      // Return the vote-committed portion to the wallet and reduce lockedAlcx accordingly
+      acct.data.alcx=parseFloat(((acct.data.alcx||0)+voteAmt).toFixed(4));
+      acct.data.lockedAlcx=Math.max(0,parseFloat(((acct.data.lockedAlcx||0)-voteAmt).toFixed(4)));
+      delete acct.data.alcxVoteLocks[p.id];
+      const sid=socketsByAccount[id];
+      if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id,refundAmt:voteAmt});
     });
     changed=true;
   });
@@ -642,10 +645,16 @@ io.on('connection',socket=>{
     // Prevent double-join
     if(side.entries.find(e=>e.id===socket.id))return;
     const ticket=side.nextTicket++;
-    side.entries.push({id:socket.id,nickname:p.nickname,ticket,locked:locked||0});
+    const lockAmt=Math.max(0,parseFloat(locked||0));
+    side.entries.push({id:socket.id,nickname:p.nickname,ticket,locked:lockAmt});
+    // Keep pdb in sync so vote validation can read lockedAlcx immediately
+    if(socket.accountId&&pdb[socket.accountId]?.data&&lockAmt>0){
+      const d=pdb[socket.accountId].data;
+      d.alcx=Math.max(0,parseFloat(((d.alcx||0)-lockAmt).toFixed(4)));
+      d.lockedAlcx=parseFloat(((d.lockedAlcx||0)+lockAmt).toFixed(4));
+      saveDb();
+    }
     socket.emit('queue_joined',{zone,queueType,ticket,serving:side.serving});
-    // Let the auto-advance tick serve the player at the normal rate.
-    // Entry queue always has NPC bots ahead; exit queue minimum wait is 1 tick (10s).
     broadcastQueueState(zone);
   });
 
@@ -656,7 +665,17 @@ io.on('connection',socket=>{
     const idx=side.entries.findIndex(e=>e.id===socket.id);
     if(idx<0)return;
     side.entries.splice(idx,1);
-    // Immediately serve the next person
+    // Refund queue-locked ALCX minus any portion committed to an active vote
+    // (vote-committed portion stays locked until the proposal settles)
+    if(socket.accountId&&pdb[socket.accountId]?.data){
+      const d=pdb[socket.accountId].data;
+      const voteLocked=getVoteLocked(socket.accountId);
+      const lockedNow=parseFloat(d.lockedAlcx||0);
+      const refund=Math.max(0,parseFloat((lockedNow-voteLocked).toFixed(4)));
+      d.alcx=parseFloat(((d.alcx||0)+refund).toFixed(4));
+      d.lockedAlcx=voteLocked; // retain only vote-committed portion
+      saveDb();
+    }
     serveNext(zone,queueType);
     broadcastQueueState(zone);
   });
@@ -934,8 +953,9 @@ io.on('connection',socket=>{
     if(isNaN(bidAmt)||bidAmt<1)return socket.emit('auction_result',{ok:false,error:'Minimum bid is 1 ALCX.'});
     // Validate server-side ALCX balance (free, not locked in governance votes)
     const bidderData=socket.accountId&&pdb[socket.accountId]?.data;
-    const serverAlcx=socket.accountId?getAvailableAlcx(socket.accountId):(bidderData?.alcx||0);
-    if(serverAlcx<bidAmt)return socket.emit('auction_result',{ok:false,error:`Not enough free ALCX. (available: ${serverAlcx.toFixed(2)} — some may be locked in governance vote)`});
+    // Vote-committed ALCX is already removed from pdb.data.alcx at vote time, so plain alcx is the free amount
+    const serverAlcx=parseFloat(bidderData?.alcx||0);
+    if(serverAlcx<bidAmt)return socket.emit('auction_result',{ok:false,error:`Not enough free ALCX (have ${serverAlcx.toFixed(2)}).`});
     const side=queues[zone][queueType];
     const myEntry=side.entries.find(e=>e.id===socket.id);
     if(!myEntry)return socket.emit('auction_result',{ok:false,error:'You are not in this queue.'});

@@ -662,8 +662,12 @@ function handleQueueDoor(key,door){
       // Served — pass through
       socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type});
       clearTimeout(G._queueServTimer);G._queueServExpiry=null;
-      G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
-      updateQueuePanel();
+      // Return only non-vote-committed portion; vote-lock stays until proposal settles
+      const _refund=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
+      G.alcx=parseFloat((G.alcx+_refund).toFixed(4));
+      G.lockedAlcx=G.alcxVoteLock;
+      G.queueState=null;
+      updateQueuePanel();renderHUD();
       changeZone(door.to,door.sx,door.sy);
     }
     // else: still waiting — panel already visible, do nothing
@@ -2458,8 +2462,8 @@ function doAuctionBid(){
   if(!G.queueState||G.queueState.served)return;
   const amt=parseFloat(document.getElementById('queue-bid-amt')?.value||0);
   if(isNaN(amt)||amt<1){chatLog('Enter a valid ALCX bid (min 1).','#FF4444');return;}
-  const freeAlcx=parseFloat((G.alcx-G.alcxVoteLock).toFixed(4));
-  if(freeAlcx<amt){chatLog(`Not enough free ALCX! (${freeAlcx.toFixed(1)} available, ${G.alcxVoteLock.toFixed(1)} locked in vote)`,'#FF4444');SFX.error();return;}
+  // G.alcx is already wallet-only; G.alcxVoteLock is inside G.lockedAlcx, not G.alcx
+  if(G.alcx<amt){chatLog(`Not enough free ALCX! (have ${G.alcx.toFixed(1)})`,'#FF4444');SFX.error();return;}
   G.alcx=parseFloat((G.alcx-amt).toFixed(4));
   renderHUD();
   socket?.emit('queue_auction_bid',{zone:G.queueState.zone,queueType:G.queueState.type,alcx:amt});
@@ -2468,8 +2472,8 @@ function doAuctionBid(){
 
 function doFastExit(fee){
   if(!G.queueState||G.queueState.type!=='exit'||G.queueState.served)return;
-  const freeAlcx=parseFloat((G.alcx-G.alcxVoteLock).toFixed(4));
-  if(freeAlcx<fee){chatLog(`Not enough free ALCX for fast exit (${freeAlcx.toFixed(1)} available, ${G.alcxVoteLock.toFixed(1)} locked in vote).`,'#FF5722');SFX.error();return;}
+  // G.alcx is wallet-only; vote-lock is inside G.lockedAlcx, not G.alcx
+  if((G.alcx||0)<fee){chatLog(`Not enough free ALCX for fast exit (have ${(G.alcx||0).toFixed(1)}).`,'#FF5722');SFX.error();return;}
   G.alcx=parseFloat((G.alcx-fee).toFixed(4));
   renderHUD();
   chatLog(`⚡ Fast exit: ${fee} ALCX paid — skipping the exit queue! Fee goes to treasury.`,'#FFD700');
@@ -4532,8 +4536,9 @@ function initSocket(){
           if(G.queueState&&G.queueState.served&&G.queueState.zone===data.zone){
             chatLog('⏰ Queue ticket expired — you took too long to reach the gate! Rejoining...','#FF5722');
             socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
-            G.alcx+=G.lockedAlcx;G.lockedAlcx=0;
-            // Auto-rejoin at back of queue
+            // Return only non-vote-committed portion; vote-lock stays until proposal settles
+            const _r=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
+            G.alcx=parseFloat((G.alcx+_r).toFixed(4));G.lockedAlcx=G.alcxVoteLock;
             const z=G.queueState.zone,t=G.queueState.type;
             G.queueState=null;G._queueServExpiry=null;
             updateQueuePanel();
@@ -4724,10 +4729,14 @@ function initSocket(){
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
     socket.on('gov_vote_released',data=>{
-      // Proposal settled — release the committed stake back to uncommitted queue-lock
+      // Server has already added refundAmt back to pdb.alcx and reduced pdb.lockedAlcx.
+      // Mirror that on the client: move the vote-committed amount back to wallet.
+      const refund=parseFloat(data.refundAmt||G.alcxVoteLock||0);
+      G.alcx=parseFloat((G.alcx+refund).toFixed(4));
+      G.lockedAlcx=Math.max(0,parseFloat((G.lockedAlcx-refund).toFixed(4)));
       G.alcxVoteLock=0;
       renderHUD();
-      chatLog('🔓 Governance vote settled — your queue stake is fully uncommitted again.','#9C27B0');
+      chatLog(`🔓 Governance vote settled — +${refund.toFixed(1)} ALCX returned to your wallet.`,'#9C27B0');
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
 
@@ -4875,8 +4884,9 @@ document.getElementById('queue-enter-btn')?.addEventListener('click',()=>{
   const{zone,type}=G.queueState;
   socket?.emit('queue_leave',{zone,queueType:type});
   clearTimeout(G._queueServTimer);G._queueServExpiry=null;
-  G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
-  updateQueuePanel();
+  const _r2=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
+  G.alcx=parseFloat((G.alcx+_r2).toFixed(4));G.lockedAlcx=G.alcxVoteLock;
+  G.queueState=null;updateQueuePanel();renderHUD();
   const key=type==='entry'?`world_${zone}`:`${zone}_exit`;
   const door=ZONE_DOORS[key];
   if(door)changeZone(door.to,door.sx,door.sy);
@@ -4885,9 +4895,11 @@ document.getElementById('queue-leave-btn')?.addEventListener('click',()=>{
   if(!G.queueState)return;
   socket?.emit('queue_leave',{zone:G.queueState.zone,queueType:G.queueState.type});
   clearTimeout(G._queueServTimer);G._queueServExpiry=null;
-  G.alcx+=G.lockedAlcx;G.lockedAlcx=0;G.queueState=null;
-  updateQueuePanel();
-  chatLog('Left the queue.','#888');
+  const _r3=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
+  G.alcx=parseFloat((G.alcx+_r3).toFixed(4));G.lockedAlcx=G.alcxVoteLock;
+  G.queueState=null;updateQueuePanel();renderHUD();
+  const _vl=G.alcxVoteLock;
+  chatLog(`Left the queue.${_vl>0?` ⚗${_vl.toFixed(1)} ALCX stays locked until your governance vote settles.`:''}`,'#888');
 });
 
 // Live countdown ticker for served-ticket window
