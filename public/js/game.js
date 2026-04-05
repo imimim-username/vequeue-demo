@@ -2658,31 +2658,15 @@ function depositBank(collateral){
   if(amt<=0){chatLog('Enter a deposit amount.','#FF8800');return;}
   if(collateral==='spacebucks'&&G.spacebucks<amt){chatLog('Not enough Spacebucks!','#FF4444');return;}
   if(collateral==='schmeckles'&&G.schmeckles<amt){chatLog('Not enough Schmeckles!','#FF4444');return;}
-  const borrow=Math.floor(amt*0.9*100)/100;
-  if(collateral==='spacebucks'){G.spacebucks-=amt;G.alUSD=Math.round((G.alUSD+borrow)*100)/100;}
-  else{G.schmeckles-=amt;G.alETH=Math.round((G.alETH+borrow)*10000)/10000;}
-  G.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
-  chatLog(`🏦 Deposited ${amt} ${collateral==='spacebucks'?'Spacebucks':'Schmeckles'} → borrowed ${borrow} ${collateral==='spacebucks'?'alUSD':'alETH'} (90% LTV)`,'#4CAF50');
-  SFX.buy();
-  socket?.emit('bank_sync',{bankPositions:G.bankPositions});
-  renderBankUI();
+  // Server-authoritative: pdb is updated first so anti-cheat won't block the resulting
+  // alETH/alUSD increase when save_character fires.
+  socket?.emit('bank_borrow',{collateral,amount:amt});
 }
 function claimBankPosition(idx){
   const pos=G.bankPositions[idx];
   if(!pos||pos.debt>0.001||pos.claimed)return;
-  const interest=pos.interestAccrued||0;
-  const total=pos.deposited+interest;
-  pos.claimed=true;
-  pos.interestAccrued=0;
-  if(pos.collateral==='spacebucks')G.spacebucks+=total;
-  else G.schmeckles+=total;
-  const icon=pos.collateral==='spacebucks'?'🪙':'💀';
-  const interestNote=interest>0?` (+${interest} ${icon} interest earned)`:'';
-  chatLog(`✅ Claimed ${total} ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'} ${icon}${interestNote}!`,'#FFD700');
-  SFX.coin();
-  socket?.emit('bank_sync',{bankPositions:G.bankPositions});
-  renderBankUI();
-  saveToServer();
+  // Server-authoritative: pdb gets spacebucks/schmeckles before save_character fires.
+  socket?.emit('bank_claim',{idx});
 }
 
 // ── TRANSMUTER ────────────────────────────────────────────────────────────────
@@ -2745,39 +2729,16 @@ function depositTransmuter(type){
 function claimTransmuter(idx){
   const dep=G.transmuterDeposits[idx];
   if(!dep||dep.available<=0.001)return;
-  const amt=dep.available;
-  dep.available=0;
-  if(dep.type==='alUSD')G.spacebucks+=Math.floor(amt);
-  else G.schmeckles+=Math.floor(amt);
-  chatLog(`✅ Transmuter: claimed ${Math.floor(amt)} ${dep.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles'}!`,'#FFD700');
-  SFX.coin();
-  socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
-  renderTransmuterUI();
-  saveToServer();
+  // Server-authoritative: pdb.spacebucks/schmeckles updated before save_character fires.
+  socket?.emit('transmuter_claim',{idx});
 }
 
 // Early withdrawal — returns unconverted synthetic minus exitFee (10% → Treasury)
 function earlyWithdrawTransmuter(idx){
   const dep=G.transmuterDeposits[idx];
   if(!dep||dep.amount<=0.001)return;
-  const gross=dep.amount;
-  const isUSD=dep.type==='alUSD';
-  const dp=isUSD?2:4;
-  const fee=parseFloat((gross*TRANSMUTER_EXIT_FEE).toFixed(dp));
-  const returned=parseFloat((gross-fee).toFixed(dp));
-  dep.amount=0;
-  if(isUSD) G.alUSD=parseFloat((G.alUSD+returned).toFixed(2));
-  else      G.alETH=parseFloat((G.alETH+returned).toFixed(4));
-  chatLog(`⚠ Transmuter early exit: returned ${returned} ${dep.type} (${fee} exitFee → Treasury).`,'#FF8C00');
-  SFX.error();
-  // Fee credited to the shared protocol Treasury on the server
-  socket?.emit('transmuter_exit_fee',{
-    feeAlUSD: isUSD?fee:0,
-    feeAlETH: isUSD?0:fee,
-  });
-  socket?.emit('transmuter_sync',{transmuterDeposits:G.transmuterDeposits});
-  renderTransmuterUI();
-  saveToServer();
+  // Server-authoritative: pdb.alETH/alUSD updated and treasury fee credited before save fires.
+  socket?.emit('transmuter_withdraw',{idx});
 }
 function distributeTransmuterPool(sbAmount,ethAmount){
   // alUSD depositors get Spacebucks, alETH depositors get Schmeckles
@@ -2924,29 +2885,8 @@ function doExchange(){
   if(amt<=0){chatLog('Enter an amount.','#FF8800');return;}
   const bal={spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,alcx:G.alcx}[from];
   if(bal<amt){chatLog('Insufficient balance!','#FF4444');SFX.error();return;}
-  const gross=amt*(EXCHANGE_RATES[from]/EXCHANGE_RATES[to]);
-  const fee=gross*0.003;
-  const received=gross-fee;
-  if(from==='spacebucks')G.spacebucks-=amt;
-  else if(from==='schmeckles')G.schmeckles-=amt;
-  else if(from==='alUSD')G.alUSD-=amt;
-  else if(from==='alETH')G.alETH-=amt;
-  else if(from==='alcx')G.alcx-=amt;
-  if(to==='spacebucks')G.spacebucks=Math.round((G.spacebucks+received)*100)/100;
-  else if(to==='schmeckles')G.schmeckles=Math.round((G.schmeckles+received)*100)/100;
-  else if(to==='alUSD')G.alUSD=Math.round((G.alUSD+received)*100)/100;
-  else if(to==='alETH')G.alETH=Math.round((G.alETH+received)*10000)/10000;
-  else if(to==='alcx')G.alcx=Math.round((G.alcx+received)*100)/100;
-  chatLog(`⚗ Swapped ${amt} ${from} → ${received.toFixed(4)} ${to} (fee: ${fee.toFixed(4)})`, '#4CAF50');
-  // Report fee to server for treasury tracking
-  if(socket){
-    const feeAlUSD=to==='alUSD'||from==='alUSD'?parseFloat(fee.toFixed(2)):0;
-    const feeAlETH=to==='alETH'||from==='alETH'?parseFloat(fee.toFixed(4)):0;
-    socket.emit('exchange_fee',{feeAlUSD,feeAlETH});
-  }
-  SFX.buy();
-  saveToServer();
-  renderExchangeUI();
+  // Server-authoritative: server validates, executes exchange, updates pdb, responds with new balances.
+  socket?.emit('currency_exchange',{from,to,amount:amt});
 }
 function renderExchangeUI(){
   document.getElementById('ex-sb').textContent=G.spacebucks;
@@ -4667,6 +4607,47 @@ function initSocket(){
       if(document.getElementById('market-ui').style.display!=='none')renderMarketUI();
     });
     socket.on('market_error',data=>{chatLog(data.error,'#FF4444');SFX.error();});
+
+    // ── Bank / Transmuter / Exchange server-authoritative results ─────────────
+    socket.on('bank_borrow_result',data=>{
+      if(!data.ok){chatLog('🏦 Bank error: '+data.error,'#FF4444');SFX.error();return;}
+      if(data.spacebucks!=null)G.spacebucks=data.spacebucks;
+      if(data.schmeckles!=null)G.schmeckles=data.schmeckles;
+      if(data.alUSD!=null)G.alUSD=data.alUSD;
+      if(data.alETH!=null)G.alETH=data.alETH;
+      if(data.bankPositions)G.bankPositions=data.bankPositions;
+      const pos=data.bankPositions?.[data.bankPositions.length-1];
+      if(pos)chatLog(`🏦 Deposited ${pos.deposited} ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'} → borrowed ${pos.borrowed} ${pos.collateral==='spacebucks'?'alUSD':'alETH'} (90% LTV)`,'#4CAF50');
+      SFX.buy();renderHUD();renderBankUI();saveToServer();
+    });
+    socket.on('bank_claim_result',data=>{
+      if(!data.ok){chatLog('🏦 Claim error: '+data.error,'#FF4444');return;}
+      G.spacebucks=data.spacebucks;G.schmeckles=data.schmeckles;G.bankPositions=data.bankPositions;
+      const icon=data.collateral==='spacebucks'?'🪙':'💀';
+      chatLog(`✅ Claimed ${data.total} ${data.collateral==='spacebucks'?'Spacebucks':'Schmeckles'} ${icon}!`,'#FFD700');
+      SFX.coin();renderHUD();renderBankUI();saveToServer();
+    });
+    socket.on('transmuter_claim_result',data=>{
+      if(!data.ok){chatLog('⚗ Transmuter error: '+data.error,'#FF4444');return;}
+      G.spacebucks=data.spacebucks;G.schmeckles=data.schmeckles;G.transmuterDeposits=data.transmuterDeposits;
+      chatLog(`✅ Transmuter: claimed ${data.claimed} ${data.type==='alUSD'?'🪙 Spacebucks':'💀 Schmeckles'}!`,'#FFD700');
+      SFX.coin();renderHUD();renderTransmuterUI();saveToServer();
+    });
+    socket.on('transmuter_withdraw_result',data=>{
+      if(!data.ok){chatLog('⚗ Transmuter error: '+data.error,'#FF4444');return;}
+      if(data.alUSD!=null)G.alUSD=data.alUSD;
+      if(data.alETH!=null)G.alETH=data.alETH;
+      G.transmuterDeposits=data.transmuterDeposits;
+      chatLog(`⚠ Transmuter early exit: returned ${data.returned} ${data.type} (${data.fee} fee → Treasury).`,'#FF8C00');
+      SFX.error();renderHUD();renderTransmuterUI();saveToServer();
+    });
+    socket.on('currency_exchange_result',data=>{
+      if(!data.ok){chatLog('⚗ Exchange error: '+data.error,'#FF4444');SFX.error();return;}
+      G.spacebucks=data.spacebucks;G.schmeckles=data.schmeckles;
+      G.alUSD=data.alUSD;G.alETH=data.alETH;G.alcx=data.alcx;
+      chatLog(`⚗ Swapped ${data.amount} ${data.from} → ${data.received.toFixed(4)} ${data.to} (fee: ${data.fee.toFixed(4)})`,'#4CAF50');
+      SFX.buy();renderHUD();renderExchangeUI();saveToServer();
+    });
 
     // ── Live Prices ──────────────────────────────────────────────────────────
     socket.on('price_update',data=>{

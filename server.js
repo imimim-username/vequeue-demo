@@ -486,7 +486,8 @@ io.on('connection',socket=>{
     socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:savedData});
   });
 
-  // Sync bank positions after any bank transaction (deposit/claim)
+  // Sync bank positions — used only for debt-reduction updates from the game tick.
+  // Borrow and claim operations now use bank_borrow / bank_claim (server-authoritative).
   socket.on('bank_sync',data=>{
     if(!socket.accountId||!pdb[socket.accountId])return;
     pdb[socket.accountId].data=pdb[socket.accountId].data||{};
@@ -494,42 +495,132 @@ io.on('connection',socket=>{
     saveDb();
   });
 
-  // Sync transmuter deposits after any transmuter transaction.
-  // Detects claimed amounts (drop in dep.available) and credits currency to pdb
-  // so the anti-cheat guard in save_character won't undo the gain.
+  // Bank borrow — server-authoritative so the resulting alETH/alUSD increase is
+  // written to pdb BEFORE save_character fires (bypassing the anti-cheat increase guard).
+  socket.on('bank_borrow',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const d=pdb[socket.accountId].data;if(!d)return;
+    const collateral=data.collateral;
+    const amt=parseInt(data.amount)||0;
+    if(amt<=0)return socket.emit('bank_borrow_result',{ok:false,error:'Invalid amount.'});
+    if(collateral==='spacebucks'){
+      if((d.spacebucks||0)<amt)return socket.emit('bank_borrow_result',{ok:false,error:'Not enough Spacebucks.'});
+      const borrow=Math.floor(amt*0.9*100)/100;
+      d.spacebucks=Math.floor((d.spacebucks||0)-amt);
+      d.alUSD=parseFloat(((d.alUSD||0)+borrow).toFixed(2));
+      d.bankPositions=d.bankPositions||[];
+      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
+      saveDb();
+      socket.emit('bank_borrow_result',{ok:true,spacebucks:d.spacebucks,alUSD:d.alUSD,bankPositions:d.bankPositions});
+    }else if(collateral==='schmeckles'){
+      if((d.schmeckles||0)<amt)return socket.emit('bank_borrow_result',{ok:false,error:'Not enough Schmeckles.'});
+      const borrow=Math.floor(amt*0.9*100)/100;
+      d.schmeckles=Math.floor((d.schmeckles||0)-amt);
+      d.alETH=parseFloat(((d.alETH||0)+borrow).toFixed(4));
+      d.bankPositions=d.bankPositions||[];
+      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
+      saveDb();
+      socket.emit('bank_borrow_result',{ok:true,schmeckles:d.schmeckles,alETH:d.alETH,bankPositions:d.bankPositions});
+    }else{
+      socket.emit('bank_borrow_result',{ok:false,error:'Unknown collateral type.'});
+    }
+  });
+
+  // Bank collateral claim — server-authoritative
+  socket.on('bank_claim',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const d=pdb[socket.accountId].data;
+    if(!d||!Array.isArray(d.bankPositions))return;
+    const idx=parseInt(data.idx);
+    const pos=d.bankPositions[idx];
+    if(!pos||pos.debt>0.001||pos.claimed)return socket.emit('bank_claim_result',{ok:false,error:'Position not claimable.'});
+    const interest=pos.interestAccrued||0;
+    const total=Math.floor(pos.deposited+interest);
+    pos.claimed=true;pos.interestAccrued=0;
+    if(pos.collateral==='spacebucks')d.spacebucks=Math.floor((d.spacebucks||0)+total);
+    else d.schmeckles=Math.floor((d.schmeckles||0)+total);
+    saveDb();
+    socket.emit('bank_claim_result',{ok:true,collateral:pos.collateral,total,spacebucks:d.spacebucks,schmeckles:d.schmeckles,bankPositions:d.bankPositions});
+  });
+
+  // Transmuter deposit sync — only called when depositing (currency decreases are safe).
   socket.on('transmuter_sync',data=>{
     if(!socket.accountId||!pdb[socket.accountId])return;
     const stored=pdb[socket.accountId].data=pdb[socket.accountId].data||{};
-    const oldDeps=stored.transmuterDeposits||[];
-    const newDeps=Array.isArray(data.transmuterDeposits)?data.transmuterDeposits:[];
-    // Credit any drop in `available` to the player's currency balance
-    newDeps.forEach((dep,i)=>{
-      const oldAvail=(oldDeps[i]?.available)||0;
-      const newAvail=dep.available||0;
-      const claimed=parseFloat((oldAvail-newAvail).toFixed(4));
-      if(claimed>0.0001){
-        if(dep.type==='alUSD') stored.alUSD=parseFloat(((stored.alUSD||0)+claimed).toFixed(2));
-        else                   stored.alETH=parseFloat(((stored.alETH||0)+claimed).toFixed(4));
-      }
-    });
-    stored.transmuterDeposits=newDeps;
+    stored.transmuterDeposits=Array.isArray(data.transmuterDeposits)?data.transmuterDeposits:stored.transmuterDeposits;
     saveDb();
   });
 
-  // Client reports exchange fees (0.3% of each swap) for treasury accounting
+  // Transmuter claim — server-authoritative so spacebucks/schmeckles increase lands in pdb first
+  socket.on('transmuter_claim',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const d=pdb[socket.accountId].data;
+    if(!d||!Array.isArray(d.transmuterDeposits))return;
+    const idx=parseInt(data.idx);
+    const dep=d.transmuterDeposits[idx];
+    if(!dep||dep.available<=0.001)return socket.emit('transmuter_claim_result',{ok:false,error:'Nothing to claim.'});
+    const amt=dep.available;dep.available=0;
+    const claimed=Math.floor(amt);
+    if(dep.type==='alUSD')d.spacebucks=Math.floor((d.spacebucks||0)+claimed);
+    else d.schmeckles=Math.floor((d.schmeckles||0)+claimed);
+    saveDb();
+    socket.emit('transmuter_claim_result',{ok:true,type:dep.type,claimed,spacebucks:d.spacebucks,schmeckles:d.schmeckles,transmuterDeposits:d.transmuterDeposits});
+  });
+
+  // Transmuter early withdrawal — server-authoritative
+  const _TRANSMUTER_EXIT_FEE=0.10;
+  socket.on('transmuter_withdraw',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const d=pdb[socket.accountId].data;
+    if(!d||!Array.isArray(d.transmuterDeposits))return;
+    const idx=parseInt(data.idx);
+    const dep=d.transmuterDeposits[idx];
+    if(!dep||dep.amount<=0.001)return socket.emit('transmuter_withdraw_result',{ok:false,error:'Nothing to withdraw.'});
+    const gross=dep.amount;const isUSD=dep.type==='alUSD';const dp=isUSD?2:4;
+    const fee=parseFloat((gross*_TRANSMUTER_EXIT_FEE).toFixed(dp));
+    const returned=parseFloat((gross-fee).toFixed(dp));
+    dep.amount=0;
+    if(isUSD){d.alUSD=parseFloat(((d.alUSD||0)+returned).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+fee).toFixed(2));}
+    else{d.alETH=parseFloat(((d.alETH||0)+returned).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+fee).toFixed(4));}
+    saveDb();broadcastTreasury();
+    socket.emit('transmuter_withdraw_result',{ok:true,type:dep.type,returned,fee,alETH:d.alETH,alUSD:d.alUSD,transmuterDeposits:d.transmuterDeposits});
+  });
+
+  // Currency exchange — server-authoritative; uses live prices same as client
+  socket.on('currency_exchange',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const d=pdb[socket.accountId].data;if(!d)return;
+    const VALID=['spacebucks','schmeckles','alUSD','alETH','alcx'];
+    const{from,to}=data;const amt=parseFloat(data.amount)||0;
+    if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0)
+      return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});
+    const rates={spacebucks:1,schmeckles:1,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
+    const bal=d[from]||0;
+    if(bal<amt-0.0001)return socket.emit('currency_exchange_result',{ok:false,error:'Insufficient balance.'});
+    const gross=amt*(rates[from]/rates[to]);
+    const fee=gross*0.003;
+    const dp_to=(to==='alETH'||to==='alcx')?4:2;
+    const dp_from=(from==='alETH'||from==='alcx')?4:2;
+    const received=parseFloat((gross-fee).toFixed(dp_to));
+    d[from]=parseFloat(Math.max(0,bal-amt).toFixed(dp_from));
+    d[to]=parseFloat(((d[to]||0)+received).toFixed(dp_to));
+    // Fee → treasury (fee is in the "to" currency denomination)
+    if(to==='alUSD'||from==='alUSD'){const f=parseFloat((fee*(to==='alUSD'?1:(rates.alUSD/rates[to]))).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+Math.abs(f)).toFixed(2));}
+    else if(to==='alETH'||from==='alETH'){const f=parseFloat((fee*(to==='alETH'?1:(rates.alETH/rates[to]))).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+Math.abs(f)).toFixed(4));}
+    saveDb();broadcastTreasury();
+    socket.emit('currency_exchange_result',{ok:true,from,to,amount:amt,received,fee,
+      spacebucks:d.spacebucks,schmeckles:d.schmeckles,alUSD:d.alUSD,alETH:d.alETH,alcx:d.alcx});
+  });
+
+  // Legacy fee-only events (kept for compatibility; new code uses currency_exchange above)
   socket.on('exchange_fee',data=>{
     const{feeAlUSD,feeAlETH}=data;
     if(feeAlUSD>0)treasury.alUSD=parseFloat((treasury.alUSD+(feeAlUSD||0)).toFixed(2));
     if(feeAlETH>0)treasury.alETH=parseFloat((treasury.alETH+(feeAlETH||0)).toFixed(4));
     broadcastTreasury();
   });
-
-  // Transmuter early-exit fee → protocol Treasury (10% of unconverted amount)
   socket.on('transmuter_exit_fee',data=>{
-    const{feeAlUSD,feeAlETH}=data;
-    if(feeAlUSD>0)treasury.alUSD=parseFloat((treasury.alUSD+feeAlUSD).toFixed(2));
-    if(feeAlETH>0)treasury.alETH=parseFloat((treasury.alETH+feeAlETH).toFixed(4));
-    broadcastTreasury();
+    // no-op: fee now handled server-side in transmuter_withdraw
   });
 
   // Quest reward grant — client calls this BEFORE save_character so the anti-cheat
