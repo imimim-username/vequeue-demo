@@ -2770,6 +2770,22 @@ const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 const CHANGELOG=[
   {
+    version:'1.0.1', date:'Apr 5 2026',
+    sections:[
+      {title:'Bank Loan Repayment Fix',items:[
+        'Loans were repaying in ~10 minutes instead of the intended ~17 hours.',
+        'Root cause: a client-side game-loop ticker was firing every 3 seconds at 0.5% of original principal — ~100× faster than the server\'s 5-minute transmuter tick — and continuously overwriting the server\'s debt values.',
+        'Fix: removed client-side repayment entirely. Debt now reduces server-side only (earmark rate × current debt every 5 minutes).',
+        'At the default 0.5% earmark rate, full loan repayment now takes ~17 hours.',
+      ]},
+      {title:'Earmark Rate Persistence Fix',items:[
+        'Admin panel earmark rate changes were lost on every server restart.',
+        'Root cause: saveGov() was persisting proposals, history, and ID sequence, but omitting earmarkRate from the file.',
+        'Fix: earmarkRate is now included in governance.json; admin changes and governance vote outcomes both survive restarts.',
+      ]},
+    ]
+  },
+  {
     version:'1.0.0', date:'Apr 5 2026',
     sections:[
       {title:'Inner-District Tunnels',items:[
