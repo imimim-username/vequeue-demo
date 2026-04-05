@@ -1,8 +1,9 @@
+import { T, TOWN_OX, TOWN_OY, NS_L, NS_R, DGN_W, DGN_H } from './data.js';
 // ── TOWN MAP ─────────────────────────────────────────────────────────────────
 // 40 wide × 28 tall. Player spawns at col 20, row 14 (centre road).
 // All roads are 2 tiles wide; buildings have 3-tile-wide entrances; no dead ends.
-const MAP_W=40,MAP_H=28;
-const TOWN_MAP=(()=>{
+export const MAP_W=40,MAP_H=28;
+export const TOWN_MAP=(()=>{
   const m=Array.from({length:MAP_H},()=>new Array(MAP_W).fill(T.GRASS));
   const set=(r,c,t)=>{if(r>=0&&r<MAP_H&&c>=0&&c<MAP_W)m[r][c]=t;};
   const fill=(r1,c1,r2,c2,t)=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)set(r,c,t);};
@@ -113,7 +114,7 @@ const TOWN_MAP=(()=>{
 //   N river: rows 22-24   S river: rows 100-102
 //   W river: cols 50-52   E river: cols 165-167
 // Main N-S road: cols 109-110   Main E-W road: rows 68-69
-const WORLD_MAP=(()=>{
+export const WORLD_MAP=(()=>{
   const m=Array.from({length:WORLD_H},()=>new Array(WORLD_W).fill(T.GRASS));
   const s=(r,c,t)=>{if(r>=0&&r<WORLD_H&&c>=0&&c<WORLD_W)m[r][c]=t;};
   const f=(r1,c1,r2,c2,t)=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)s(r,c,t);};
@@ -379,7 +380,7 @@ const WORLD_MAP=(()=>{
 })();
 
 // ── BUILDING INTERIORS ────────────────────────────────────────────────────────
-const ZONE_MAPS = {
+export const ZONE_MAPS = {
   tavern: makeTavern(),
   governance: makeGovernance(),
   marketplace: makeMarketplace(),
@@ -593,7 +594,7 @@ function makeGovernanceChamber(){
 }
 
 // Zone metadata
-const ZONES = {
+export const ZONES = {
   world:      {map:WORLD_MAP,              w:WORLD_W,h:WORLD_H,spawnX:TOWN_OX+20,spawnY:TOWN_OY+14,
                solid:WORLD_SOLID,          name:'Town Square',bg:'world'},
   tavern:     {map:ZONE_MAPS.tavern,      w:20,h:13,spawnX:10,spawnY:10,solid:SOLID_TILES,
@@ -616,7 +617,7 @@ const ZONES = {
 // Zone entrance/exit connections
 // ── NPC DEFINITIONS ───────────────────────────────────────────────────────────
 // Each NPC: {id, x, y (tile coords), type (sprite), name, face (direction 0-3), dialog[]}
-const NPCS = {
+export const NPCS = {
   world:[
     { id:'town_crier', x:TOWN_OX+20, y:TOWN_OY+10, type:'guard', face:2, name:'Town Crier', questId:'wolf_hunt', priceCrier:true,
       dialog:[
@@ -877,7 +878,7 @@ const NPCS = {
   ],
 };
 
-const ZONE_DOORS = {
+export const ZONE_DOORS = {
   // From world → building interiors (tileRows/Cols in WORLD coordinates)
   world_tavern:     {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+7,TOWN_OX+8,TOWN_OX+9], to:'tavern',    sx:10,sy:11},
   world_governance: {from:'world',tileRows:[TOWN_OY+11],tileCols:[TOWN_OX+28,TOWN_OX+29,TOWN_OX+30],to:'governance',sx:10,sy:11},

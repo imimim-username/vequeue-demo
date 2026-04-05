@@ -1,14 +1,17 @@
+import { T, TS, WORLD_W, WORLD_H, TOWN_OX, TOWN_OY, SOLID_TILES, PLAYER_COLORS, HAIR_COLORS, SKIN_TONES, SPECIES, RARITY_COLOR, RARITY_LABEL, CFG } from './data.js';
+import { ZONES, NPCS, ZONE_DOORS, MAP_W, MAP_H, ZONE_MAPS, TOWN_MAP } from './maps.js';
+
 // ── TILE CACHE ───────────────────────────────────────────────────────────────
 // Pre-render every tile type into an offscreen canvas for fast stamping
-const TILE_CACHE = {};
-let WATER_FRAMES = [];  // 3 pre-rendered animation frames for water tiles
+export const TILE_CACHE = {};
+export let WATER_FRAMES = [];  // 3 pre-rendered animation frames for water tiles
 
 function makeTile(fn){
   const c=document.createElement('canvas');c.width=TS;c.height=TS;
   fn(c.getContext('2d'));return c;
 }
 
-function buildTileCache(){
+export function buildTileCache(){
   TILE_CACHE[T.VOID]   = makeTile(drawVoid);
   TILE_CACHE[T.GRASS]  = makeTile(drawGrass);
   TILE_CACHE[T.ROAD]   = makeTile(drawRoad);
@@ -160,7 +163,7 @@ function drawWater(c){
   c.fillRect(3,6,4,1);c.fillRect(19,12,4,1);c.fillRect(7,20,5,1);
 }
 
-function drawWaterAnimated(c,phase){
+export function drawWaterAnimated(c,phase){
   // base gradient
   const g=c.createLinearGradient(0,0,0,TS);
   g.addColorStop(0,'#1565C0');g.addColorStop(1,'#0D47A1');
@@ -176,6 +179,17 @@ function drawWaterAnimated(c,phase){
   c.fillStyle='#AACCFF44';
   c.fillRect(4+phase*3,4,8,2);
   c.fillRect(18+phase*2,14,6,2);
+}
+
+// Build 3 animated water frames and populate the exported WATER_FRAMES array.
+// Called by game.js startGame() — must happen after DOM is ready (canvas creation).
+export function buildWaterFrames(){
+  WATER_FRAMES.length=0;
+  [0,1,2].forEach(phase=>{
+    const c=document.createElement('canvas');c.width=c.height=TS;
+    drawWaterAnimated(c.getContext('2d'),phase);
+    WATER_FRAMES.push(c);
+  });
 }
 
 function drawPlank(c){
@@ -414,7 +428,7 @@ function drawDirt(c){
 }
 
 // ── BACKGROUND / PARALLAX ─────────────────────────────────────────────────────
-function drawBackground(ctx,zone,camPx,camPy,W,H,tick){
+export function drawBackground(ctx,zone,camPx,camPy,W,H,tick){
   if(zone==='world'){
     const tx=Math.floor(G.x/TS),ty=Math.floor(G.y/TS);
     const inTown=tx>=TOWN_OX&&tx<TOWN_OX+MAP_W&&ty>=TOWN_OY&&ty<TOWN_OY+MAP_H;
@@ -832,7 +846,7 @@ function drawHideoutCeiling(ctx,W,tick){
   ctx.fillStyle='#201208';ctx.fillRect(0,60,W,4);ctx.fillStyle='#301C0C';ctx.fillRect(0,60,W,1);
 }
 
-function renderCeiling(ctx,zone,W,H,tick){
+export function renderCeiling(ctx,zone,W,H,tick){
   ctx.clearRect(0,0,W,H);
   if(zone==='world')return;
   if(zone==='tavern')          drawTavernCeiling(ctx,W,tick);
@@ -1309,7 +1323,7 @@ function drawVillageBG(ctx,W,H,tick){
 // ── PLAYER SPRITE ─────────────────────────────────────────────────────────────
 // species-aware, hair-color-aware, direction+animation aware.
 // gender + skinToneIdx + class_ route human characters to the correct procedural sprite.
-function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx,class_){
+export function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairColor,accessory,gender,skinToneIdx,class_){
   const sp=species||'human';
   const _g=gender||'male', _st=skinToneIdx??2, _hr=hairColor||HAIR_COLORS[1];
 
@@ -1636,7 +1650,7 @@ function drawPlayerSprite(ctx,ox,oy,dir,color,frame,moving,godMode,species,hairC
 
 // ── NPC SPRITE ────────────────────────────────────────────────────────────────
 // face: 0=up 1=right 2=down 3=left (affects eye/hair rendering for portrait clarity)
-function drawNPCSprite(ctx,ox,oy,type,face=2){
+export function drawNPCSprite(ctx,ox,oy,type,face=2){
   // type: 'clerk'|'barkeep'|'guard'|'merchant'
   const palettes={
     clerk:  {body:'#1A3A5E',hi:'#2A5A8E',skin:'#FFCC99',hair:'#222'},

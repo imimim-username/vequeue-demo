@@ -1,10 +1,9 @@
-'use strict';
 // ═══════════════════════════════════════════════════════════════════════════
 //  VICTORY QUEST  —  Graphics Engine + Game Client
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const CFG = {
+export const CFG = {
   W:640, H:416,          // logical canvas resolution
   TS:32,                 // tile size (logical px)
   TW:20, TH:13,          // viewport in tiles
@@ -15,10 +14,10 @@ const CFG = {
   MAX_HP:10,
   KONAMI:[38,38,40,40,37,39,37,39,66,65],
 };
-const {W,H,TS,TW,TH} = CFG;
+export const {W,H,TS,TW,TH} = CFG;
 
 // ── TILE CONSTANTS ───────────────────────────────────────────────────────────
-const T={
+export const T={
   VOID:0, GRASS:1, ROAD:2, WALL:3, TREE:4, SIGN:5,
   FENCE:6, WATER:7, PLANK:8, MARBLE:9, STONE:10,
   VELVET:11, WINDOW:12, COUNTER:13, COLUMN:14,
@@ -26,32 +25,32 @@ const T={
   STALL:19, FOUNTAIN:20, PATH:21, SHRUB:22,
   QUEUE_IN:23, QUEUE_OUT:24, TICKET:25, DIRT:26,
 };
-const SOLID_TILES = new Set([
+export const SOLID_TILES = new Set([
   T.WALL,T.TREE,T.FENCE,T.COLUMN,T.DOOR_C,T.SIGN,T.SHRUB,T.STALL
 ]); // T.VAULT intentionally walkable — decorative floor plating
-const WORLD_SOLID = new Set([...SOLID_TILES, T.WATER]);
+export const WORLD_SOLID = new Set([...SOLID_TILES, T.WATER]);
 // Town offset within the world map
-const WORLD_W=220, WORLD_H=150;
-const TOWN_OX=90, TOWN_OY=55; // top-left of town in world tile coords
-const NS_L=TOWN_OX+19, NS_R=TOWN_OX+20; // N-S road cols (109,110)
-const EW_T=TOWN_OY+13, EW_B=TOWN_OY+14; // E-W road rows (68,69)
-const RESPAWN_TX=TOWN_OX+20, RESPAWN_TY=TOWN_OY+14; // Town respawn tile (road intersection)
+export const WORLD_W=220, WORLD_H=150;
+export const TOWN_OX=90, TOWN_OY=55; // top-left of town in world tile coords
+export const NS_L=TOWN_OX+19, NS_R=TOWN_OX+20; // N-S road cols (109,110)
+export const EW_T=TOWN_OY+13, EW_B=TOWN_OY+14; // E-W road rows (68,69)
+export const RESPAWN_TX=TOWN_OX+20, RESPAWN_TY=TOWN_OY+14; // Town respawn tile (road intersection)
 
 // ── COLORS ───────────────────────────────────────────────────────────────────
-const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
-const COLOR_NAMES   = ['Blue','Red','Green','Purple','Orange','Teal','Pink','Cyan'];
+export const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
+export const COLOR_NAMES   = ['Blue','Red','Green','Purple','Orange','Teal','Pink','Cyan'];
 
 function hexToRgb(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r,g,b}}
 function lighten(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.min(255,r+a)},${Math.min(255,g+a)},${Math.min(255,b+a)})`}
 function darken(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.max(0,r-a)},${Math.max(0,g-a)},${Math.max(0,b-a)})`}
 
 // ── HAIR COLORS ───────────────────────────────────────────────────────────────
-const HAIR_COLORS  = ['#1A0A00','#3A2010','#7A5020','#C8A040','#E8E0C0','#E04030','#4080D0','#20A060'];
-const HAIR_NAMES   = ['Black','Brown','Auburn','Blonde','Silver','Red','Blue','Green'];
+export const HAIR_COLORS  = ['#1A0A00','#3A2010','#7A5020','#C8A040','#E8E0C0','#E04030','#4080D0','#20A060'];
+export const HAIR_NAMES   = ['Black','Brown','Auburn','Blonde','Silver','Red','Blue','Green'];
 
 // ── SKIN TONES ────────────────────────────────────────────────────────────────
 // base = [R,G,B] midtone used for palette-swap reference
-const SKIN_TONES = [
+export const SKIN_TONES = [
   {label:'I',   base:[242,210,178]},  // very light / porcelain
   {label:'II',  base:[218,176,130]},  // light / fair
   {label:'III', base:[192,140, 95]},  // medium-light / warm tan
@@ -61,7 +60,7 @@ const SKIN_TONES = [
 ];
 
 // ── SPECIES ───────────────────────────────────────────────────────────────────
-const SPECIES = {
+export const SPECIES = {
   human: {
     label:'Human', baseHp:6,
     statCaps:{str:5,vit:5,agi:5,end:5,lck:5},
@@ -102,10 +101,10 @@ const SPECIES = {
 
 // ── CLASSES ───────────────────────────────────────────────────────────────────
 // ── RARITY COLORS ─────────────────────────────────────────────────────────────
-const RARITY_COLOR={common:'#aaaaaa',rare:'#4A90E2',epic:'#9B59B6',legendary:'#F1C40F'};
-const RARITY_LABEL={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary'};
+export const RARITY_COLOR={common:'#aaaaaa',rare:'#4A90E2',epic:'#9B59B6',legendary:'#F1C40F'};
+export const RARITY_LABEL={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary'};
 
-const CLASSES = {
+export const CLASSES = {
   warrior: {
     label:'Warrior', icon:'⚔',
     classFloor:{str:2,end:2},
@@ -136,7 +135,7 @@ const CLASSES = {
 
 // ── ENEMIES ───────────────────────────────────────────────────────────────────
 // physWeakness / magicWeakness / holyWeakness: damage multipliers (1.0=neutral, >1=weak, <1=resistant)
-const ENEMIES = {
+export const ENEMIES = {
   wolf: {
     type:'wolf', name:'Dire Wolf', maxHp:12, atk:3, def:1, spd:5,
     xp:12, drops:{spacebucks:8},
@@ -258,8 +257,8 @@ const ENEMIES = {
 };
 
 // ── DUNGEON MAP ───────────────────────────────────────────────────────────────
-const DGN_W=50, DGN_H=36;
-const DUNGEON_MAP=(()=>{
+export const DGN_W=50, DGN_H=36;
+export const DUNGEON_MAP=(()=>{
   const m=Array.from({length:DGN_H},()=>new Array(DGN_W).fill(T.WALL));
   function f(r1,c1,r2,c2,t){for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)m[r][c]=t;}
   function s(r,c,t){m[r][c]=t;}
@@ -304,7 +303,7 @@ const DUNGEON_MAP=(()=>{
 })();
 
 // ── QUEST DEFINITIONS ─────────────────────────────────────────────────────────
-const QUEST_DEFS = {
+export const QUEST_DEFS = {
   wolf_hunt:{
     id:'wolf_hunt', title:'Wolf Culling', giver:'Town Crier',
     type:'kill', target:'wolf', required:5,
@@ -456,7 +455,7 @@ const QUEST_DEFS = {
 // ── SHOP CATALOG ───────────────────────────────────────────────────────────────
 // weapon fields: dmg, dmgType ('physical'|'magic'|'holy'), rarity, critBonus, statReq (optional)
 // armor/shield fields: def, rarity
-const SHOP_CATALOG = {
+export const SHOP_CATALOG = {
   zelda: [
     // ── Physical weapons ────────────────────────────────────────────────────
     {name:'Steel Sword',  icon:'⚔',  desc:'A reliable blade for seasoned fighters.',     type:'weapon', dmg:7,  dmgType:'physical', rarity:'common',    critBonus:0,    cost:160, lvl:2, currency:'alUSD'},
@@ -498,13 +497,13 @@ const SHOP_CATALOG = {
 };
 
 // Offscreen canvases for the pixelation transition effect
-const _snapCanvas=document.createElement('canvas');
+export const _snapCanvas=document.createElement('canvas');
 _snapCanvas.width=W;_snapCanvas.height=H;
-const _snapCtx=_snapCanvas.getContext('2d');
-const _pixCanvas=document.createElement('canvas');
-const _pixCtx=_pixCanvas.getContext('2d');
+export const _snapCtx=_snapCanvas.getContext('2d');
+export const _pixCanvas=document.createElement('canvas');
+export const _pixCtx=_pixCanvas.getContext('2d');
 _pixCtx.imageSmoothingEnabled=false;
 
 // Battle button hit-boxes (populated each frame during renderBattleScreen)
-const BATTLE_BTNS={};
+export const BATTLE_BTNS={};
 

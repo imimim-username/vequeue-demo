@@ -17,7 +17,11 @@ function hashPin(pin){return crypto.createHash('sha256').update('vq2026:'+pin).d
 const app=express();
 const srv=http.createServer(app);
 const io=new Server(srv,{cors:{origin:'*'}});
-app.use(express.static(path.join(__dirname,'public')));
+// In production serve the Vite-built dist/; in dev Vite's own server handles static files
+const clientDir = process.env.NODE_ENV === 'production'
+  ? path.join(__dirname, 'dist')
+  : path.join(__dirname, 'public');
+app.use(express.static(clientDir));
 
 const players={};
 const socketsByAccount={}; // accountId -> socket.id (for targeted emits)

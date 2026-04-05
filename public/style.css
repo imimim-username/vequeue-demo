@@ -252,4 +252,3 @@ body.fullscreen #btn-fullscreen{color:#fff;border-color:#fff;background:#ffffff2
 .cl-section{color:#87CEEB;font-size:.72rem;font-weight:bold;margin:7px 0 3px}
 .cl-item{color:#CCC;font-size:.72rem;margin:2px 0 2px 10px;line-height:1.4}
 .cl-item::before{content:"▸ ";color:#666}
-</style>

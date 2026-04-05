@@ -5,8 +5,6 @@
 //                                  → echo send → 125 ms delay → LPF → feedback loop
 //                                                              → wet return → destination
 
-'use strict';
-
 let _actx      = null;
 let _sfxMuted  = false;
 let _snesOut   = null;   // master bus — all audio routes here
@@ -14,7 +12,7 @@ let _waves     = null;   // PeriodicWave timbres (cached)
 let _noiseBuf  = null;   // shared noise buffer for percussion (cached)
 
 // ── Audio context ─────────────────────────────────────────────────────────────
-function getAudioCtx(){
+export function getAudioCtx(){
   if(!_actx) _actx = new (window.AudioContext||window.webkitAudioContext)();
   if(_actx.state==='suspended') _actx.resume();
   return _actx;
@@ -246,7 +244,7 @@ function _noise(dur, vol, cutoff=3000){
 }
 
 // ── Mute controls ─────────────────────────────────────────────────────────────
-function toggleMute(){
+export function toggleMute(){
   _sfxMuted=!_sfxMuted;
   const btn=document.getElementById('hud-mute');
   if(btn) btn.textContent=_sfxMuted?'🔇':'🔊';
@@ -254,7 +252,7 @@ function toggleMute(){
 }
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
-const SFX={
+export const SFX={
   step(){ _sweep(75,38,'triangle',0.07,0.10); },
   swing(){
     _snesNoise(null,0.11,0.22,5500);
@@ -1139,7 +1137,7 @@ function _musSched(){
 }
 
 // ── Public music controls ─────────────────────────────────────────────────────
-function musPlay(zone){
+export function musPlay(zone){
   const key=MUS_TRACKS[zone]?zone:'world';
   if(_musZone===key) return;
   if(_musSchedId){ clearInterval(_musSchedId); _musSchedId=null; }
@@ -1160,7 +1158,7 @@ function musPlay(zone){
   _musSchedId=setInterval(_musSched,50);
 }
 
-function toggleMuteMusic(){
+export function toggleMuteMusic(){
   _musMuted=!_musMuted;
   if(_musGain) _musGain.gain.linearRampToValueAtTime(
     _musMuted?0:0.22, getAudioCtx().currentTime+0.05);
