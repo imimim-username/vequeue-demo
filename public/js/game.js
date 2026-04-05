@@ -148,6 +148,7 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.key==='Escape'){
+    if(document.getElementById('help-overlay')?.style.display==='flex'){closeHelp();e.preventDefault();return;}
     if(G._pendingConfirm&&!G._pendingConfirm._info){ _dismissConfirm(false); e.preventDefault(); return; }
     if(document.getElementById('bank-ui').style.display!=='none'){ closeBank(); return; }
     handleEsc(); e.preventDefault();
@@ -3541,6 +3542,246 @@ function togglePause(){
   if(G.paused)renderInventoryScreen();
 }
 
+// ── HOW TO PLAY overlay ───────────────────────────────────────────────────────
+const HELP_PAGES=[
+  {
+    title:'🗺 Getting Around',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 8px">Movement & Controls</p>
+<table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+  <tr><td style="color:#FFD700;width:40%;padding:3px 0">WASD / Arrow Keys</td><td>Move your character</td></tr>
+  <tr><td style="color:#FFD700;padding:3px 0">E / Space / Enter</td><td>Interact with NPCs and doors</td></tr>
+  <tr><td style="color:#FFD700;padding:3px 0">Escape</td><td>Open character menu / close panels</td></tr>
+  <tr><td style="color:#FFD700;padding:3px 0">T / Enter</td><td>Open chat (talk to other players)</td></tr>
+</table>
+<p style="color:#4FC3F7;font-weight:bold;margin:8px 0">The World</p>
+<p>You start in <b>Town Square</b> — the hub connecting everything. From here you can reach:</p>
+<ul style="margin:4px 0;padding-left:18px">
+  <li>🍺 <b>The Tavern</b> (north-west) — quests, gear, and rumours</li>
+  <li>🏛 <b>Governance Hall</b> (north-east) — vote on protocol policy</li>
+  <li>🛒 <b>Marketplace</b> (east gate) — buy/sell items with other players</li>
+  <li>🏦 <b>Treasury</b> (south gate) — deposit alUSD/alETH into the transmuter</li>
+  <li>🗡 <b>Dungeons & Wilds</b> — combat zones reachable through portals</li>
+</ul>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 Walk up to any glowing NPC and press <b>E</b> to talk. Doors automatically open when you step on them.</p>
+`
+  },
+  {
+    title:'💰 Currencies',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 8px">Six currencies power the economy</p>
+<table style="width:100%;border-collapse:collapse">
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700;width:38%">🪙 Spacebucks</td>
+    <td style="padding:5px 0">Basic currency — earned from quests, loot, zones. Used in most shops.</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">💀 Schmeckles</td>
+    <td style="padding:5px 0">Rarer currency — higher-tier shops and collateral for alETH loans.</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#4FC3F7">◈ alUSD</td>
+    <td style="padding:5px 0">Synthetic dollar — borrowed from the bank against Spacebucks. Stable-ish.</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#4FC3F7">⬡ alETH</td>
+    <td style="padding:5px 0">Synthetic ETH — borrowed from the bank against Schmeckles. Volatile.</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#9C27B0">⚗ ALCX</td>
+    <td style="padding:5px 0">Governance token — earned while waiting in veQueues. Used to vote.</td>
+  </tr>
+</table>
+<p style="color:#888;font-size:.78rem;margin-top:8px">💡 Swap any currency for any other at <b>Exchanger Rex</b> (Town Square, near the fountain) for a 0.3% fee.</p>
+<p style="color:#888;font-size:.78rem">💡 Live alETH and ALCX prices are pulled from real market data and update every few minutes. Watch the Town Crier for price alerts!</p>
+`
+  },
+  {
+    title:'🏦 Bank & Loans',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Self-Repaying Loans — No Liquidation Risk</p>
+<p>Talk to <b>Banker Alyx</b> in the <b>Treasury</b> zone to access the Alchemix Bank.</p>
+<div style="background:#0a1520;border:1px solid #1a3a5a;border-radius:6px;padding:10px;margin:8px 0">
+  <p style="margin:0 0 6px;color:#FFD700">How it works:</p>
+  <ol style="margin:0;padding-left:18px">
+    <li>Deposit <b>🪙 Spacebucks</b> as collateral → borrow up to <b>90%</b> as <b>◈ alUSD</b></li>
+    <li>Deposit <b>💀 Schmeckles</b> as collateral → borrow up to <b>90%</b> as <b>⬡ alETH</b></li>
+    <li>Your debt automatically repays over time — no payments required from you</li>
+    <li>Once fully repaid, claim your collateral back from Banker Alyx</li>
+  </ol>
+</div>
+<p>These are <b>self-repaying</b> loans — the debt shrinks on its own each game tick. You can never be liquidated.</p>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 Use borrowed alUSD/alETH to buy gear in the Marketplace, deposit into the Transmuter for yield, or swap at the Exchange. The collateral stays locked until the loan is repaid.</p>
+`
+  },
+  {
+    title:'⚗ Transmuter',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Convert Synthetics Back to Collateral</p>
+<p>Talk to <b>Transmuter Mira</b> in the <b>Treasury</b> zone.</p>
+<div style="background:#0a1520;border:1px solid #1a3a5a;border-radius:6px;padding:10px;margin:8px 0">
+  <p style="margin:0 0 6px;color:#FFD700">How it works:</p>
+  <ol style="margin:0;padding-left:18px">
+    <li>Deposit <b>◈ alUSD</b> → when borrowers repay debt, you receive <b>🪙 Spacebucks</b> at 1:1</li>
+    <li>Deposit <b>⬡ alETH</b> → when borrowers repay debt, you receive <b>💀 Schmeckles</b> at 1:1</li>
+    <li>Claim your earned collateral any time once it appears as "available"</li>
+  </ol>
+</div>
+<p><b>Arbitrage play:</b> If alUSD is trading below $1.00 at the Exchange, you can buy it cheap and deposit into the Transmuter to earn 1:1 Spacebucks — pocketing the spread.</p>
+<p style="color:#FF8C00;margin-top:6px">⚠ Early withdrawal costs a <b>10% exit fee</b> on the unconverted amount. Plan accordingly.</p>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 Global redemption events happen on a server-wide timer — your deposit earns a pro-rata share of each redemption batch.</p>
+`
+  },
+  {
+    title:'🎫 veQueue System',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Patience-Based Access to DeFi Zones</p>
+<p>The <b>Marketplace</b> and <b>Treasury</b> are rate-limited — you need a queue ticket to enter.</p>
+<div style="background:#0a1520;border:1px solid #1a3a5a;border-radius:6px;padding:10px;margin:8px 0">
+  <p style="margin:0 0 6px;color:#FFD700">Joining a queue:</p>
+  <ol style="margin:0;padding-left:18px">
+    <li>Walk to the entry gate of the zone and press <b>E</b></li>
+    <li>Lock a portion of your <b>⚗ ALCX</b> as a commitment deposit</li>
+    <li>Receive your ticket number — then roam freely while you wait</li>
+    <li>When your number is called, walk to the gate and enter!</li>
+  </ol>
+</div>
+<p style="color:#9C27B0;font-weight:bold;margin:8px 0 4px">While you wait, you earn ALCX:</p>
+<ul style="margin:0;padding-left:18px">
+  <li>+1 ALCX every few seconds just for being in the queue</li>
+  <li>More ALCX per yield tick once inside the zone (seniority bonus)</li>
+</ul>
+<p style="margin-top:8px"><b>Fast-exit fee:</b> Need to leave before your turn? You pay <b>2.5 ALCX per position</b> you're jumping. That fee goes to the patient waiters ahead of you.</p>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 ALCX locked for the queue is returned when you enter or leave. It stays locked during the wait — you can't spend it elsewhere while committed.</p>
+`
+  },
+  {
+    title:'🗳 Governance',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Vote on Protocol Policy with Your ALCX</p>
+<p>Enter <b>Governance Hall</b> (north-east of Town Square) and talk to the <b>Governance Board</b>.</p>
+<div style="background:#0a1520;border:1px solid #1a3a5a;border-radius:6px;padding:10px;margin:8px 0">
+  <p style="margin:0 0 6px;color:#FFD700">The earmark rate:</p>
+  <p style="margin:0">A percentage of all bank loan repayments is <b>earmarked</b> and routed through the transmuter. Governance proposals set this rate (0.1%–2.0%). Higher rates = faster transmuter yield for depositors.</p>
+</div>
+<p style="color:#FFD700;font-weight:bold;margin:8px 0 4px">How to vote:</p>
+<ol style="margin:0;padding-left:18px">
+  <li>You must have ALCX <b>locked in a veQueue</b> (join the Marketplace or Treasury queue first)</li>
+  <li>Any queued player can propose a new rate — must stake at least 1 ALCX</li>
+  <li>Other queued players vote FOR or AGAINST within a <b>24-hour epoch</b></li>
+  <li>If total vote weight ≥ 50 ALCX quorum, the winning side sets the new rate</li>
+  <li>Your staked ALCX is returned after the vote settles</li>
+</ol>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 Your vote weight = the amount of queue-locked ALCX you stake on the vote. Locking more = more influence. Staked ALCX is inaccessible for other purposes until the epoch ends.</p>
+`
+  },
+  {
+    title:'⚔ Combat & Quests',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Fighting Enemies & Completing Quests</p>
+<p style="color:#FFD700;font-weight:bold;margin:4px 0">Combat</p>
+<ul style="margin:0 0 8px;padding-left:18px">
+  <li>Walk into an enemy to attack — combat is automatic</li>
+  <li>Enemies drop <b>loot piles</b> on death — walk over and press <b>E</b> to claim</li>
+  <li>Loot decays 20% if it sits unclaimed too long</li>
+  <li>Die in battle? You respawn in Town Square and drop a loot pile for others to find</li>
+</ul>
+<p style="color:#FFD700;font-weight:bold;margin:4px 0">Stats</p>
+<ul style="margin:0 0 8px;padding-left:18px">
+  <li><b>STR</b> — physical attack power</li>
+  <li><b>DEF</b> — damage reduction</li>
+  <li><b>AGI</b> — dodge chance and attack speed</li>
+  <li><b>VIT</b> — max HP</li>
+  <li><b>LCK</b> — crit chance and max MP</li>
+</ul>
+<p style="color:#FFD700;font-weight:bold;margin:4px 0">Quests</p>
+<p>Talk to NPCs with a <b>🗡</b> quest indicator to pick up quests. Kill targets, then return to collect your reward — XP, Spacebucks, and gear.</p>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 Level up by earning XP → gain stat points to allocate at the Character menu (Escape). Higher levels unlock harder dungeons with better loot.</p>
+`
+  },
+  {
+    title:'🛒 Shops & NPCs',
+    html:`
+<p style="color:#4FC3F7;font-weight:bold;margin:0 0 8px">Key NPCs to Know</p>
+<table style="width:100%;border-collapse:collapse">
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700;width:40%">📣 Town Crier</td>
+    <td style="padding:5px 0">Town Square — price alerts, market news, and quests</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">🧙 Exchanger Rex</td>
+    <td style="padding:5px 0">Town Square — swap any currency for any other (0.3% fee)</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">🏪 Merchant Ned</td>
+    <td style="padding:5px 0">Town Square — potions and basic supplies</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">🛡 Armorer Brix</td>
+    <td style="padding:5px 0">Governance Hall area — high-tier armor and weapons</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">🏦 Banker Alyx</td>
+    <td style="padding:5px 0">Treasury zone — self-repaying loans (see Bank tab)</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">⚗ Transmuter Mira</td>
+    <td style="padding:5px 0">Treasury zone — synthetic-to-collateral conversion</td>
+  </tr>
+  <tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:5px 0;color:#FFD700">📦 Market Board</td>
+    <td style="padding:5px 0">Marketplace — player-to-player item trading</td>
+  </tr>
+  <tr>
+    <td style="padding:5px 0;color:#FFD700">🗳 Governance Board</td>
+    <td style="padding:5px 0">Governance Hall — vote on earmark rate</td>
+  </tr>
+</table>
+<p style="color:#888;font-size:.78rem;margin-top:8px">💡 Press <b>Escape → 📖 HOW TO PLAY</b> any time to re-open this guide.</p>
+`
+  },
+];
+
+let _helpPage=0;
+function showHelp(page){
+  _helpPage=page??0;
+  const el=document.getElementById('help-overlay');
+  el.style.display='flex';
+  _renderHelpPage();
+}
+function closeHelp(){
+  document.getElementById('help-overlay').style.display='none';
+}
+function helpNav(dir){
+  _helpPage=Math.max(0,Math.min(HELP_PAGES.length-1,_helpPage+dir));
+  _renderHelpPage();
+}
+function _renderHelpPage(){
+  // Build tab bar
+  const tabs=document.getElementById('help-tabs');
+  tabs.innerHTML=HELP_PAGES.map((p,i)=>{
+    const active=i===_helpPage;
+    return `<button onclick="showHelp(${i})" style="background:${active?'#0a1f33':'none'};border:none;border-bottom:2px solid ${active?'#4FC3F7':'transparent'};color:${active?'#4FC3F7':'#555'};cursor:pointer;padding:8px 12px;font-family:inherit;font-size:.75rem;white-space:nowrap;flex-shrink:0;transition:color .15s">${p.title}</button>`;
+  }).join('');
+  // Content
+  document.getElementById('help-content').innerHTML=HELP_PAGES[_helpPage].html;
+  // Page indicator
+  document.getElementById('help-page-indicator').textContent=`${_helpPage+1} / ${HELP_PAGES.length}`;
+  // Prev/next button state
+  document.getElementById('help-prev').style.opacity=_helpPage===0?'0.3':'1';
+  document.getElementById('help-next').style.opacity=_helpPage===HELP_PAGES.length-1?'0.3':'1';
+  document.getElementById('help-next').textContent=_helpPage===HELP_PAGES.length-1?'DONE ✓':'NEXT ▶';
+  if(_helpPage===HELP_PAGES.length-1){
+    document.getElementById('help-next').onclick=closeHelp;
+    document.getElementById('help-next').style.color='#4CAF50';
+    document.getElementById('help-next').style.borderColor='#4CAF50';
+  }else{
+    document.getElementById('help-next').onclick=()=>helpNav(1);
+    document.getElementById('help-next').style.color='#4FC3F7';
+    document.getElementById('help-next').style.borderColor='#4FC3F7';
+  }
+}
+
 // ── Helper: equip an item from a general inventory slot ──────────────────────
 function equipFromBag(slotIdx){
   const item=G.inventory[slotIdx];
@@ -4143,6 +4384,8 @@ function buildCreateScreen(){
     if(!G.persist)chatLog('⚠ Progress will not be saved between sessions.','#FF8C00');
     startGame();
     saveToServer();
+    // Show the How to Play guide automatically for new characters
+    setTimeout(()=>showHelp(0),400);
   });
 }
 
