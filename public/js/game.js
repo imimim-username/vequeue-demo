@@ -302,6 +302,8 @@ function _applyTouchMove(clientX, clientY){
     // Only handle touches directly on the canvas layers (not overlay buttons)
     const tgt = e.target;
     if(tgt.tagName !== 'CANVAS') return;
+    // During battle the cv-ui touchstart handler owns the event — don't interfere
+    if(G.battle) return;
     _touching = true;
     _applyTouchMove(e.touches[0].clientX, e.touches[0].clientY);
     e.preventDefault();
@@ -3379,6 +3381,46 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
 }
 
+// ── Building name signs ───────────────────────────────────────────────────────
+// Floating banner labels rendered above each main building entrance in the world
+// zone — always visible so players immediately know what each building is.
+const _BUILDING_SIGNS=[
+  // [label, centreWorldTileX, centreWorldTileY, nameColour]
+  // Tavern (NW building)
+  ['🍺 The Tavern',      TOWN_OX+9.5,  TOWN_OY+5,   '#FFD700'],
+  // Governance Hall (NE building) — voting & proposals inside
+  ['🏛 Governance Hall', TOWN_OX+30,   TOWN_OY+5,   '#88BBFF'],
+  // Marketplace (SW building)
+  ['🏪 Marketplace',     TOWN_OX+9.5,  TOWN_OY+21,  '#FFD700'],
+  // Treasury (SE building)
+  ['💰 Treasury',        TOWN_OX+30,   TOWN_OY+21,  '#AAFFAA'],
+  // Currency exchange NPC (town square, between buildings)
+  ['💱 Currency Exchange', TOWN_OX+24, TOWN_OY+6.5, '#FF9944'],
+];
+function renderBuildingSigns(ctx){
+  ctx.save();
+  ctx.textAlign='center';
+  for(const[label,tx,ty,col] of _BUILDING_SIGNS){
+    const sx=tx*TS-G.camX;
+    const sy=ty*TS-G.camY;
+    // Skip if entirely off screen
+    if(sx<-80||sx>W+80||sy<-24||sy>H+24)continue;
+    const tw=ctx.measureText(label).width+14;
+    const bx=sx-tw/2, by=sy-9;
+    // Dark background pill
+    ctx.fillStyle='rgba(0,0,0,0.72)';
+    ctx.beginPath();ctx.roundRect(bx,by,tw,15,4);ctx.fill();
+    // Coloured border
+    ctx.strokeStyle=col;ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(bx,by,tw,15,4);ctx.stroke();
+    // Text
+    ctx.fillStyle=col;ctx.font='bold 10px monospace';
+    ctx.fillText(label,sx,by+10.5);
+  }
+  ctx.textAlign='left';
+  ctx.restore();
+}
+
 function renderHUD(){
   const hearts=document.getElementById('hud-hearts');
   hearts.innerHTML='';
@@ -4130,6 +4172,8 @@ function gameLoop(ts){
     drawBackground(ctxBG,G.zone,G.camX,G.camY,W,H,G.tick);
     // render sprites
     renderSpriteLayer(ctxSprites);
+    // building name signs — rendered after sprites so they appear above NPCs
+    if(G.zone==='world')renderBuildingSigns(ctxSprites);
     // foreground tile layer (z:4) — tree canopies, column capitals above player
     renderFgLayer(ctxFg);
     // ceiling layer (z:5) — interior zone ceiling art above everything
@@ -4779,17 +4823,17 @@ document.getElementById('npc-dialog-inner')?.addEventListener('click',()=>{
 });
 
 // ── Battle canvas click / key handler ─────────────────────────────────────────
-document.getElementById('cv-ui').addEventListener('click',e=>{
+// ── Battle UI hit-testing (shared by click and touchstart) ───────────────────
+function _handleBattleUIPoint(clientX,clientY,target){
   const bt=G.battle;if(!bt)return;
   if(bt.result){endBattle();return;}
   if(bt.phase!=='player_turn')return;
-  const rect=e.target.getBoundingClientRect();
+  const rect=target.getBoundingClientRect();
   const scale=W/rect.width;
-  const mx=(e.clientX-rect.left)*scale;
-  const my=(e.clientY-rect.top)*scale;
+  const mx=(clientX-rect.left)*scale;
+  const my=(clientY-rect.top)*scale;
   for(const[action,btn] of Object.entries(BATTLE_BTNS)){
     if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){
-      // One-click weapon swap from loadout strip
       if(action.startsWith('ws_')){
         if(bt.phase!=='player_turn'||bt.result)return;
         const idx=parseInt(action.slice(3));
@@ -4806,7 +4850,21 @@ document.getElementById('cv-ui').addEventListener('click',e=>{
       doBattleAction(action);return;
     }
   }
+}
+
+document.getElementById('cv-ui').addEventListener('click',e=>{
+  _handleBattleUIPoint(e.clientX,e.clientY,e.target);
 });
+
+// Mobile: touchstart fires immediately (no 300 ms click delay) and we stop
+// propagation so the game-wrap tap-to-move handler doesn't also fire.
+document.getElementById('cv-ui').addEventListener('touchstart',e=>{
+  if(!G.battle)return;
+  e.preventDefault();    // block tap-to-move from triggering via event bubbling
+  e.stopPropagation();   // don't let game-wrap's touchstart handler see this
+  const t=e.changedTouches[0];
+  _handleBattleUIPoint(t.clientX,t.clientY,e.target);
+},{passive:false});
 
 // Keyboard shortcuts during battle
 window.addEventListener('keydown',e=>{

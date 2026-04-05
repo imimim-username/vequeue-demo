@@ -20,6 +20,31 @@ function getAudioCtx(){
   return _actx;
 }
 
+// ── Mobile audio unlock ───────────────────────────────────────────────────────
+// iOS Safari and Android Chrome create AudioContext in a suspended state and
+// ONLY allow resume() within a direct user-gesture handler (touchstart/click).
+// This listener fires once on the first tap/click, creates the context if needed,
+// resumes it, and plays a 1-sample silent buffer — the only reliable way to
+// fully unlock audio on iOS (resume() alone is not sufficient on older Safari).
+(function _setupMobileAudioUnlock(){
+  function _unlock(){
+    try{
+      if(!_actx) _actx = new (window.AudioContext||window.webkitAudioContext)();
+      if(_actx.state==='suspended'){
+        _actx.resume().then(()=>{
+          // Silent buffer: forces iOS to finish unlocking the audio hardware
+          const buf=_actx.createBuffer(1,1,_actx.sampleRate);
+          const src=_actx.createBufferSource();
+          src.buffer=buf; src.connect(_actx.destination); src.start(0);
+        }).catch(()=>{});
+      }
+    }catch(err){}
+  }
+  // capture:true ensures this fires before any other listeners (including our game handler)
+  document.addEventListener('touchstart',_unlock,{once:true,passive:true,capture:true});
+  document.addEventListener('click',     _unlock,{once:true,capture:true});
+})();
+
 // ── SNES signal chain ─────────────────────────────────────────────────────────
 // Gaussian interpolation (SNES SPC700 runs at 32 kHz → gentle anti-alias brick)
 // S-DSP echo: 125 ms delay, lowpass feedback, wet return
