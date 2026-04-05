@@ -23,7 +23,7 @@ ssh -i /workspace/group/.ssh/droplet_deploy -o StrictHostKeyChecking=no root@24.
 
 **Full deploy flow:**
 1. Make changes in `/workspace/extra/gits/vequeue-demo/`
-2. Bump asset version in `public/index.html` (all `v=YYYYMMDDX` occurrences, currently `v=20260402p`)
+2. Bump asset version in `public/index.html` (all `v=YYYYMMDDX` occurrences, currently `v=20260405e`)
 3. `git add … && git commit -m "…"`
 4. `GIT_SSH_COMMAND="ssh -i /workspace/extra/github-keys/github_deploy -o StrictHostKeyChecking=no" git push origin main`
 5. Run the one-liner above to pull + restart on the droplet
@@ -175,6 +175,69 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 - Fast-exit button appears when in exit queue
 - `doFastExit(fee)` deducts ALCX, emits `queue_fast_exit`
 - 1-second interval refreshes countdown when served: `setInterval(…, 1000)`
+
+---
+
+## 2026-04-05 — `v=20260405e` — save_character hardening + data restoration
+
+| Change | Details |
+|--------|---------|
+| **alETH/alUSD wiped on reload — fixed (root cause)** | `save_character` was doing a full `pdb.data = clientData` replace, silently overwriting server-authoritative fields. On load, `G.alETH` initialised to 0 before `applyServerState` ran; if `saveToServer()` fired in that window it wrote 0 to the DB. Anti-cheat only blocked *increases*, so `alETH = 0` passed unchecked |
+| **Bidirectional currency protection** | `save_character` now blocks catastrophic drops: if `data.alETH < prev.alETH * 0.1` and `prev.alETH > 0.01` the save is rejected and the server value is kept. Same guard applied to alUSD |
+| **Server-only fields preserved** | After accepting a client save, `alcxVoteLocks`, `_lastZoneYield`, and `_lastQueueYield` are re-injected from the pre-save DB snapshot so they can never be wiped by a client payload |
+| **Missing pdb guard added** | `save_character` now early-returns if `pdb[socket.accountId]` is undefined (previously would throw if pdb entry missing) |
+| **Player data restoration** | Affected account restored: alETH back-calculated from active schmeckles bank loan (72.9) minus transmuter deposit (54.83) and Elven Ward purchase (0.7) = **17.37 alETH**; alUSD from active spacebucks loan (1015.2) minus transmuter (243.38), War Axe (280), Leather Armor (80), misc (≈30) = **381.82 alUSD** |
+
+---
+
+## 2026-04-05 — `v=20260405d` — mechanic bug fixes + NPC accessibility
+
+| Change | Details |
+|--------|---------|
+| **Exchanger Rex unreachable — fixed** | Rex was placed at `TOWN_OX+24, TOWN_OY+8`, inside the Governance Hall wall box (rows 2–11, cols 22–38 are all WALL/MARBLE). No walkable path existed within 2-tile interaction range. Moved to `TOWN_OX+23, TOWN_OY+13` on the main road east of the fountain |
+| **Armorer Brix unreachable — fixed** | Brix was at `TOWN_OY+11`, the bottom wall row of Governance Hall. Moved to `TOWN_OY+12` (open grass tile) |
+| **ALCX zone/queue yield — server-authorised** | Client previously self-credited `G.alcx += drip` and then called `saveToServer()`, bypassing anti-cheat (server only blocked increases). Replaced with a request/response pattern: client emits `alcx_yield_request{source}`, server validates zone/queue membership, enforces 4s/8s throttle, pre-updates pdb.alcx, then emits `alcx_yield{amount}` back to client |
+| **Fast-exit fee formula** | Changed from 5% of wallet ALCX (favoured wealthy players, meaningless for broke ones) to **2.5 ALCX × positions ahead in queue**. One position ahead = 2.5 ALCX fee; ten positions ahead = 25 ALCX |
+| **Vote-locked ALCX shielded from fast-exit** | `doFastExit` fee is deducted from free ALCX only — `G.alcxVoteLock` portion (already removed from `G.alcx`) is no longer double-deducted |
+| **Vote-locked ALCX shielded from auction bids** | `doAuctionBid` similarly no longer subtracts the vote lock a second time |
+| **Queue-leave retains vote-committed stake** | All queue-leave paths now compute `refund = lockedAlcx − alcxVoteLock` and leave `G.lockedAlcx = G.alcxVoteLock`, so vote stake cannot be reclaimed by simply leaving the queue |
+| **Vote settlement refunds stake to wallet** | On proposal passage/failure, server now credits `voteAmt` back to `pdb.alcx`, reduces `pdb.lockedAlcx`, and emits `gov_vote_released{refundAmt}` to the voter. Previously vote-committed ALCX was deleted with no refund |
+| **`_govIdSeq` persisted across restarts** | Proposal IDs are now unique across server restarts (previously reset to 1, risking stale `alcxVoteLocks` matching a new Proposal #1) |
+
+---
+
+## 2026-04-05 — `v=20260405c` — queue/governance state-tracking bug fixes
+
+| Change | Details |
+|--------|---------|
+| **`pdb.lockedAlcx` never updated on queue_join** | Queue stake was tracked in `G.lockedAlcx` client-side and saved via `save_character`, but `queue_join` on the server never updated `pdb.data.lockedAlcx` directly. Governance vote validation always read 0 from pdb → everyone blocked from voting even after joining the queue. Fixed: `queue_join` and `queue_leave` now both update `pdb.data.alcx` and `pdb.data.lockedAlcx` atomically and call `saveDb()` |
+| **`lockedAlcx` anti-cheat added** | `save_character` now applies the same increase-block guard to `lockedAlcx` as it does to `alcx`, `alUSD`, and `alETH` — clients could previously inflate vote weight arbitrarily |
+| **Vote weight validated against pdb** | `governance_propose` and `governance_vote` now read `pdb[socket.accountId].data.lockedAlcx` as the authoritative stake, not client-supplied free-wallet ALCX |
+| **Governance history persistence** | `govProposals`, `idSeq`, and `history` are now all saved in `governance.json`. `EARMARK_RATE_LIVE` is also persisted — governance state survives server restarts |
+
+---
+
+## 2026-04-05 — `v=20260405b` — vote weight gated to queue-locked ALCX
+
+| Change | Details |
+|--------|---------|
+| **Vote weight source redesigned** | Previously anyone could vote with free-wallet ALCX. Now only ALCX that is actively locked inside a veQueue position (`G.lockedAlcx`) counts as vote-eligible stake |
+| **Amount selector in governance UI** | Players choose how much of their locked ALCX to commit to a proposal (1 to available-for-vote). Selected amount is further locked (`alcxVoteLocks[proposalId]`) and inaccessible until vote settles |
+| **`alcxVoteLock` in HUD** | HUD notation: `⚗{alcx} 🔒{lockedAlcx} (🗳{alcxVoteLock})` — vote-committed portion is always visible |
+| **Propose disabled when no queue stake** | Governance panel shows a clear message when `G.lockedAlcx === 0` instead of an enabled propose button |
+| **Governance history panel** | Last 20 settled proposals rendered in governance UI: outcome, earmark rate, vote weights For/Against, proposer, timestamp |
+
+---
+
+## 2026-04-05 — `v=20260405a` — governance overhaul
+
+| Change | Details |
+|--------|---------|
+| **24-hour voting epoch** | `VOTE_DURATION_MS = 24 * 60 * 60 * 1000` — proposals live for one full day before auto-settling |
+| **Quorum requirement** | Proposals require ≥ 50 ALCX total vote weight to be actionable. Sub-quorum proposals fail even if For > Against |
+| **`alcxVoteLocks` tracking** | Per-account map `{proposalId → alcxAmount}` stored server-side. Vote-committed ALCX is inaccessible for queue-leave, fast-exit, or auction bid while a vote is live |
+| **`broadcastGovState`** | New server function emits current proposals with quorum status and remaining time to all connected clients on every governance event |
+| **Governance state broadcast on connect** | Clients receive full governance state immediately on `auth_result` |
 
 ---
 
