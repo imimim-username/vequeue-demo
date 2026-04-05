@@ -633,7 +633,7 @@ io.on('connection',socket=>{
     const now=Date.now();
     const src=data?.source||'zone';
     if(src==='zone'){
-      if(!['marketplace','treasury'].includes(p.zone))return;
+      if(!['marketplace','treasury','gov_chamber'].includes(p.zone))return;
       // Throttle: min 4s between zone yields (client fires every ~5s)
       if(d._lastZoneYield&&now-d._lastZoneYield<4000)return;
       d._lastZoneYield=now;

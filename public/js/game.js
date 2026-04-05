@@ -861,8 +861,8 @@ function changeZone(zone,sx,sy){
   G.camX=Math.max(0,Math.min(_maxCX,G.x-W/2));
   G.camY=Math.max(0,Math.min(_maxCY,G.y-H/2));
   G._prevX=G.x;G._prevY=G.y;G._camVx=0;G._camVy=0;
-  // Reset seniority when leaving economic zones
-  if(G.zone!=='marketplace'&&G.zone!=='treasury')G.zoneSeniority=0;
+  // Reset seniority when leaving economic zones (gov_chamber is part of the inner district)
+  if(G.zone!=='marketplace'&&G.zone!=='treasury'&&G.zone!=='gov_chamber')G.zoneSeniority=0;
   musPlay(zone);
   _mmCanvas=null;G.showMinimap=false;
   {
@@ -2770,6 +2770,21 @@ const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 const CHANGELOG=[
   {
+    version:'1.0.3', date:'Apr 5 2026',
+    sections:[
+      {title:'Governance Chamber — Voting Inside the District',items:[
+        'New Governance Chamber zone added as a third room in the veQueue inner district.',
+        'Accessible via the east door of the Treasury — no re-queuing required.',
+        'The Governance Board NPC inside the Chamber lets you vote on protocol parameters using your queue-locked ALCX.',
+        'Chamber includes the Chamber Clerk (explains voting rules) and Chamber Warden (guides you back).',
+        'The existing Governance Hall (outside the queue) now directs players to the Chamber for actual voting.',
+        'Zone seniority and ALCX yield continue to accumulate while inside the Governance Chamber.',
+        'Live price / treasury panel is shown on the HUD inside the Chamber.',
+        'South exit door in the Chamber returns you to the world map if needed.',
+      ]},
+    ]
+  },
+  {
     version:'1.0.2', date:'Apr 5 2026',
     sections:[
       {title:'Balance — Monster Schmeckle Rewards',items:[
@@ -4568,11 +4583,11 @@ function gameLoop(ts){
     renderHUD();
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
-    // Governance Hall: treasury + live prices panel
-    if(G.zone==='governance')renderGovernancePanel(ctxUI);
+    // Governance Hall / Governance Chamber: show treasury + live prices panel
+    if(G.zone==='governance'||G.zone==='gov_chamber')renderGovernancePanel(ctxUI);
     // ── ALCX yield: request server authorisation — server pre-updates pdb ──────
     // Seniority tick: every ~5s while physically inside an economic zone
-    if((G.zone==='marketplace'||G.zone==='treasury')&&G.tick%300===0){
+    if((G.zone==='marketplace'||G.zone==='treasury'||G.zone==='gov_chamber')&&G.tick%300===0){
       G.zoneSeniority=(G.zoneSeniority||0)+1;
       socket?.emit('alcx_yield_request',{source:'zone'});
       updateQueuePanel();

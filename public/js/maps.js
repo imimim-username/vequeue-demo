@@ -384,6 +384,7 @@ const ZONE_MAPS = {
   governance: makeGovernance(),
   marketplace: makeMarketplace(),
   treasury: makeTreasury(),
+  gov_chamber: makeGovernanceChamber(),
   cavern: makeCavern(),
   hideout: makeHideout(),
   ruins: makeRuins(),
@@ -565,6 +566,29 @@ function makeTreasury(){
   fill(5,1,6,4,T.VELVET);
   // Cut open west wall and mark as open door
   m[5][0]=T.DOOR_O;m[6][0]=T.DOOR_O;
+  // ── East portal → Governance Chamber ──
+  fill(5,15,6,18,T.VELVET);   // velvet corridor leads to portal
+  m[5][19]=T.DOOR_O;m[6][19]=T.DOOR_O;
+  return m;
+}
+
+function makeGovernanceChamber(){
+  const{m,fill}=makeInterior(20,13,T.MARBLE);
+  // fully walkable marble interior
+  fill(1,1,11,18,T.MARBLE);
+  // raised velvet dais at north end — the voting platform
+  fill(1,3,3,16,T.VELVET);
+  // flanking columns framing the chamber
+  m[2][2]=T.COLUMN;m[2][17]=T.COLUMN;
+  m[8][2]=T.COLUMN;m[8][17]=T.COLUMN;
+  // gallery benches along each side (rows 4 and 7 keep center path clear)
+  fill(4,3,4,8,T.COUNTER);fill(4,11,4,16,T.COUNTER);
+  fill(7,3,7,8,T.COUNTER);fill(7,11,7,16,T.COUNTER);
+  // south emergency exit door → world
+  m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;
+  // ── West portal → Treasury ──
+  fill(5,1,6,4,T.VELVET);   // velvet corridor leads to portal
+  m[5][0]=T.DOOR_O;m[6][0]=T.DOOR_O;
   return m;
 }
 
@@ -580,6 +604,8 @@ const ZONES = {
                name:'Marketplace',bg:'marketplace'},
   treasury:   {map:ZONE_MAPS.treasury,    w:20,h:13,spawnX:10,spawnY:2, solid:SOLID_TILES,
                name:'Treasury',bg:'treasury'},
+  gov_chamber:{map:ZONE_MAPS.gov_chamber, w:20,h:13,spawnX:10,spawnY:2, solid:SOLID_TILES,
+               name:'Governance Chamber',bg:'governance'},
   dungeon:    {map:DUNGEON_MAP,            w:DGN_W,h:DGN_H,spawnX:8,spawnY:6, solid:SOLID_TILES, name:'Ancient Dungeon',bg:'dungeon'},
   cavern:     {map:ZONE_MAPS.cavern,       w:22,h:15,spawnX:11,spawnY:12, solid:SOLID_TILES, name:'Crystal Cavern',   bg:'cavern'},
   hideout:    {map:ZONE_MAPS.hideout,      w:22,h:15,spawnX:11,spawnY:12, solid:SOLID_TILES, name:'Bandit Hideout',   bg:'hideout'},
@@ -671,7 +697,12 @@ const NPCS = {
       ]
     },
     {type:'wizard',face:2,name:'Governance Board',x:14,y:6,
-     dialog:['Cast your ALCX-weighted vote on protocol parameters.','Current vote: earmark rate controls how fast bank loans repay.'],
+     dialog:[
+       'You can read proposals and history here.',
+       'To vote, you need ALCX locked while inside the veQueue district.',
+       'Join the queue → enter the Marketplace or Treasury → head east to the Governance Chamber.',
+       'Your queue-locked ALCX is your ballot weight.',
+     ],
      govBoard:true},
   ],
   marketplace:[
@@ -805,9 +836,42 @@ const NPCS = {
      transmuter:true},
     { id:'trs_corridor_guide', x:2, y:3, type:'guard', face:3, name:'Corridor Warden',
       dialog:[
-        "The passage behind me connects directly to the Marketplace — no re-queuing.",
-        "The inner district is yours to move through freely once you've earned your place in the queue.",
-        "In the Marketplace you'll find shops, the Market Board, and the Armorer.",
+        "The west passage connects directly to the Marketplace — shops, the Market Board, and the Armorer.",
+        "The east passage leads to the Governance Chamber — that's where you vote on protocol parameters.",
+        "Once you're in the district you can move between all three zones freely.",
+      ]
+    },
+    { id:'trs_gov_guide', x:17, y:4, type:'guard', face:1, name:'Corridor Warden',
+      dialog:[
+        "The Governance Chamber is just through the east door.",
+        "Bring your queue-locked ALCX — vote weight equals how much you locked when you joined.",
+        "Current vote: earmark rate, which controls how quickly Alchemix loans self-repay.",
+      ]
+    },
+  ],
+  gov_chamber:[
+    { id:'gov_board_chamber', x:10, y:2, type:'wizard', face:2, name:'Governance Board',
+      dialog:[
+        'Cast your ALCX-weighted vote on protocol parameters.',
+        'Your vote weight is the ALCX you locked when entering the veQueue.',
+        'Current vote: earmark rate — the % of debt repaid per 5-minute tick.',
+        'Quorum requires 50 ALCX total weight. Once met, the winning side sets the rate.',
+      ],
+      govBoard:true
+    },
+    { id:'chamber_clerk', x:5, y:2, type:'clerk', face:1, name:'Chamber Clerk',
+      dialog:[
+        'Welcome to the Governance Chamber — the voting hall of the veQueue district.',
+        'Only citizens with queue-locked ALCX may cast votes. Your lock amount is your voice.',
+        'Proposals set the earmark rate: the share of loan principal repaid each tick.',
+        'History of past votes is visible on the Governance Board.',
+      ]
+    },
+    { id:'gov_portal_guide', x:2, y:6, type:'guard', face:1, name:'Chamber Warden',
+      dialog:[
+        'The passage behind me leads back to the Treasury.',
+        'From there you can reach the Marketplace, or exit the district entirely.',
+        'Once your session in the queue ends, your vote lock is released automatically.',
       ]
     },
   ],
@@ -834,6 +898,11 @@ const ZONE_DOORS = {
                             msg:'↔ Inner District: you step through the corridor into the Treasury.'},
   treasury_to_marketplace:{from:'treasury',   tileRows:[5,6], tileCols:[0],         to:'marketplace',sx:18,sy:5,
                             msg:'↔ Inner District: you step through the corridor into the Marketplace.'},
+  treasury_to_gov_chamber:{from:'treasury',   tileRows:[5,6], tileCols:[19],        to:'gov_chamber',sx:1, sy:5,
+                            msg:'↔ Inner District: you step into the Governance Chamber.'},
+  gov_chamber_to_treasury:{from:'gov_chamber',tileRows:[5,6], tileCols:[0],         to:'treasury',   sx:18,sy:5,
+                            msg:'↔ Inner District: you step back into the Treasury.'},
+  gov_chamber_exit:        {from:'gov_chamber',tileRows:[12], tileCols:[9,10],       to:'world',      sx:TOWN_OX+29,sy:TOWN_OY+12},
   world_dungeon:   {from:'world', tileRows:[139,140,141,142,143,144], tileCols:[108,109,110,111], to:'dungeon', sx:8, sy:6},
   // Dungeon exit: spawn NORTH of the grating (row 134) so player doesn't immediately re-trigger dungeon entry when walking back to town
   dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:134},
