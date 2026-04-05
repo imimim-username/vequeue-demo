@@ -5,7 +5,7 @@ import { MAP_W, MAP_H, ZONES, NPCS } from './maps.js';
 import { SFX } from './audio.js';
 import { TILE_CACHE, WATER_FRAMES, drawPlayerSprite, drawNPCSprite } from './render.js';
 // Circular imports from game.js — only used inside function bodies, safe for ES modules
-import { chatLog, W, H, ctxUI, showNpcDialog, showTxToast } from './game.js';
+import { chatLog, W, H, ctxUI, ctxTiles, showNpcDialog, showTxToast } from './game.js';
 // socket.js exports — circular (socket.js also imports from ui.js), safe inside function bodies
 import { saveToServer, socket, others, G_accountId } from './socket.js';
 // combat.js exports — not circular (combat.js does not import from ui.js)
@@ -905,7 +905,6 @@ export function usePotion(slotIdx){
 }
 
 // ── TILE LAYER RENDERER ───────────────────────────────────────────────────────
-let cvTiles,ctxTiles;
 export function renderTileLayer(){
   const z=ZONES[G.zone];if(!z)return;
   const m=z.map;
