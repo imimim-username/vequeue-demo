@@ -2770,6 +2770,18 @@ const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 const CHANGELOG=[
   {
+    version:'1.0.2', date:'Apr 5 2026',
+    sections:[
+      {title:'Balance — Monster Schmeckle Rewards',items:[
+        'Schmeckle drops from all enemies reduced by roughly 50–60% to make the currency feel scarce and earned.',
+        'Wailing Specter: 3→1 · Dark Knight: 5→2 · Shadow Wraith: 5→2 · Forest Warden: 5→2.',
+        'River Serpent: 6→2 · Stone Golem: 6→2 · Shadow Mage: 7→3 · Ruin Guardian: 8→3.',
+        'Thorn Beast: 9→4 · Ancient Lich: 25→10.',
+        'alUSD and Spacebucks drops from enemies are unchanged.',
+      ]},
+    ]
+  },
+  {
     version:'1.0.1', date:'Apr 5 2026',
     sections:[
       {title:'Bank Loan Repayment Fix',items:[
