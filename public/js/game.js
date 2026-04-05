@@ -2767,6 +2767,72 @@ const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 const CHANGELOG=[
   {
+    version:'0.9.9', date:'Apr 5 2026',
+    sections:[
+      {title:'How to Play Guide',items:[
+        'New 8-page tabbed "How to Play" overlay covering all game systems.',
+        'Auto-shown when a brand-new character first enters the world.',
+        'Re-open any time via "📖 HOW TO PLAY" button in the Escape / Character menu.',
+        'Press Escape to close the guide without leaving the menu.',
+        'Tabs: Getting Around · Currencies · Bank · Transmuter · veQueue · Governance · Combat · NPCs.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.8', date:'Apr 5 2026',
+    sections:[
+      {title:'Currency Persistence Fix',items:[
+        'Fixed a critical bug where alETH, alUSD, and other currency gains vanished on every reload.',
+        'Root cause: save_character anti-cheat blocked ALL client-side currency increases — including legitimate ones from bank borrows, transmuter claims, and exchanges. Players saw correct balances during play (ghost balances) but pdb was never updated.',
+        'Bank borrow, bank claim, transmuter claim, transmuter early-withdrawal, and currency exchange are now fully server-authoritative: pdb is updated first, then the client receives canonical balances.',
+        'Five new server socket events: bank_borrow, bank_claim, transmuter_claim, transmuter_withdraw, currency_exchange.',
+        'Fixed transmuter_sync incorrectly crediting alUSD/alETH when available dropped (should credit spacebucks/schmeckles); credit now handled by the new transmuter_claim handler.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.7', date:'Apr 5 2026',
+    sections:[
+      {title:'Save System Hardening',items:[
+        'save_character now re-injects server-only fields (alcxVoteLocks, _lastZoneYield, _lastQueueYield) after writing client data — previously a full replace wiped them on every save.',
+        'Anti-cheat extended bidirectionally: saves where alETH or alUSD drops below 10% of the stored value are now rejected, catching accidental zero-saves at startup.',
+        'Added missing pdb existence guard in save_character to prevent potential crash on unregistered accounts.',
+        'Governance proposal IDs now persist across server restarts (idSeq saved to governance.json) — prevents vote lock ID collisions.',
+      ]},
+      {title:'NPC Accessibility',items:[
+        'Exchanger Rex moved from inside Governance Hall wall tiles (unreachable) to main road east of the fountain.',
+        'Armorer Brix moved one tile south to walkable ground.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.6', date:'Apr 5 2026',
+    sections:[
+      {title:'veQueue & Governance Mechanics Review',items:[
+        'Fixed: pdb.lockedAlcx was never updated on queue_join/leave — vote validation always read 0, blocking all players from voting even after joining a queue.',
+        'Fixed: auction bid and fast-exit fee double-deducted vote-locked ALCX (it\'s inside lockedAlcx, not free alcx).',
+        'Fixed: queue leave returned full lockedAlcx including vote-committed portion — players could recover vote-staked ALCX by simply leaving the queue.',
+        'Fixed: vote settlement deleted alcxVoteLocks entry but did not refund the ALCX — vote-staked tokens were silently destroyed. Settlement now credits the refund and emits gov_vote_released.',
+        'Fixed: zone/queue ALCX yield bypassed anti-cheat (client self-credited). Replaced with server-authoritative alcx_yield_request / alcx_yield pattern with per-source throttling (4s zone, 8s queue).',
+        'Fast-exit fee changed from 5% of wallet to 2.5 ALCX × positions ahead — fairer and chain-agnostic.',
+      ]},
+    ]
+  },
+  {
+    version:'0.9.5', date:'Apr 5 2026',
+    sections:[
+      {title:'Governance Overhaul',items:[
+        'Voting epochs extended to 24 hours (was 5 minutes).',
+        'Votes now require ALCX locked inside a veQueue zone — free-wallet ALCX cannot vote.',
+        'Players choose how much of their queue-locked ALCX to commit to each vote.',
+        'Committed ALCX is inaccessible for other purposes (withdrawals, bids) until the epoch settles.',
+        'Quorum raised to 50 ALCX total weight before a vote can pass.',
+        'Governance history (last 20 votes) now persisted across server restarts.',
+        'Earmark rate live value persisted in governance.json.',
+      ]},
+    ]
+  },
+  {
     version:'0.9.4', date:'Apr 2 2026',
     sections:[
       {title:'UX Polish',items:[
