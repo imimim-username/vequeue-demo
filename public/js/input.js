@@ -1,5 +1,5 @@
 import { G } from './state.js';
-import { CFG } from './data.js';
+import { CFG, T } from './data.js';
 import { toggleMute } from './audio.js';
 // Circular imports — safe, used inside function bodies
 import { chatLog, _dismissConfirm, advanceDialog, tryInteract, declineOrAbandonQuest, resetMmCanvas } from './game.js';

@@ -1,9 +1,10 @@
 import { G } from './state.js';
-import { ENEMIES, QUEST_DEFS, TS, _snapCanvas, _snapCtx, _pixCanvas, _pixCtx, BATTLE_BTNS } from './data.js';
+import { T, ENEMIES, QUEST_DEFS, TS, RARITY_COLOR, RESPAWN_TX, RESPAWN_TY, _snapCanvas, _snapCtx, _pixCanvas, _pixCtx, BATTLE_BTNS } from './data.js';
 import { SFX } from './audio.js';
 // These are imported from game.js (circular is fine — only used inside functions, not at eval time)
 import { chatLog, changeZone, updateQuestProgress, W, H, ctxUI } from './game.js';
 import { saveToServer } from './socket.js';
+import { ZONES, WORLD_MAP } from './maps.js';
 
 // ── BATTLE SYSTEM ─────────────────────────────────────────────────────────────
 
