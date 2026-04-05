@@ -40,9 +40,9 @@ export const RESPAWN_TX=TOWN_OX+20, RESPAWN_TY=TOWN_OY+14; // Town respawn tile 
 export const PLAYER_COLORS = ['#2255DD','#DD2222','#22AA44','#9922CC','#DD8822','#116688','#CC44AA','#44AACC'];
 export const COLOR_NAMES   = ['Blue','Red','Green','Purple','Orange','Teal','Pink','Cyan'];
 
-function hexToRgb(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r,g,b}}
-function lighten(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.min(255,r+a)},${Math.min(255,g+a)},${Math.min(255,b+a)})`}
-function darken(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.max(0,r-a)},${Math.max(0,g-a)},${Math.max(0,b-a)})`}
+export function hexToRgb(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r,g,b}}
+export function lighten(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.min(255,r+a)},${Math.min(255,g+a)},${Math.min(255,b+a)})`}
+export function darken(h,a){const{r,g,b}=hexToRgb(h);return`rgb(${Math.max(0,r-a)},${Math.max(0,g-a)},${Math.max(0,b-a)})`}
 
 // ── HAIR COLORS ───────────────────────────────────────────────────────────────
 export const HAIR_COLORS  = ['#1A0A00','#3A2010','#7A5020','#C8A040','#E8E0C0','#E04030','#4080D0','#20A060'];
