@@ -639,7 +639,10 @@ function checkDoorTrigger(){
       if(door.queue){
         // Only prompt if the player hasn't already declined on this exact tile this visit
         if(!G._queueDeclinedTile) handleQueueDoor(key,door);
-      } else{changeZone(door.to,door.sx,door.sy);}
+      } else{
+        if(door.msg)chatLog(door.msg,'#B0BEC5');
+        changeZone(door.to,door.sx,door.sy);
+      }
       return;
     }
   }
@@ -2766,6 +2769,18 @@ const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
 // Add new entries at the TOP. Each entry has: version, date, sections[].
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 const CHANGELOG=[
+  {
+    version:'1.0.0', date:'Apr 5 2026',
+    sections:[
+      {title:'Inner-District Tunnels',items:[
+        'Marketplace and Treasury are now connected by a direct passage — no re-queuing required.',
+        'Velvet corridor strips lead to each portal; open doorways cut through the shared wall.',
+        'Corridor Warden NPCs at each entrance explain the free-passage rule.',
+        'Once inside the veQueue district (having earned your spot through the queue), you can walk freely between Marketplace and Treasury as many times as you like.',
+        'Chat log announces the corridor transition so you always know which zone you entered.',
+      ]},
+    ]
+  },
   {
     version:'0.9.9', date:'Apr 5 2026',
     sections:[

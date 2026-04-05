@@ -534,8 +534,13 @@ function makeMarketplace(){
   // doors: north entry and south exit (both DOOR_O so players can see them clearly)
   m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
   m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;
-  // columns
-  m[2][18]=T.COLUMN;m[10][18]=T.COLUMN;
+  // columns (moved inward 1 tile so east portal has breathing room)
+  m[2][17]=T.COLUMN;m[10][17]=T.COLUMN;
+  // ── East portal → Treasury ──
+  // Velvet carpet leading to the portal (VIP corridor feel)
+  fill(5,15,6,18,T.VELVET);
+  // Cut open east wall and mark as open door
+  m[5][19]=T.DOOR_O;m[6][19]=T.DOOR_O;
   return m;
 }
 
@@ -551,10 +556,15 @@ function makeTreasury(){
   // entry door (north) and exit queue (south)
   m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
   m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;
-  // corner columns (decorative)
-  m[2][1]=T.COLUMN;m[2][18]=T.COLUMN;m[9][1]=T.COLUMN;m[9][18]=T.COLUMN;
+  // corner columns (decorative; west-side columns moved inward to clear portal)
+  m[2][2]=T.COLUMN;m[2][18]=T.COLUMN;m[9][2]=T.COLUMN;m[9][18]=T.COLUMN;
   // centrepiece fountain (walkable)
   m[5][9]=T.FOUNTAIN;m[5][10]=T.FOUNTAIN;m[6][9]=T.FOUNTAIN;m[6][10]=T.FOUNTAIN;
+  // ── West portal → Marketplace ──
+  // Velvet carpet leading from the portal
+  fill(5,1,6,4,T.VELVET);
+  // Cut open west wall and mark as open door
+  m[5][0]=T.DOOR_O;m[6][0]=T.DOOR_O;
   return m;
 }
 
@@ -694,6 +704,13 @@ const NPCS = {
         "Fair warning: the deep forest hides things that don't appreciate visitors.",
       ]
     },
+    { id:'mkt_corridor_guide', x:18, y:3, type:'guard', face:1, name:'Corridor Warden',
+      dialog:[
+        "The passage behind me leads directly to the Treasury — no re-queuing needed.",
+        "Once you're inside the veQueue district, you move freely between zones.",
+        "The Treasury is just through there: Banker Alyx, the Transmuter, and the live price board.",
+      ]
+    },
   ],
   cavern:[
     { id:'miner_gundra', x:11, y:8, type:'merchant', face:2, name:'Miner Gundra', questId:'cavern_quest',
@@ -786,6 +803,13 @@ const NPCS = {
     {type:'merchant', face:3, name:'Transmuter Mira', x:14, y:6,
      dialog:['Welcome to the Transmuter.','Deposit alUSD or alETH here.','As borrowers repay their earmarked debt, you receive the underlying collateral at 1:1.','Arbitrage opportunity: buy cheap alUSD at the exchange, deposit here, earn the spread.'],
      transmuter:true},
+    { id:'trs_corridor_guide', x:2, y:3, type:'guard', face:3, name:'Corridor Warden',
+      dialog:[
+        "The passage behind me connects directly to the Marketplace — no re-queuing.",
+        "The inner district is yours to move through freely once you've earned your place in the queue.",
+        "In the Marketplace you'll find shops, the Market Board, and the Armorer.",
+      ]
+    },
   ],
 };
 
@@ -804,6 +828,12 @@ const ZONE_DOORS = {
   // Treasury: south exit (far from entry) + north exit (back through entry door)
   treasury_exit:         {from:'treasury',    tileRows:[12],  tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
   treasury_north_exit:   {from:'treasury',    tileRows:[0],   tileCols:[9,10],      to:'world', sx:TOWN_OX+29, sy:TOWN_OY+14},
+  // ── Inner-district tunnels: free passage between veQueue zones ────────────
+  // Once inside the system (marketplace or treasury) you may cross freely without re-queuing.
+  marketplace_to_treasury:{from:'marketplace',tileRows:[5,6], tileCols:[19],        to:'treasury',   sx:1, sy:5,
+                            msg:'↔ Inner District: you step through the corridor into the Treasury.'},
+  treasury_to_marketplace:{from:'treasury',   tileRows:[5,6], tileCols:[0],         to:'marketplace',sx:18,sy:5,
+                            msg:'↔ Inner District: you step through the corridor into the Marketplace.'},
   world_dungeon:   {from:'world', tileRows:[139,140,141,142,143,144], tileCols:[108,109,110,111], to:'dungeon', sx:8, sy:6},
   // Dungeon exit: spawn NORTH of the grating (row 134) so player doesn't immediately re-trigger dungeon entry when walking back to town
   dungeon_exit:    {from:'dungeon', tileRows:[2,3], tileCols:[7,8], to:'world', sx:NS_L, sy:134},
