@@ -104,7 +104,7 @@ let govHistory=(_govState.history||[]).slice(-20); // keep last 20 settled propo
 // Persist idSeq so proposal IDs are unique across server restarts
 let _govIdSeq=Math.max(1,(_govState.idSeq||1),(govProposals.reduce((m,p)=>Math.max(m,p.id||0),0)+1));
 function saveGov(){
-  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory}),'utf8');}catch(e){}
+  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory,earmarkRate:EARMARK_RATE_LIVE}),'utf8');}catch(e){}
 }
 let EARMARK_RATE_LIVE=_govState.earmarkRate||0.005; // persist across restarts
 const VOTE_DURATION_MS=24*60*60*1000; // 24-hour voting epoch
@@ -1317,8 +1317,8 @@ adminNs.on('connection',socket=>{
   socket.on('admin_set_earmark',({rate})=>{
     const r=parseFloat(rate);
     if(isNaN(r)||r<0.001||r>0.05)return socket.emit('admin_msg',{ok:false,msg:'Rate must be 0.1–5%.'});
-    EARMARK_RATE_LIVE=r;broadcastGovState();
-    socket.emit('admin_msg',{ok:true,msg:`Earmark rate → ${(r*100).toFixed(2)}%`});
+    EARMARK_RATE_LIVE=r;saveGov();broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Earmark rate → ${(r*100).toFixed(2)}% (saved)`});
   });
 
   socket.on('admin_set_loot_ttl',({minutes})=>{

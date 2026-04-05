@@ -4553,22 +4553,8 @@ function gameLoop(ts){
     if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%600===0){
       socket?.emit('alcx_yield_request',{source:'queue'});
     }
-    // Bank: local yield repayment (server handles earmarking/transmuter globally every 60s)
-    if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
-      let anyRepaid=false;
-      G.bankPositions.forEach(pos=>{
-        if(pos.claimed||pos.debt<=0.001)return;
-        const payment=Math.min(pos.debt,pos.borrowed*0.005);
-        pos.debt=Math.max(0,pos.debt-payment);
-        if(pos.debt<=0.001&&!pos.claimed){
-          pos.debt=0;
-          chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
-          SFX.coin();
-        }
-        anyRepaid=true;
-      });
-      if(anyRepaid)socket?.emit('bank_sync',{bankPositions:G.bankPositions});
-    }
+    // Bank debt repayment is handled entirely server-side (transmuter tick every 5 min).
+    // The server pushes bank_positions_updated when debt changes; no client-side ticker needed.
     // ── Passive HP regen ────────────────────────────────────────────────────
     // Base: 1 HP per ~25 s at VIT 1 + full HP (≈ 1 500 ticks @ 60 fps).
     // VIT multiplier: +20% per point above 1 (VIT 5 → 1.8×, VIT 10 → 2.8×).
