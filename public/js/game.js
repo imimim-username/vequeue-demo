@@ -2360,14 +2360,27 @@ function renderGovernanceUI(){
   const rate=(G.earmarkRate||0.005)*100;
   const quorum=G.govQuorum||50;
   const prop=G.govProposals.find(p=>p.passed===null);
-  const freeAlcx=parseFloat((G.alcx-(G.alcxVoteLock||0)).toFixed(4));
+  // Voting stake = ALCX locked inside a veQueue zone (queue entry stake)
+  const queueStake=G.lockedAlcx||0;
+  const voteCommitted=G.alcxVoteLock||0;
+  const voteAvailable=Math.max(0,parseFloat((queueStake-voteCommitted).toFixed(4)));
+
   let html=`<div style="color:#FFD700;margin-bottom:6px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
   html+=`<div style="color:#888;font-size:.72rem;margin-bottom:8px">% of debt redeemed per 5-min tick. Higher = faster repayment & more transmuter yield.</div>`;
-  if(G.alcxVoteLock>0){
-    html+=`<div style="background:#1A1030;border:1px solid #9C27B0;border-radius:4px;padding:6px;margin-bottom:8px;font-size:.75rem">`;
-    html+=`🗳 <b>${G.alcxVoteLock.toFixed(1)} ALCX locked in active vote</b> — inaccessible until proposal settles.<br>`;
-    html+=`<span style="color:#aaa">Free ALCX: ${freeAlcx.toFixed(1)}</span></div>`;
+
+  // Voting stake status panel
+  html+=`<div style="background:#0D0020;border:1px solid #3A2060;border-radius:4px;padding:7px;margin-bottom:10px;font-size:.73rem">`;
+  html+=`<div style="color:#B080FF;margin-bottom:3px">⚗ Your Governance Stake (queue-locked ALCX)</div>`;
+  if(queueStake>0){
+    html+=`<div style="color:#eee">Total queue stake: <b>${queueStake.toFixed(1)} ALCX</b></div>`;
+    if(voteCommitted>0)html+=`<div style="color:#9C27B0">🗳 Committed to active vote: ${voteCommitted.toFixed(1)} ALCX</div>`;
+    html+=`<div style="color:#4CAF50">Available to vote: ${voteAvailable.toFixed(1)} ALCX</div>`;
+  }else{
+    html+=`<div style="color:#FF5722">⚠ No queue stake found.</div>`;
+    html+=`<div style="color:#888;margin-top:2px">Join the Marketplace or Treasury entry queue to lock ALCX as your governance stake. Only locked participants can vote.</div>`;
   }
+  html+=`</div>`;
+
   if(prop){
     const msLeft=Math.max(0,prop.endsAt-Date.now());
     const hLeft=Math.floor(msLeft/3600000);
@@ -2381,47 +2394,66 @@ function renderGovernanceUI(){
     html+=`<div style="color:#B080FF;font-weight:bold;margin-bottom:4px">📜 Active Proposal #${prop.id}</div>`;
     html+=`<div style="font-size:.75rem;color:#ccc">Proposer: ${prop.proposerName}</div>`;
     html+=`<div style="font-size:.8rem;margin:4px 0">New earmark rate: <b style="color:#FFD700">${(prop.value*100).toFixed(2)}%</b></div>`;
-    html+=`<div style="color:#aaa;font-size:.72rem;margin-bottom:6px">⏱ ${timeStr} remaining (24h epoch)</div>`;
-    // Vote weight bars
-    html+=`<div style="font-size:.72rem;margin-bottom:4px">`;
-    html+=`<span style="color:#4CAF50">✅ YES ${prop.yesWeight.toFixed(1)} ALCX (${yesPct}%)</span>&nbsp;&nbsp;`;
-    html+=`<span style="color:#FF4444">❌ NO ${prop.noWeight.toFixed(1)} ALCX (${100-yesPct}%)</span>`;
+    html+=`<div style="color:#aaa;font-size:.72rem;margin-bottom:6px">⏱ ${timeStr} remaining</div>`;
+    // Vote bars
+    html+=`<div style="font-size:.72rem;margin-bottom:3px">`;
+    html+=`<span style="color:#4CAF50">✅ YES ${prop.yesWeight.toFixed(1)} (${yesPct}%)</span>&nbsp;&nbsp;`;
+    html+=`<span style="color:#FF4444">❌ NO ${prop.noWeight.toFixed(1)} (${100-yesPct}%)</span>`;
     html+=`</div>`;
-    // Vote bar
-    html+=`<div style="background:#222;border-radius:3px;height:8px;margin-bottom:6px;overflow:hidden">`;
+    html+=`<div style="background:#222;border-radius:3px;height:8px;margin-bottom:5px;overflow:hidden">`;
     html+=`<div style="background:#4CAF50;height:100%;width:${yesPct}%;float:left"></div>`;
     html+=`<div style="background:#FF4444;height:100%;width:${100-yesPct}%;float:left"></div></div>`;
-    // Quorum bar
     html+=`<div style="font-size:.7rem;color:#888;margin-bottom:2px">Quorum: ${total.toFixed(1)} / ${quorum} ALCX (${quorumPct}%)</div>`;
     html+=`<div style="background:#222;border-radius:3px;height:5px;margin-bottom:8px;overflow:hidden">`;
     html+=`<div style="background:${quorumPct>=100?'#FFD700':'#555'};height:100%;width:${quorumPct}%"></div></div>`;
     if(alreadyVoted){
-      html+=`<div style="color:#888;font-size:.75rem;text-align:center;padding:6px">✔ You have voted — ALCX locked until proposal settles.</div>`;
-    }else{
-      html+=`<div style="display:flex;gap:6px;margin-top:4px">`;
-      html+=`<button onclick="govVote(${prop.id},'yes')" style="flex:1;padding:5px;background:#1A3A1A;border:1px solid #4CAF50;color:#4CAF50;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">✅ Vote YES (lock ${freeAlcx.toFixed(1)} ALCX)</button>`;
-      html+=`<button onclick="govVote(${prop.id},'no')" style="flex:1;padding:5px;background:#3A1A1A;border:1px solid #FF4444;color:#FF4444;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">❌ Vote NO (lock ${freeAlcx.toFixed(1)} ALCX)</button>`;
+      html+=`<div style="color:#888;font-size:.75rem;text-align:center;padding:6px 0">✔ Voted — ${voteCommitted.toFixed(1)} ALCX stake committed until proposal settles.</div>`;
+    }else if(voteAvailable>0){
+      // Amount selector
+      html+=`<div style="margin-bottom:6px">`;
+      html+=`<div style="font-size:.72rem;color:#aaa;margin-bottom:3px">Stake amount to commit (1 – ${voteAvailable.toFixed(1)} ALCX):</div>`;
+      html+=`<input id="gov-vote-amt" type="number" min="1" max="${voteAvailable.toFixed(4)}" step="1" value="${voteAvailable.toFixed(1)}" style="width:90px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px;font-size:.8rem">`;
+      html+=`<span style="color:#666;font-size:.68rem;margin-left:6px">of your ${queueStake.toFixed(1)} queue stake</span>`;
       html+=`</div>`;
-      html+=`<div style="color:#666;font-size:.68rem;margin-top:4px">Voting locks your free ALCX until the proposal settles.</div>`;
+      html+=`<div style="display:flex;gap:6px">`;
+      html+=`<button onclick="govVote(${prop.id},'yes')" style="flex:1;padding:5px;background:#1A3A1A;border:1px solid #4CAF50;color:#4CAF50;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">✅ Vote YES</button>`;
+      html+=`<button onclick="govVote(${prop.id},'no')" style="flex:1;padding:5px;background:#3A1A1A;border:1px solid #FF4444;color:#FF4444;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">❌ Vote NO</button>`;
+      html+=`</div>`;
+      html+=`<div style="color:#666;font-size:.68rem;margin-top:4px">Committed stake is locked until the proposal settles (24h max).</div>`;
+    }else{
+      html+=`<div style="color:#888;font-size:.75rem;padding:6px 0">No uncommitted queue stake available to vote with.</div>`;
     }
     html+=`</div>`;
   }else{
+    // Propose panel
     html+=`<div style="color:#888;margin-bottom:8px;font-size:.75rem">No active proposal. Propose a new earmark rate:</div>`;
-    html+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">`;
+    html+=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">`;
     html+=`<span style="color:#aaa;font-size:.8rem">Rate (%):</span>`;
-    html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${rate.toFixed(2)}" style="width:70px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
-    html+=`<button onclick="govPropose()" style="padding:4px 10px;background:#1A1030;border:1px solid #9C27B0;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">📜 Propose</button>`;
+    html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${rate.toFixed(2)}" style="width:65px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
+    if(queueStake>0){
+      html+=`<span style="color:#aaa;font-size:.8rem">Stake:</span>`;
+      html+=`<input id="gov-propose-amt" type="number" min="1" max="${voteAvailable.toFixed(4)}" step="1" value="${voteAvailable.toFixed(1)}" style="width:65px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
+      html+=`<button onclick="govPropose()" style="padding:4px 10px;background:#1A1030;border:1px solid #9C27B0;color:#B080FF;cursor:pointer;border-radius:4px;font-family:monospace;font-size:.75rem">📜 Propose</button>`;
+    }else{
+      html+=`<button disabled style="padding:4px 10px;background:#111;border:1px solid #333;color:#555;border-radius:4px;font-family:monospace;font-size:.75rem;cursor:not-allowed">📜 Propose</button>`;
+    }
     html+=`</div>`;
-    html+=`<div style="color:#666;font-size:.7rem">Requires ≥10 free ALCX · Auto-votes YES · Locks your ALCX for 24h · Needs ${quorum} ALCX quorum to pass</div>`;
+    html+=`<div style="color:#666;font-size:.7rem">Requires queue-locked ALCX · Auto-votes YES · Stake locked 24h · Needs ${quorum} ALCX quorum</div>`;
   }
   el.innerHTML=html;
 }
 function govPropose(){
   const v=parseFloat(document.getElementById('gov-rate-inp')?.value);
   if(isNaN(v)||v<0.1||v>2.0){chatLog('Rate must be 0.1–2.0%.','#FF4444');return;}
-  socket?.emit('governance_propose',{rate:v/100});
+  const amt=parseFloat(document.getElementById('gov-propose-amt')?.value||(G.lockedAlcx||0));
+  if(isNaN(amt)||amt<=0){chatLog('Enter the ALCX stake amount for your proposal.','#FF4444');return;}
+  socket?.emit('governance_propose',{rate:v/100,amount:amt});
 }
-function govVote(id,choice){socket?.emit('governance_vote',{proposalId:id,choice});}
+function govVote(id,choice){
+  const amt=parseFloat(document.getElementById('gov-vote-amt')?.value||(G.lockedAlcx||0));
+  if(isNaN(amt)||amt<=0){chatLog('Enter a valid ALCX stake amount to vote.','#FF4444');return;}
+  socket?.emit('governance_vote',{proposalId:id,choice,amount:amt});
+}
 function doAuctionBid(){
   if(!G.queueState||G.queueState.served)return;
   const amt=parseFloat(document.getElementById('queue-bid-amt')?.value||0);
@@ -3474,8 +3506,10 @@ function renderHUD(){
   }
   document.getElementById('hud-spacebucks').textContent = `🪙${G.spacebucks}`;
   document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
-  const alcxTxt = (G.lockedAlcx>0||G.alcxVoteLock>0)
-    ? `⚗${G.alcx}${G.lockedAlcx>0?` 🔒${G.lockedAlcx}`:''}${G.alcxVoteLock>0?` 🗳${G.alcxVoteLock.toFixed(1)}`:''}` : `⚗${G.alcx}`;
+  // lockedAlcx = queue stake; alcxVoteLock = subset of that committed to active vote
+  const alcxTxt = G.lockedAlcx>0
+    ? `⚗${G.alcx} 🔒${G.lockedAlcx}${G.alcxVoteLock>0?`(🗳${G.alcxVoteLock.toFixed(1)})`:''}`
+    : `⚗${G.alcx}`;
   document.getElementById('hud-alcx').textContent = alcxTxt;
   // Level display — badge for unspent stat points or ready quests
   const hasReady=Object.values(G.quests).some(q=>q.status==='ready');
@@ -3798,7 +3832,7 @@ function renderInventoryScreen(){
     <div class="stat-line" style="color:#888"><span>💀 Schmeckles</span><span>${G.schmeckles}</span></div>
     <div class="stat-line" style="color:#4CAF50"><span>$ alUSD</span><span>${G.alUSD.toFixed(2)}</span></div>
     <div class="stat-line" style="color:#7B68EE"><span>⟠ alETH</span><span>${G.alETH.toFixed(4)}</span></div>
-    <div class="stat-line" style="color:#9C27B0"><span>⚗ ALCX${G.lockedAlcx>0?' (🔒'+G.lockedAlcx+' queue)':''}${G.alcxVoteLock>0?' (🗳'+G.alcxVoteLock.toFixed(1)+' vote)':''}</span><span>${G.alcx}</span></div>
+    <div class="stat-line" style="color:#9C27B0"><span>⚗ ALCX${G.lockedAlcx>0?' (🔒'+G.lockedAlcx+' staked'+(G.alcxVoteLock>0?', 🗳'+G.alcxVoteLock.toFixed(1)+' in vote':'')+')':''}</span><span>${G.alcx}</span></div>
   `;
   // Quest log
   const qBox=document.getElementById('quest-log-box');
@@ -4672,33 +4706,28 @@ function initSocket(){
       G.govProposals=data.proposals||[];
       G.earmarkRate=data.earmarkRate||0.005;
       if(data.quorum!=null)G.govQuorum=data.quorum;
-      // Sync server-reported vote lock on reconnect/join
-      if(data.myLockedAlcx!=null)G.alcxVoteLock=data.myLockedAlcx;
-      renderHUD();
+      // Sync vote-committed amount from server on join/reconnect
+      if(data.myVoteLocked!=null){G.alcxVoteLock=data.myVoteLocked;renderHUD();}
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
     socket.on('gov_result',data=>{
       if(data.ok){
-        if(data.lockedAlcx!=null){G.alcxVoteLock=data.lockedAlcx;renderHUD();}
+        // lockedAlcx here = the amount of queue-stake committed to the vote
+        if(data.lockedAlcx!=null){G.alcxVoteLock=parseFloat((G.alcxVoteLock+(data.lockedAlcx||0)).toFixed(4));renderHUD();}
         if(data.choice){
           const hLeft=data.hoursLeft||0;
-          chatLog(`🗳 Vote cast: ${data.choice.toUpperCase()} (${data.weight?.toFixed(1)} ALCX locked for ~${hLeft}h)`,'#9C27B0');
+          chatLog(`🗳 Voted ${data.choice.toUpperCase()}: ${data.weight?.toFixed(1)} ALCX queue-stake committed (~${hLeft}h remaining)`,'#9C27B0');
         }else if(data.proposed){
-          chatLog('📜 Governance proposal submitted! Your ALCX is locked for 24h.','#9C27B0');
+          chatLog(`📜 Proposal submitted! ${data.lockedAlcx?.toFixed(1)} ALCX queue-stake committed for 24h vote.`,'#9C27B0');
         }
       }else chatLog('Gov: '+data.error,'#FF4444');
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
     socket.on('gov_vote_released',data=>{
-      // Vote locks released after proposal settles
-      G.alcxVoteLock=Math.max(0,(data.availableAlcx!=null)?0:G.alcxVoteLock);
-      if(data.availableAlcx!=null){
-        // availableAlcx is the new free amount; alcxVoteLock = total - available
-        // But we don't want to change G.alcx; just zero out the lock
-        G.alcxVoteLock=0;
-      }
+      // Proposal settled — release the committed stake back to uncommitted queue-lock
+      G.alcxVoteLock=0;
       renderHUD();
-      chatLog('🔓 Your governance vote lock has been released! ALCX is free again.','#9C27B0');
+      chatLog('🔓 Governance vote settled — your queue stake is fully uncommitted again.','#9C27B0');
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
 

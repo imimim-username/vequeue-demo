@@ -141,7 +141,7 @@ setInterval(()=>{
       if(acct.data.alcxVoteLocks[p.id]!==undefined){
         delete acct.data.alcxVoteLocks[p.id];
         const sid=socketsByAccount[id];
-        if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id,availableAlcx:getAvailableAlcx(id)});
+        if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id});
       }
     });
     changed=true;
@@ -598,7 +598,7 @@ io.on('connection',socket=>{
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
-    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,myLockedAlcx:socket.accountId?getVoteLocked(socket.accountId):0});
+    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
     // Send active world event to new joiner
     if(worldEvent&&Date.now()<worldEvent.endsAt){
       socket.emit('world_event_start',worldEvent);
@@ -874,21 +874,27 @@ io.on('connection',socket=>{
     const rate=parseFloat(data.rate);
     if(isNaN(rate)||rate<0.001||rate>0.02)
       return socket.emit('gov_result',{ok:false,error:'Rate must be 0.1%–2.0%.'});
-    const avail=getAvailableAlcx(socket.accountId);
-    if(avail<10)return socket.emit('gov_result',{ok:false,error:`Need ≥10 free ALCX to propose (you have ${avail.toFixed(1)} available).`});
+    // Vote weight must come from ALCX locked inside the veQueue system (queue stake), not free wallet
     const acctData=pdb[socket.accountId].data;
+    const queueLocked=parseFloat(acctData?.lockedAlcx||0);
+    if(queueLocked<=0)
+      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to propose. Join the Marketplace or Treasury entry queue first.'});
+    const voteAmt=parseFloat(data.amount)||queueLocked; // client may specify partial amount
+    const maxVote=parseFloat((queueLocked-getVoteLocked(socket.accountId)).toFixed(4));
+    if(voteAmt<=0||voteAmt>maxVote)
+      return socket.emit('gov_result',{ok:false,error:`Vote amount must be 1–${maxVote.toFixed(1)} (your uncommitted queue stake).`});
     acctData.alcxVoteLocks=acctData.alcxVoteLocks||{};
     const p={
       id:_govIdSeq++,type:'earmark_rate',value:rate,
       proposerName:pdb[socket.accountId].username||socket.accountId,
-      yesWeight:avail,noWeight:0,
-      votes:{[socket.accountId]:{weight:avail,choice:'yes'}},
+      yesWeight:voteAmt,noWeight:0,
+      votes:{[socket.accountId]:{weight:voteAmt,choice:'yes'}},
       endsAt:Date.now()+VOTE_DURATION_MS,passed:null,
     };
-    acctData.alcxVoteLocks[p.id]=avail; // lock proposer's ALCX for 24h
+    acctData.alcxVoteLocks[p.id]=voteAmt;
     govProposals.push(p);saveGov();saveDb();broadcastGovState();
-    io.emit('chat',{nickname:'⚗ Governance',text:`📜 ${p.proposerName} proposes earmark rate → ${(rate*100).toFixed(2)}%. 24-hour vote open! Need ${VOTE_QUORUM} ALCX quorum.`});
-    socket.emit('gov_result',{ok:true,proposed:true,proposalId:p.id,lockedAlcx:avail,availableAlcx:0});
+    io.emit('chat',{nickname:'⚗ Governance',text:`📜 ${p.proposerName} proposes earmark rate → ${(rate*100).toFixed(2)}% (${voteAmt.toFixed(1)} ALCX staked). 24h vote — need ${VOTE_QUORUM} ALCX quorum.`});
+    socket.emit('gov_result',{ok:true,proposed:true,proposalId:p.id,lockedAlcx:voteAmt});
   });
 
   socket.on('governance_vote',data=>{
@@ -898,17 +904,26 @@ io.on('connection',socket=>{
     const prop=govProposals.find(p=>p.id===proposalId&&p.passed===null);
     if(!prop)return socket.emit('gov_result',{ok:false,error:'No active proposal found.'});
     if(prop.votes[socket.accountId])return socket.emit('gov_result',{ok:false,error:'Already voted on this proposal.'});
-    const avail=getAvailableAlcx(socket.accountId);
-    if(avail<=0)return socket.emit('gov_result',{ok:false,error:'No free ALCX available to vote with (some may be locked in this proposal already).'});
+    // Vote weight must come from ALCX locked inside the veQueue system
     const acctData=pdb[socket.accountId].data;
+    const queueLocked=parseFloat(acctData?.lockedAlcx||0);
+    if(queueLocked<=0)
+      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to vote. Join the Marketplace or Treasury entry queue first.'});
+    const alreadyCommitted=getVoteLocked(socket.accountId);
+    const maxVote=parseFloat((queueLocked-alreadyCommitted).toFixed(4));
+    if(maxVote<=0)
+      return socket.emit('gov_result',{ok:false,error:'All your queue-locked ALCX is already committed to an active vote.'});
+    const voteAmt=Math.min(parseFloat(data.amount)||maxVote, maxVote);
+    if(voteAmt<=0)
+      return socket.emit('gov_result',{ok:false,error:'Vote amount must be greater than 0.'});
     acctData.alcxVoteLocks=acctData.alcxVoteLocks||{};
-    acctData.alcxVoteLocks[proposalId]=avail; // lock voter's ALCX until proposal settles
-    prop.votes[socket.accountId]={weight:avail,choice};
-    if(choice==='yes')prop.yesWeight+=avail;else prop.noWeight+=avail;
+    acctData.alcxVoteLocks[proposalId]=voteAmt;
+    prop.votes[socket.accountId]={weight:voteAmt,choice};
+    if(choice==='yes')prop.yesWeight+=voteAmt;else prop.noWeight+=voteAmt;
     saveGov();saveDb();broadcastGovState();
     const hoursLeft=Math.ceil((prop.endsAt-Date.now())/3600000);
-    socket.emit('gov_result',{ok:true,choice,weight:avail,hoursLeft,lockedAlcx:avail,availableAlcx:0});
-    io.emit('chat',{nickname:'⚗ Governance',text:`${pdb[socket.accountId].username} voted ${choice==='yes'?'✅ YES':'❌ NO'} (${avail.toFixed(1)} ALCX locked 🔒)`});
+    socket.emit('gov_result',{ok:true,choice,weight:voteAmt,hoursLeft,lockedAlcx:voteAmt});
+    io.emit('chat',{nickname:'⚗ Governance',text:`${pdb[socket.accountId].username} voted ${choice==='yes'?'✅ YES':'❌ NO'} (${voteAmt.toFixed(1)} queue-staked ALCX 🔒)`});
   });
 
   socket.on('queue_auction_bid',data=>{
