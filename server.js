@@ -93,13 +93,20 @@ function updateHallOfFame(accountId,data){
 
 // ── Governance Votes ──────────────────────────────────────────────────────────
 const GOV_FILE=path.join(__dirname,'governance.json');
-let govProposals=[];
-try{govProposals=JSON.parse(fs.readFileSync(GOV_FILE,'utf8'));}catch(e){govProposals=[];}
-// Remove already-settled proposals from loaded state
-govProposals=govProposals.filter(p=>p.passed===null);
-function saveGov(){try{fs.writeFileSync(GOV_FILE,JSON.stringify(govProposals),'utf8');}catch(e){}}
-let _govIdSeq=1;
-let EARMARK_RATE_LIVE=0.005; // governance-controlled, default 0.5%
+let _govState={proposals:[],idSeq:1,history:[]};
+try{const raw=JSON.parse(fs.readFileSync(GOV_FILE,'utf8'));
+  if(Array.isArray(raw)){_govState.proposals=raw;} // legacy: old format was just array
+  else{_govState=Object.assign(_govState,raw);}
+}catch(e){}
+// Active proposals only (passed===null); history kept separately
+let govProposals=_govState.proposals.filter(p=>p.passed===null);
+let govHistory=(_govState.history||[]).slice(-20); // keep last 20 settled proposals
+// Persist idSeq so proposal IDs are unique across server restarts
+let _govIdSeq=Math.max(1,(_govState.idSeq||1),(govProposals.reduce((m,p)=>Math.max(m,p.id||0),0)+1));
+function saveGov(){
+  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory}),'utf8');}catch(e){}
+}
+let EARMARK_RATE_LIVE=_govState.earmarkRate||0.005; // persist across restarts
 const VOTE_DURATION_MS=24*60*60*1000; // 24-hour voting epoch
 const VOTE_QUORUM=50; // minimum total ALCX weight for a valid result
 
@@ -118,23 +125,29 @@ function getAvailableAlcx(accountId){
   return Math.max(0,parseFloat((total-getVoteLocked(accountId)).toFixed(4)));
 }
 
-function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM});}
+function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,history:govHistory});}
 // Check vote outcomes every 60s
 setInterval(()=>{
   const now=Date.now();let changed=false;
   govProposals.forEach(p=>{
     if(p.passed!==null||now<p.endsAt)return;
     const totalWeight=p.yesWeight+p.noWeight;
+    let outcome,outcomeMsg;
     if(totalWeight<VOTE_QUORUM){
-      p.passed=false;
-      io.emit('chat',{nickname:'⚗ Governance',text:`❌ Proposal #${p.id} FAILED — quorum not reached (${totalWeight.toFixed(1)} / ${VOTE_QUORUM} ALCX). Earmark rate unchanged.`});
+      p.passed=false;outcome='quorum_fail';
+      outcomeMsg=`❌ Proposal #${p.id} FAILED — quorum not reached (${totalWeight.toFixed(1)} / ${VOTE_QUORUM} ALCX). Earmark rate unchanged.`;
     }else if(p.yesWeight>p.noWeight){
-      p.passed=true;EARMARK_RATE_LIVE=p.value;
-      io.emit('chat',{nickname:'⚗ Governance',text:`✅ Proposal #${p.id} PASSED (${totalWeight.toFixed(1)} ALCX)! Earmark rate → ${(p.value*100).toFixed(2)}% (proposed by ${p.proposerName})`});
+      p.passed=true;EARMARK_RATE_LIVE=p.value;outcome='passed';
+      outcomeMsg=`✅ Proposal #${p.id} PASSED (${totalWeight.toFixed(1)} ALCX)! Earmark rate → ${(p.value*100).toFixed(2)}% (proposed by ${p.proposerName})`;
     }else{
-      p.passed=false;
-      io.emit('chat',{nickname:'⚗ Governance',text:`❌ Proposal #${p.id} FAILED (${p.yesWeight.toFixed(1)} YES vs ${p.noWeight.toFixed(1)} NO). Earmark rate stays at ${(EARMARK_RATE_LIVE*100).toFixed(2)}%.`});
+      p.passed=false;outcome='failed';
+      outcomeMsg=`❌ Proposal #${p.id} FAILED (${p.yesWeight.toFixed(1)} YES vs ${p.noWeight.toFixed(1)} NO). Earmark rate stays at ${(EARMARK_RATE_LIVE*100).toFixed(2)}%.`;
     }
+    io.emit('chat',{nickname:'⚗ Governance',text:outcomeMsg});
+    // Record in history for governance panel display
+    govHistory.push({id:p.id,type:p.type,value:p.value,proposerName:p.proposerName,
+      yesWeight:p.yesWeight,noWeight:p.noWeight,outcome,settledAt:now});
+    if(govHistory.length>20)govHistory.shift();
     // Release vote locks: refund committed ALCX back to wallet (it was a subset of lockedAlcx)
     Object.entries(pdb).forEach(([id,acct])=>{
       if(!acct.data?.alcxVoteLocks)return;
@@ -521,6 +534,35 @@ io.on('connection',socket=>{
 
   // Quest reward grant — client calls this BEFORE save_character so the anti-cheat
   // guard sees the new value as the prev value and allows it through.
+  // ── Zone & queue ALCX yield — server-authorised to bypass anti-cheat ─────────
+  socket.on('alcx_yield_request',data=>{
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    const p=players[socket.id];if(!p)return;
+    const d=pdb[socket.accountId].data||{};
+    const now=Date.now();
+    const src=data?.source||'zone';
+    if(src==='zone'){
+      if(!['marketplace','treasury'].includes(p.zone))return;
+      // Throttle: min 4s between zone yields (client fires every ~5s)
+      if(d._lastZoneYield&&now-d._lastZoneYield<4000)return;
+      d._lastZoneYield=now;
+      const seniority=Math.max(0,parseInt(d.zoneSeniority||0));
+      const drip=1+Math.floor(seniority/3);
+      d.alcx=parseFloat(((d.alcx||0)+drip).toFixed(4));
+      saveDb();
+      socket.emit('alcx_yield',{amount:drip,seniority,source:'zone'});
+    }else if(src==='queue'){
+      // Queue patience yield: must actually be in a queue
+      const inQ=QUEUE_ZONES.some(z=>queues[z].entry.entries.find(e=>e.id===socket.id)||queues[z].exit.entries.find(e=>e.id===socket.id));
+      if(!inQ)return;
+      if(d._lastQueueYield&&now-d._lastQueueYield<8000)return;
+      d._lastQueueYield=now;
+      d.alcx=parseFloat(((d.alcx||0)+1).toFixed(4));
+      saveDb();
+      socket.emit('alcx_yield',{amount:1,source:'queue'});
+    }
+  });
+
   socket.on('quest_reward',data=>{
     if(!socket.accountId||!pdb[socket.accountId])return;
     const stored=pdb[socket.accountId].data=pdb[socket.accountId].data||{};
@@ -558,6 +600,10 @@ io.on('connection',socket=>{
       if(data.alUSD>alUSDPrev+0.01)data.alUSD=parseFloat(alUSDPrev.toFixed(2));
       if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
       if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
+      // lockedAlcx is managed server-side (queue_join/queue_leave/gov settlement).
+      // Block any client-side inflation to prevent vote-weight manipulation.
+      if((data.lockedAlcx||0)>(prev.lockedAlcx||0)+0.0001)
+        data.lockedAlcx=parseFloat((prev.lockedAlcx||0).toFixed(4));
       // Guard: client cannot inflate dep.available (only server transmuter tick may increase it)
       if(Array.isArray(data.transmuterDeposits)&&Array.isArray(prev.transmuterDeposits)){
         data.transmuterDeposits.forEach((dep,i)=>{
@@ -601,7 +647,7 @@ io.on('connection',socket=>{
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
-    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
+    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,history:govHistory,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
     // Send active world event to new joiner
     if(worldEvent&&Date.now()<worldEvent.endsAt){
       socket.emit('world_event_start',worldEvent);

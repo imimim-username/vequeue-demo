@@ -609,7 +609,7 @@ const NPCS = {
         "We keep the peace in this town. Monsters stay out — that's the deal.",
       ]
     },
-    { id:'armorer_brix', x:TOWN_OX+31, y:TOWN_OY+11, type:'merchant', face:3, name:'Armorer Brix', questId:'dark_knight_elite',
+    { id:'armorer_brix', x:TOWN_OX+31, y:TOWN_OY+12, type:'merchant', face:3, name:'Armorer Brix', questId:'dark_knight_elite',
       dialog:[
         "Looking to earn alETH? The premium currency of the on-chain realm?",
         "Dark Knights drop it — and I pay bounties in alETH for every three you slay.",
@@ -624,7 +624,8 @@ const NPCS = {
         "...No, I don't know what 'proper channels' means exactly. Ask the clerk.",
       ]
     },
-    {type:'wizard', face:0, name:'Exchanger Rex', x:TOWN_OX+24, y:TOWN_OY+8,
+    // Exchanger Rex stands on the main road east of the fountain — fully accessible
+    {type:'wizard', face:0, name:'Exchanger Rex', x:TOWN_OX+23, y:TOWN_OY+13,
      dialog:['Welcome to the Currency Exchange.','Swap any token for any other at a 0.30% fee.'],
      exchange:true},
     {type:'guard', face:3, name:'Hall of Fame', x:TOWN_OX+27, y:TOWN_OY+10,

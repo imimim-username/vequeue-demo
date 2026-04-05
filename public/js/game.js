@@ -40,6 +40,7 @@ const G = {
   lockedAlcx:0,         // ALCX locked while in entry queue
   zoneSeniority:0,      // 5-min intervals spent in marketplace/treasury without leaving
   govProposals:[],      // active governance proposals
+  govHistory:[],        // settled proposals (newest last)
   earmarkRate:0.005,    // current earmark rate (from server)
   alcxVoteLock:0,       // ALCX locked in active governance vote (inaccessible)
   govQuorum:50,         // quorum required for a valid proposal result
@@ -829,8 +830,12 @@ function updateQueuePanel(){
     panel.insertBefore(fastExitEl,document.getElementById('queue-enter-btn'));
   }
   if(type==='exit'&&!served){
-    const fee=Math.max(1,Math.floor((G.alcx||0)*0.05));
-    fastExitEl.innerHTML=`<button onclick="doFastExit(${fee})" style="width:100%;padding:3px 0;background:#1A0A00;border:1px solid #FF8C00;color:#FF8C00;cursor:pointer;border-radius:3px;font-family:monospace;font-size:.7rem">⚡ Fast Exit (${fee} ALCX)</button><div style="font-size:.6rem;color:#555;text-align:center;margin-top:2px">Skip the exit queue — fee goes to treasury</div>`;
+    // Fee scales with position in queue: farther back = more to pay (patience premium)
+    const sq=serverQueues[zone]?.exit;
+    const ahead=sq&&ticket?sq.entries.filter(e=>e.ticket<ticket).length:0;
+    const posFee=Math.max(1,Math.ceil(ahead*2.5)); // 2.5 ALCX per position ahead
+    const fee=posFee;
+    fastExitEl.innerHTML=`<button onclick="doFastExit(${fee})" style="width:100%;padding:3px 0;background:#1A0A00;border:1px solid #FF8C00;color:#FF8C00;cursor:pointer;border-radius:3px;font-family:monospace;font-size:.7rem">⚡ Fast Exit (${fee} ALCX)</button><div style="font-size:.6rem;color:#555;text-align:center;margin-top:2px">Skip ${ahead} position${ahead!==1?'s':''} — fee to treasury</div>`;
     fastExitEl.style.display='block';
   }else{fastExitEl.style.display='none';}
 
@@ -2444,6 +2449,26 @@ function renderGovernanceUI(){
     html+=`</div>`;
     html+=`<div style="color:#666;font-size:.7rem">Requires queue-locked ALCX · Auto-votes YES · Stake locked 24h · Needs ${quorum} ALCX quorum</div>`;
   }
+
+  // ── Governance history ────────────────────────────────────────────────────
+  const hist=(G.govHistory||[]).slice().reverse(); // newest first
+  if(hist.length>0){
+    html+=`<div style="margin-top:12px;border-top:1px solid #222;padding-top:8px">`;
+    html+=`<div style="color:#888;font-size:.72rem;margin-bottom:5px">📜 Recent Proposals</div>`;
+    hist.slice(0,5).forEach(h=>{
+      const icon=h.outcome==='passed'?'✅':h.outcome==='quorum_fail'?'⚠️':'❌';
+      const desc=h.outcome==='passed'?`Passed → ${(h.value*100).toFixed(2)}%`
+        :h.outcome==='quorum_fail'?'Failed (no quorum)'
+        :`Failed (${h.yesWeight?.toFixed(1)} vs ${h.noWeight?.toFixed(1)})`;
+      const d=new Date(h.settledAt);
+      const dateStr=`${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+      html+=`<div style="font-size:.7rem;color:#666;margin-bottom:2px">`;
+      html+=`${icon} #${h.id} ${desc} <span style="color:#444">${dateStr} · ${h.proposerName}</span>`;
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  }
+
   el.innerHTML=html;
 }
 function govPropose(){
@@ -3461,7 +3486,7 @@ const _BUILDING_SIGNS=[
   // Treasury (SE building)
   ['💰 Treasury',        TOWN_OX+30,   TOWN_OY+21,  '#AAFFAA'],
   // Currency exchange NPC (town square, between buildings)
-  ['💱 Currency Exchange', TOWN_OX+24, TOWN_OY+6.5, '#FF9944'],
+  ['💱 Currency Exchange', TOWN_OX+23, TOWN_OY+12,  '#FF9944'],
 ];
 function renderBuildingSigns(ctx){
   ctx.save();
@@ -4253,21 +4278,16 @@ function gameLoop(ts){
     renderMinimap(ctxUI);
     // Governance Hall: treasury + live prices panel
     if(G.zone==='governance')renderGovernancePanel(ctxUI);
-    // ── ALCX yield: seniority builds INSIDE the zone, drip while waiting ──────
-    // Seniority accumulates while physically inside an economic zone.
-    // This correctly models the protocol: longer commitment inside = more yield.
+    // ── ALCX yield: request server authorisation — server pre-updates pdb ──────
+    // Seniority tick: every ~5s while physically inside an economic zone
     if((G.zone==='marketplace'||G.zone==='treasury')&&G.tick%300===0){
       G.zoneSeniority=(G.zoneSeniority||0)+1;
-      const drip=1+Math.floor(G.zoneSeniority/3);
-      G.alcx+=drip;
-      const bonusStr=drip>1?` (seniority ×${drip})`:'';
-      chatLog(`⚗ Zone Yield: +${drip} ALCX${bonusStr}`,'#9C27B0');
+      socket?.emit('alcx_yield_request',{source:'zone'});
       updateQueuePanel();
     }
-    // Small base drip while waiting in queue (commitment signal earns too)
+    // Queue patience yield: every ~10s while waiting in a queue
     if(G.queueState&&G.queueState.ticket&&!G.queueState.served&&G.tick%600===0){
-      G.alcx+=1;
-      chatLog('⚗ Queue Yield: +1 ALCX (patience pays)','#9C27B0');
+      socket?.emit('alcx_yield_request',{source:'queue'});
     }
     // Bank: local yield repayment (server handles earmarking/transmuter globally every 60s)
     if(G.bankPositions&&G.bankPositions.length>0&&G.tick%180===0){
@@ -4711,6 +4731,7 @@ function initSocket(){
       G.govProposals=data.proposals||[];
       G.earmarkRate=data.earmarkRate||0.005;
       if(data.quorum!=null)G.govQuorum=data.quorum;
+      if(data.history!=null)G.govHistory=data.history;
       // Sync vote-committed amount from server on join/reconnect
       if(data.myVoteLocked!=null){G.alcxVoteLock=data.myVoteLocked;renderHUD();}
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
@@ -4728,6 +4749,18 @@ function initSocket(){
       }else chatLog('Gov: '+data.error,'#FF4444');
       if(document.getElementById('governance-ui')?.style.display!=='none')renderGovernanceUI();
     });
+    socket.on('alcx_yield',data=>{
+      // Server pre-updated pdb.alcx; mirror it on client
+      G.alcx=parseFloat((G.alcx+(data.amount||0)).toFixed(4));
+      renderHUD();
+      if(data.source==='zone'){
+        const bonusStr=data.amount>1?` (seniority ×${data.amount})`:'';
+        chatLog(`⚗ Zone Yield: +${data.amount} ALCX${bonusStr}`,'#9C27B0');
+      }else if(data.source==='queue'){
+        chatLog('⚗ Queue Yield: +1 ALCX (patience pays)','#9C27B0');
+      }
+    });
+
     socket.on('gov_vote_released',data=>{
       // Server has already added refundAmt back to pdb.alcx and reduced pdb.lockedAlcx.
       // Mirror that on the client: move the vote-committed amount back to wallet.
