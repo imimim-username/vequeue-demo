@@ -1,10 +1,12 @@
 import { G } from './state.js';
 import { T, ENEMIES, QUEST_DEFS, TS, RARITY_COLOR, RESPAWN_TX, RESPAWN_TY, _snapCanvas, _snapCtx, _pixCanvas, _pixCtx, BATTLE_BTNS } from './data.js';
-import { SFX } from './audio.js';
+import { SFX, musPlay } from './audio.js';
 // These are imported from game.js (circular is fine — only used inside functions, not at eval time)
-import { chatLog, changeZone, updateQuestProgress, W, H, ctxUI } from './game.js';
+import { chatLog, changeZone, updateQuestProgress, W, H, ctxUI, hasRaft, hasForestPass } from './game.js';
 import { saveToServer } from './socket.js';
 import { ZONES, WORLD_MAP } from './maps.js';
+// ui.js imports — circular (ui.js imports xpForLevel etc. from combat.js), safe inside function bodies
+import { degradeItem, itemEffDmg, itemMaxDur } from './ui.js';
 
 // ── BATTLE SYSTEM ─────────────────────────────────────────────────────────────
 

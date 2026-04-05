@@ -687,7 +687,7 @@ export function renderExchangeUI(){
 // ── Gear durability system ────────────────────────────────────────────────────
 // Max durability by rarity; starting (untagged) gear gets 40.
 export const MAX_DUR={common:60,rare:80,epic:100};
-function itemMaxDur(item){return MAX_DUR[item?.rarity||'common']||40;}
+export function itemMaxDur(item){return MAX_DUR[item?.rarity||'common']||40;}
 // Call when an item enters the player's possession (buy or loot) to stamp durability.
 export function stampDurability(item){
   if(!item||item.type==='potion'||item.durability!=null)return item;

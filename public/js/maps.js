@@ -1,4 +1,4 @@
-import { T, TOWN_OX, TOWN_OY, NS_L, NS_R, DGN_W, DGN_H, WORLD_W, WORLD_H, EW_T, EW_B, SOLID_TILES, WORLD_SOLID } from './data.js';
+import { T, TOWN_OX, TOWN_OY, NS_L, NS_R, DGN_W, DGN_H, DUNGEON_MAP, WORLD_W, WORLD_H, EW_T, EW_B, SOLID_TILES, WORLD_SOLID } from './data.js';
 // ── TOWN MAP ─────────────────────────────────────────────────────────────────
 // 40 wide × 28 tall. Player spawns at col 20, row 14 (centre road).
 // All roads are 2 tiles wide; buildings have 3-tile-wide entrances; no dead ends.

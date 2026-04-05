@@ -65,8 +65,8 @@ function _playerHasEffect(effect){
   if(G.accessory?.effect===effect||G.accessory?.effect==='raftAndForest')return true;
   return G.inventory.some(it=>it&&(it.effect===effect||it.effect==='raftAndForest'));
 }
-function hasRaft(){return _playerHasEffect('raft');}
-function hasForestPass(){return _playerHasEffect('forestPass');}
+export function hasRaft(){return _playerHasEffect('raft');}
+export function hasForestPass(){return _playerHasEffect('forestPass');}
 
 function isSolid(zone,tx,ty){
   const z=ZONES[zone];if(!z)return true;
