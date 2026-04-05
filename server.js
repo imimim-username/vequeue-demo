@@ -592,6 +592,7 @@ io.on('connection',socket=>{
     // Cross-currency guard: prevent currencies from INCREASING via client manipulation.
     // Legitimate decreases (purchases) are allowed; only inflation is blocked.
     // TODO: full server-side shop validation requires moving item definitions server-side.
+    if(!pdb[socket.accountId])return;
     const prev=pdb[socket.accountId].data;
     if(prev){
       const alUSDPrev=prev.alUSD||0, alETHPrev=prev.alETH||0;
@@ -600,6 +601,11 @@ io.on('connection',socket=>{
       if(data.alUSD>alUSDPrev+0.01)data.alUSD=parseFloat(alUSDPrev.toFixed(2));
       if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
       if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
+      // Bidirectional protection: reject catastrophic near-zero saves that weren't
+      // preceded by a server-side deduction.  (Root cause: client saves G.alETH=0
+      // if saveToServer fires before applyServerState populates G from auth_result.)
+      if(data.alETH<alETHPrev*0.10&&alETHPrev>0.001)data.alETH=parseFloat(alETHPrev.toFixed(4));
+      if(data.alUSD<alUSDPrev*0.10&&alUSDPrev>1)    data.alUSD=parseFloat(alUSDPrev.toFixed(2));
       // lockedAlcx is managed server-side (queue_join/queue_leave/gov settlement).
       // Block any client-side inflation to prevent vote-weight manipulation.
       if((data.lockedAlcx||0)>(prev.lockedAlcx||0)+0.0001)
@@ -614,6 +620,12 @@ io.on('connection',socket=>{
     }
     data._sig      =signPlayerData(data);
     pdb[socket.accountId].data=data;
+    // Re-inject server-only fields the client never holds — full-replace above would
+    // otherwise wipe them, breaking vote locks and yield throttle timestamps.
+    if(prev){
+      const SERVER_ONLY=['alcxVoteLocks','_lastZoneYield','_lastQueueYield'];
+      SERVER_ONLY.forEach(f=>{if(prev[f]!==undefined)pdb[socket.accountId].data[f]=prev[f];});
+    }
     pdb[socket.accountId].updated=Date.now();
     saveDb();
     updateHallOfFame(socket.accountId,data);
