@@ -471,14 +471,13 @@ export function applyServerState(s){
 
 export function saveToServer(){
   if(!socket||!G_accountId)return;
+  // Economy fields (currencies, bank, transmuter) are server-authoritative and
+  // managed exclusively by server-side handlers — never sent from the client.
   socket.emit('save_character',{
     nickname:G.nickname,color:G.color,hairColor:G.hairColor,
     gender:G.gender,skinTone:G.skinTone,
     species:G.species,class_:G.class_,
-    spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,
-    alcx:G.alcx,lockedAlcx:G.lockedAlcx,bankPositions:G.bankPositions,
     stats:G.stats,hp:G.hp,maxHp:G.maxHp,mp:G.mp,maxMp:G.maxMp,
-    transmuterDeposits:G.transmuterDeposits,
     xp:G.xp,level:G.level,statPoints:G.statPoints,
     inventory:G.inventory,accessory:G.accessory,equippedArmor:G.equippedArmor,maxInvSlots:G.maxInvSlots,
     quests:G.quests,dungeonBossDefeated:G.dungeonBossDefeated,

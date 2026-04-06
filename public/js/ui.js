@@ -420,6 +420,19 @@ export const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 export const CHANGELOG=[
   {
+    version:'1.0.7', date:'Apr 5 2026',
+    sections:[
+      {title:'Architecture — Server-Authoritative Economy',items:[
+        'All economy state (spacebucks, schmeckles, alUSD, alETH, ALCX, bank positions, transmuter deposits, lockedAlcx) is now owned exclusively by the server.',
+        'Client no longer sends currency fields in save_character — the server always restores them from its own pdb, ignoring whatever the client sends. A devtools hack on G currencies will never reach the database.',
+        'Removed HMAC signature system (signPlayerData / verifyPlayerData / _sig). The signature\'s secret was in the source code, making it weak; more importantly, every server-side handler that mutated currencies needed to re-sign before saving, which was the root cause of the data-loss bug fixed in v1.0.6.',
+        'Removed save_character inflation guard and all bidirectional anti-cheat checks — no longer needed since the server never accepts client-provided currency values.',
+        'Removed G._txPending race-condition guard — no longer needed since currencies are not part of the client save payload.',
+        'save_character now only carries gameplay state: appearance, stats, HP/MP, XP/level, inventory, quests, kills. This payload is fully client-authoritative and contains no economically sensitive data.',
+      ]},
+    ]
+  },
+  {
     version:'1.0.6', date:'Apr 5 2026',
     sections:[
       {title:'Critical Fix — Currency Exchange & Data Persistence',items:[

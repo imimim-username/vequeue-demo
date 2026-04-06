@@ -26,24 +26,6 @@ app.use(express.static(clientDir));
 const players={};
 const socketsByAccount={}; // accountId -> socket.id (for targeted emits)
 
-// ── HMAC Anti-Cheat ───────────────────────────────────────────────────────────
-const SERVER_SECRET=process.env.VQ_SECRET||'vq-anticheat-2026';
-function signPlayerData(d){
-  const payload=JSON.stringify({
-    spacebucks:Math.round(d.spacebucks||0),
-    schmeckles:Math.round(d.schmeckles||0),
-    alUSD:parseFloat((d.alUSD||0).toFixed(2)),
-    alETH:parseFloat((d.alETH||0).toFixed(4)),
-    alcx:parseFloat((d.alcx||0).toFixed(4)),
-    level:d.level||1,
-    xp:d.xp||0,
-  });
-  return crypto.createHmac('sha256',SERVER_SECRET).update(payload).digest('hex');
-}
-function verifyPlayerData(d){
-  if(!d||!d._sig)return true; // unsigned old data: trust it once
-  return d._sig===signPlayerData(d);
-}
 
 // ── Snowball Enemies ──────────────────────────────────────────────────────────
 const SNOWBALL_FILE=path.join(__dirname,'snowball_enemies.json');
@@ -161,7 +143,7 @@ setInterval(()=>{
       acct.data.alcx=parseFloat(((acct.data.alcx||0)+voteAmt).toFixed(4));
       acct.data.lockedAlcx=Math.max(0,parseFloat(((acct.data.lockedAlcx||0)-voteAmt).toFixed(4)));
       delete acct.data.alcxVoteLocks[p.id];
-      acct.data._sig=signPlayerData(acct.data);
+      
       const sid=socketsByAccount[id];
       if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id,refundAmt:voteAmt});
     });
@@ -483,11 +465,6 @@ io.on('connection',socket=>{
     socket.accountId=key;
     socketsByAccount[key]=socket.id;
     const savedData=row.data||null;
-    if(savedData&&!verifyPlayerData(savedData)){
-      console.warn(`[HMAC] Tamper detected for account: ${key} — stripping data`);
-      socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:null,_tampered:true});
-      return;
-    }
     socket.emit('auth_result',{ok:true,isNew:false,username:row.username,data:savedData});
   });
 
@@ -515,7 +492,7 @@ io.on('connection',socket=>{
       d.alUSD=parseFloat(((d.alUSD||0)+borrow).toFixed(2));
       d.bankPositions=d.bankPositions||[];
       d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
       socket.emit('bank_borrow_result',{ok:true,spacebucks:d.spacebucks,alUSD:d.alUSD,bankPositions:d.bankPositions});
     }else if(collateral==='schmeckles'){
       if((d.schmeckles||0)<amt)return socket.emit('bank_borrow_result',{ok:false,error:'Not enough Schmeckles.'});
@@ -524,7 +501,7 @@ io.on('connection',socket=>{
       d.alETH=parseFloat(((d.alETH||0)+borrow).toFixed(4));
       d.bankPositions=d.bankPositions||[];
       d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
       socket.emit('bank_borrow_result',{ok:true,schmeckles:d.schmeckles,alETH:d.alETH,bankPositions:d.bankPositions});
     }else{
       socket.emit('bank_borrow_result',{ok:false,error:'Unknown collateral type.'});
@@ -544,7 +521,7 @@ io.on('connection',socket=>{
     pos.claimed=true;pos.interestAccrued=0;
     if(pos.collateral==='spacebucks')d.spacebucks=Math.floor((d.spacebucks||0)+total);
     else d.schmeckles=Math.floor((d.schmeckles||0)+total);
-    d._sig=signPlayerData(d);saveDb();
+    saveDb();
     socket.emit('bank_claim_result',{ok:true,collateral:pos.collateral,total,spacebucks:d.spacebucks,schmeckles:d.schmeckles,bankPositions:d.bankPositions});
   });
 
@@ -568,7 +545,7 @@ io.on('connection',socket=>{
     const claimed=Math.floor(amt);
     if(dep.type==='alUSD')d.spacebucks=Math.floor((d.spacebucks||0)+claimed);
     else d.schmeckles=Math.floor((d.schmeckles||0)+claimed);
-    d._sig=signPlayerData(d);saveDb();
+    saveDb();
     socket.emit('transmuter_claim_result',{ok:true,type:dep.type,claimed,spacebucks:d.spacebucks,schmeckles:d.schmeckles,transmuterDeposits:d.transmuterDeposits});
   });
 
@@ -587,7 +564,7 @@ io.on('connection',socket=>{
     dep.amount=0;
     if(isUSD){d.alUSD=parseFloat(((d.alUSD||0)+returned).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+fee).toFixed(2));}
     else{d.alETH=parseFloat(((d.alETH||0)+returned).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+fee).toFixed(4));}
-    d._sig=signPlayerData(d);saveDb();broadcastTreasury();
+    saveDb();broadcastTreasury();
     socket.emit('transmuter_withdraw_result',{ok:true,type:dep.type,returned,fee,alETH:d.alETH,alUSD:d.alUSD,transmuterDeposits:d.transmuterDeposits});
   });
 
@@ -597,7 +574,6 @@ io.on('connection',socket=>{
     const d=pdb[socket.accountId].data;if(!d)return;
     const VALID=['spacebucks','schmeckles','alUSD','alETH','alcx'];
     const{from,to}=data;const amt=parseFloat(data.amount)||0;
-    console.log(`[exchange] ${socket.accountId}: ${amt} ${from} → ${to} | pdb before: sb=${d.spacebucks} sm=${d.schmeckles} alUSD=${d.alUSD} alETH=${d.alETH}`);
     if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0)
       return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});
     const rates={spacebucks:1,schmeckles:1,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
@@ -613,8 +589,6 @@ io.on('connection',socket=>{
     // Fee → treasury (fee is in the "to" currency denomination)
     if(to==='alUSD'||from==='alUSD'){const f=parseFloat((fee*(to==='alUSD'?1:(rates.alUSD/rates[to]))).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+Math.abs(f)).toFixed(2));}
     else if(to==='alETH'||from==='alETH'){const f=parseFloat((fee*(to==='alETH'?1:(rates.alETH/rates[to]))).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+Math.abs(f)).toFixed(4));}
-    d._sig=signPlayerData(d);
-    console.log(`[exchange] ${socket.accountId}: pdb after: sb=${d.spacebucks} sm=${d.schmeckles} alUSD=${d.alUSD} alETH=${d.alETH} | emitting received=${received}`);
     saveDb();broadcastTreasury();
     socket.emit('currency_exchange_result',{ok:true,from,to,amount:amt,received,fee,
       spacebucks:d.spacebucks,schmeckles:d.schmeckles,alUSD:d.alUSD,alETH:d.alETH,alcx:d.alcx});
@@ -648,7 +622,7 @@ io.on('connection',socket=>{
       const seniority=Math.max(0,parseInt(d.zoneSeniority||0));
       const drip=1+Math.floor(seniority/3);
       d.alcx=parseFloat(((d.alcx||0)+drip).toFixed(4));
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
       socket.emit('alcx_yield',{amount:drip,seniority,source:'zone'});
     }else if(src==='queue'){
       // Queue patience yield: must actually be in a queue
@@ -657,7 +631,7 @@ io.on('connection',socket=>{
       if(d._lastQueueYield&&now-d._lastQueueYield<8000)return;
       d._lastQueueYield=now;
       d.alcx=parseFloat(((d.alcx||0)+1).toFixed(4));
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
       socket.emit('alcx_yield',{amount:1,source:'queue'});
     }
   });
@@ -672,62 +646,25 @@ io.on('connection',socket=>{
     if(dAlUSD>0) stored.alUSD =parseFloat(((stored.alUSD||0)+dAlUSD).toFixed(2));
     if(dAlETH>0) stored.alETH =parseFloat(((stored.alETH||0)+dAlETH).toFixed(4));
     if(dAlcx >0) stored.alcx  =parseFloat(((stored.alcx ||0)+dAlcx ).toFixed(4));
-    stored._sig=signPlayerData(stored);saveDb();
+    saveDb();
   });
 
   socket.on('save_character',data=>{
-    if(!socket.accountId)return;
-    // Sanity-clamp numeric fields to prevent client-side inflation
+    if(!socket.accountId||!pdb[socket.accountId])return;
+    // Clamp client-authoritative numeric fields
     const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,Number(v)||0));
-    data.spacebucks=clamp(data.spacebucks,0,9_999_999);
-    data.schmeckles=clamp(data.schmeckles,0,9_999_999);
-    data.alUSD     =parseFloat(clamp(data.alUSD,0,500_000).toFixed(2));
-    data.alETH     =parseFloat(clamp(data.alETH,0,10_000).toFixed(4));
-    data.alcx      =parseFloat(clamp(data.alcx,0,100_000).toFixed(4));
-    data.level     =clamp(data.level,1,50);
-    data.xp        =clamp(data.xp,0,1_000_000);
-    data.kills         =clamp(data.kills,0,999_999);
-    data.zoneSeniority =clamp(data.zoneSeniority,0,999);
-    // Cross-currency guard: prevent currencies from INCREASING via client manipulation.
-    // Legitimate decreases (purchases) are allowed; only inflation is blocked.
-    // TODO: full server-side shop validation requires moving item definitions server-side.
-    if(!pdb[socket.accountId])return;
-    const prev=pdb[socket.accountId].data;
-    if(prev){
-      const alUSDPrev=prev.alUSD||0, alETHPrev=prev.alETH||0;
-      // Block any save where alUSD/alETH rose without a server-initiated transaction
-      // (transmuter_sync, loot_pickup, market_buy all update pdb first so the new value is accepted here)
-      if(data.alUSD>alUSDPrev+0.01){
-        console.log(`[save_char] ANTI-CHEAT alUSD: ${socket.accountId} sent ${data.alUSD} but prev=${alUSDPrev} — clamping`);
-        data.alUSD=parseFloat(alUSDPrev.toFixed(2));
-      }
-      if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
-      if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
-      // Bidirectional protection: reject catastrophic near-zero saves that weren't
-      // preceded by a server-side deduction.  (Root cause: client saves G.alETH=0
-      // if saveToServer fires before applyServerState populates G from auth_result.)
-      if(data.alETH<alETHPrev*0.10&&alETHPrev>0.001)data.alETH=parseFloat(alETHPrev.toFixed(4));
-      if(data.alUSD<alUSDPrev*0.10&&alUSDPrev>1)    data.alUSD=parseFloat(alUSDPrev.toFixed(2));
-      // lockedAlcx is managed server-side (queue_join/queue_leave/gov settlement).
-      // Block any client-side inflation to prevent vote-weight manipulation.
-      if((data.lockedAlcx||0)>(prev.lockedAlcx||0)+0.0001)
-        data.lockedAlcx=parseFloat((prev.lockedAlcx||0).toFixed(4));
-      // Guard: client cannot inflate dep.available (only server transmuter tick may increase it)
-      if(Array.isArray(data.transmuterDeposits)&&Array.isArray(prev.transmuterDeposits)){
-        data.transmuterDeposits.forEach((dep,i)=>{
-          const storedAvail=(prev.transmuterDeposits[i]?.available)||0;
-          if((dep.available||0)>storedAvail+0.0001)dep.available=storedAvail;
-        });
-      }
-    }
-    data._sig      =signPlayerData(data);
+    data.level        =clamp(data.level,1,50);
+    data.xp           =clamp(data.xp,0,1_000_000);
+    data.kills        =clamp(data.kills,0,999_999);
+    data.zoneSeniority=clamp(data.zoneSeniority,0,999);
+    // All economy fields are server-authoritative — always restore from pdb,
+    // ignoring whatever the client sent. Eliminates the need for anti-cheat guards.
+    const existing=pdb[socket.accountId].data||{};
+    const SERVER_OWNED=['spacebucks','schmeckles','alUSD','alETH','alcx',
+      'lockedAlcx','bankPositions','transmuterDeposits',
+      'alcxVoteLocks','_lastZoneYield','_lastQueueYield'];
+    SERVER_OWNED.forEach(f=>{if(f in existing)data[f]=existing[f];});
     pdb[socket.accountId].data=data;
-    // Re-inject server-only fields the client never holds — full-replace above would
-    // otherwise wipe them, breaking vote locks and yield throttle timestamps.
-    if(prev){
-      const SERVER_ONLY=['alcxVoteLocks','_lastZoneYield','_lastQueueYield'];
-      SERVER_ONLY.forEach(f=>{if(prev[f]!==undefined)pdb[socket.accountId].data[f]=prev[f];});
-    }
     pdb[socket.accountId].updated=Date.now();
     saveDb();
     updateHallOfFame(socket.accountId,data);
@@ -812,7 +749,7 @@ io.on('connection',socket=>{
       const d=pdb[socket.accountId].data;
       d.alcx=Math.max(0,parseFloat(((d.alcx||0)-lockAmt).toFixed(4)));
       d.lockedAlcx=parseFloat(((d.lockedAlcx||0)+lockAmt).toFixed(4));
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
     }
     socket.emit('queue_joined',{zone,queueType,ticket,serving:side.serving});
     broadcastQueueState(zone);
@@ -834,7 +771,7 @@ io.on('connection',socket=>{
       const refund=Math.max(0,parseFloat((lockedNow-voteLocked).toFixed(4)));
       d.alcx=parseFloat(((d.alcx||0)+refund).toFixed(4));
       d.lockedAlcx=voteLocked; // retain only vote-committed portion
-      d._sig=signPlayerData(d);saveDb();
+      saveDb();
     }
     serveNext(zone,queueType);
     broadcastQueueState(zone);
@@ -915,7 +852,7 @@ io.on('connection',socket=>{
           if(slot!==-1)pd.inventory[slot]=item;
         });
       }
-      pd._sig=signPlayerData(pd);saveDb();
+      saveDb();
     }
     socket.emit('loot_claimed',{ok:true,lootId,items:decayedItems,currencies:pile.currencies,decayPct:DECAY,fromPlayer:pile.ownerName});
     io.to(pile.zone).emit('world_loot_removed',{id:pile.id});
@@ -959,7 +896,7 @@ io.on('connection',socket=>{
     if(listing.currency==='alETH')buyerData.alETH=parseFloat(((buyerData.alETH||0)-listing.price).toFixed(4));
     else buyerData.alUSD=parseFloat(((buyerData.alUSD||0)-listing.price).toFixed(2));
     buyerInv[freeSlot]=listing.item;
-    buyerData._sig=signPlayerData(buyerData);saveDb();
+    saveDb();
     const fee=parseFloat((listing.price*0.05).toFixed(listing.currency==='alETH'?4:2));
     const payout=parseFloat((listing.price-fee).toFixed(listing.currency==='alETH'?4:2));
     // 5% marketplace fee → treasury
@@ -970,7 +907,7 @@ io.on('connection',socket=>{
     if(sellerData){
       if(listing.currency==='alETH')sellerData.alETH=parseFloat(((sellerData.alETH||0)+payout).toFixed(4));
       else sellerData.alUSD=parseFloat(((sellerData.alUSD||0)+payout).toFixed(2));
-      sellerData._sig=signPlayerData(sellerData);saveDb();
+      saveDb();
     }
     const sellerSid=socketsByAccount[listing.sellerId];
     if(sellerSid)io.to(sellerSid).emit('market_sale_notify',{item:listing.item,price:listing.price,payout,currency:listing.currency});
@@ -1120,7 +1057,7 @@ io.on('connection',socket=>{
     const myEntry=side.entries.find(e=>e.id===socket.id);
     if(!myEntry)return socket.emit('auction_result',{ok:false,error:'You are not in this queue.'});
     // Deduct ALCX server-side so reconnect doesn't restore the bid amount
-    if(bidderData){bidderData.alcx=parseFloat(Math.max(0,(bidderData.alcx||0)-bidAmt).toFixed(4));bidderData._sig=signPlayerData(bidderData);saveDb();}
+    if(bidderData){bidderData.alcx=parseFloat(Math.max(0,(bidderData.alcx||0)-bidAmt).toFixed(4));saveDb();}
     // Move to front: give ticket value just below current serving+1
     side.entries=side.entries.filter(e=>e.id!==socket.id);
     const frontTicket=side.serving+0.5; // sorts before next integer ticket
