@@ -596,6 +596,7 @@ io.on('connection',socket=>{
     const d=pdb[socket.accountId].data;if(!d)return;
     const VALID=['spacebucks','schmeckles','alUSD','alETH','alcx'];
     const{from,to}=data;const amt=parseFloat(data.amount)||0;
+    console.log(`[exchange] ${socket.accountId}: ${amt} ${from} → ${to} | pdb before: sb=${d.spacebucks} sm=${d.schmeckles} alUSD=${d.alUSD} alETH=${d.alETH}`);
     if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0)
       return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});
     const rates={spacebucks:1,schmeckles:1,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
@@ -611,6 +612,7 @@ io.on('connection',socket=>{
     // Fee → treasury (fee is in the "to" currency denomination)
     if(to==='alUSD'||from==='alUSD'){const f=parseFloat((fee*(to==='alUSD'?1:(rates.alUSD/rates[to]))).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+Math.abs(f)).toFixed(2));}
     else if(to==='alETH'||from==='alETH'){const f=parseFloat((fee*(to==='alETH'?1:(rates.alETH/rates[to]))).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+Math.abs(f)).toFixed(4));}
+    console.log(`[exchange] ${socket.accountId}: pdb after: sb=${d.spacebucks} sm=${d.schmeckles} alUSD=${d.alUSD} alETH=${d.alETH} | emitting received=${received}`);
     saveDb();broadcastTreasury();
     socket.emit('currency_exchange_result',{ok:true,from,to,amount:amt,received,fee,
       spacebucks:d.spacebucks,schmeckles:d.schmeckles,alUSD:d.alUSD,alETH:d.alETH,alcx:d.alcx});
@@ -693,7 +695,10 @@ io.on('connection',socket=>{
       const alUSDPrev=prev.alUSD||0, alETHPrev=prev.alETH||0;
       // Block any save where alUSD/alETH rose without a server-initiated transaction
       // (transmuter_sync, loot_pickup, market_buy all update pdb first so the new value is accepted here)
-      if(data.alUSD>alUSDPrev+0.01)data.alUSD=parseFloat(alUSDPrev.toFixed(2));
+      if(data.alUSD>alUSDPrev+0.01){
+        console.log(`[save_char] ANTI-CHEAT alUSD: ${socket.accountId} sent ${data.alUSD} but prev=${alUSDPrev} — clamping`);
+        data.alUSD=parseFloat(alUSDPrev.toFixed(2));
+      }
       if(data.alETH>alETHPrev+0.0001)data.alETH=parseFloat(alETHPrev.toFixed(4));
       if(data.alcx>(prev.alcx||0)+0.0001)data.alcx=parseFloat((prev.alcx||0).toFixed(4));
       // Bidirectional protection: reject catastrophic near-zero saves that weren't
