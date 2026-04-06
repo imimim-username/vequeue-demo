@@ -424,12 +424,32 @@ export const CHANGELOG=[
   {
     version:'1.0.8', date:'Apr 6 2026',
     sections:[
-      {title:'Economy — Schmeckles Now ETH-Pegged',items:[
-        'Schmeckles are now pegged to the live ETH price (same rate as alETH). Previously treated as $1 in-game tokens.',
-        'Spacebucks remain hardcoded at $1, matching alUSD. Schmeckles and alETH now reflect real ETH market value.',
-        'Currency exchange: swapping schmeckles ↔ alUSD now uses the ETH/USD rate (~$2,100 per schmeckle at current prices).',
-        'Exchange UI now shows schmeckle holdings with approximate USD value (e.g. "2.50 💀 (≈$5,250)").',
-        'HUD alUSD display now shows 2 decimal places ($164.57 instead of $164) so small credits are visible.',
+      {title:'Economy — Four-Currency Price Feeds & Arbitrage',items:[
+        'Each currency now has its own independent live price feed from CoinGecko:',
+        '  • Spacebucks — hardcoded $1.00 (USD stablecoin equivalent)',
+        '  • alUSD — live alUSD market price (~$0.99); no longer hardcoded to $1',
+        '  • Schmeckles — pegged to spot ETH price (ethereum on CoinGecko, ~$2,100+)',
+        '  • alETH — pegged to the alETH liquid-staking token price (alchemix-eth on CoinGecko, distinct from spot ETH)',
+        '  • ALCX — live ALCX governance token price (unchanged)',
+        'This creates real arbitrage opportunities: alUSD/spacebucks spread (~0.5%), alETH/schmeckles spread (~3–5%) depending on alETH depeg.',
+        'Server emits an alert in town chat when alETH diverges from spot ETH by more than 1.5% — useful signal for traders.',
+        'Currency exchange now uses the correct cross-rate: 1 schmeckle exchanged for alUSD yields ~$2,100 worth of alUSD (less 0.3% fee), not $1.',
+        'Schmeckles precision upgraded to 4 decimal places (matching alETH) since the ETH price makes sub-unit amounts meaningful.',
+      ]},
+      {title:'Economy — UI Fixes',items:[
+        'Exchange panel now shows schmeckle balance with live USD value, e.g. "2.5000 💀 (≈$5,370)".',
+        'HUD alUSD balance now shows 2 decimal places ($164.57 instead of $164) — small exchange credits are no longer invisible.',
+      ]},
+      {title:'Security — New-Account Currency Hardening',items:[
+        'Fixed a gap in the server-authoritative economy: on a brand-new account\'s very first save_character call, the server had no existing currency data, so it would fall back to whatever the client sent.',
+        'Server now always initialises new accounts to zero for all currency fields (spacebucks, schmeckles, alUSD, alETH, ALCX, lockedAlcx) regardless of what the client sends.',
+        'Bank positions and transmuter deposits likewise default to empty arrays on first save, preventing fabricated loan or deposit records.',
+      ]},
+      {title:'Engineering — Test Suite',items:[
+        'Added 37-test integration + unit test suite (tests/server.test.mjs) using Node\'s built-in node:test runner.',
+        'Integration tests connect to the live server via socket.io-client and exercise: authentication (register/login/PIN rejection), save_character client-authoritative field persistence, save_character server-owned field protection, currency_exchange validation, bank_borrow validation.',
+        'Unit tests cover: exchange rate cross-currency math (including schmeckles↔alUSD at ETH rate), bank LTV calculations, and transmuter fee calculations.',
+        'Run with: cd tests && node --test server.test.mjs',
       ]},
     ],
   },
