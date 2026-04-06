@@ -574,11 +574,15 @@ io.on('connection',socket=>{
     const d=pdb[socket.accountId].data;if(!d)return;
     const VALID=['spacebucks','schmeckles','alUSD','alETH','alcx'];
     const{from,to}=data;const amt=parseFloat(data.amount)||0;
-    if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0)
-      return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});
+    console.log(`[Exchange] ${socket.accountId}: ${amt} ${from}→${to} | bal_before=${d[from]}`);
+    if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0){
+      console.log(`[Exchange] REJECTED invalid params`);
+      return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});}
     const rates={spacebucks:1,schmeckles:1,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
     const bal=d[from]||0;
-    if(bal<amt-0.0001)return socket.emit('currency_exchange_result',{ok:false,error:'Insufficient balance.'});
+    if(bal<amt-0.0001){
+      console.log(`[Exchange] REJECTED insufficient: bal=${bal} < amt=${amt}`);
+      return socket.emit('currency_exchange_result',{ok:false,error:'Insufficient balance.'});}
     const gross=amt*(rates[from]/rates[to]);
     const fee=gross*0.003;
     const dp_to=(to==='alETH'||to==='alcx')?4:2;
@@ -586,6 +590,7 @@ io.on('connection',socket=>{
     const received=parseFloat((gross-fee).toFixed(dp_to));
     d[from]=parseFloat(Math.max(0,bal-amt).toFixed(dp_from));
     d[to]=parseFloat(((d[to]||0)+received).toFixed(dp_to));
+    console.log(`[Exchange] OK: gross=${gross} fee=${fee} received=${received} | ${from}_after=${d[from]} ${to}_after=${d[to]}`);
     // Fee → treasury (fee is in the "to" currency denomination)
     if(to==='alUSD'||from==='alUSD'){const f=parseFloat((fee*(to==='alUSD'?1:(rates.alUSD/rates[to]))).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+Math.abs(f)).toFixed(2));}
     else if(to==='alETH'||from==='alETH'){const f=parseFloat((fee*(to==='alETH'?1:(rates.alETH/rates[to]))).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+Math.abs(f)).toFixed(4));}
