@@ -413,7 +413,8 @@ export function distributeTransmuterPool(sbAmount,ethAmount){
 
 // ── EXCHANGE ──────────────────────────────────────────────────────────────────
 // Exchange rates (relative to alUSD)
-// spacebucks = $1 hardcoded stable. schmeckles pegged to ETH price (updated on price_update).
+// spacebucks=$1 | alUSD=live (~$1) | schmeckles=spot ETH | alETH=alETH token | alcx=live
+// All except spacebucks are updated on price_update from server.
 export const EXCHANGE_RATES={spacebucks:1,schmeckles:2000,alUSD:1,alETH:2000,alcx:5};
 
 // ── CHANGELOG ─────────────────────────────────────────────────────────────────
@@ -706,9 +707,11 @@ export function closeChangelog(){
 })();
 // Updated from server on price_update events
 export function applyLivePrices(prices){
-  if(prices.alETH){EXCHANGE_RATES.alETH=prices.alETH;EXCHANGE_RATES.schmeckles=prices.alETH;}
-  if(prices.alcx) EXCHANGE_RATES.alcx=prices.alcx;
-  // spacebucks = $1 stable; alUSD = $1 peg; schmeckles tracks ETH price
+  if(prices.alUSD) EXCHANGE_RATES.alUSD=prices.alUSD;    // stablecoin — can depeg
+  if(prices.alETH) EXCHANGE_RATES.alETH=prices.alETH;    // alETH liquid-staking token
+  if(prices.ETH)   EXCHANGE_RATES.schmeckles=prices.ETH; // schmeckles track spot ETH
+  if(prices.alcx)  EXCHANGE_RATES.alcx=prices.alcx;
+  // spacebucks stays hardcoded at 1
   G.livePrices={...prices};
 }
 export function openExchange(){

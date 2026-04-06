@@ -210,14 +210,19 @@ setInterval(()=>{
 },5*60*1000);
 
 // ── Live Price Feed ────────────────────────────────────────────────────────────
-let livePrices={alUSD:1.00,alETH:1800.0,alcx:5.0};
+// ETH = spot ETH (schmeckles peg), alETH = alETH liquid-staking token (slightly different)
+let livePrices={alUSD:1.00,alETH:1800.0,ETH:1800.0,alcx:5.0};
 let prevPrices={...livePrices};
 // Treasury: accumulated protocol fees (alUSD and alETH)
 let treasury={alUSD:0,alETH:0};
 function broadcastTreasury(){io.emit('treasury_update',{treasury});}
 
 function fetchCoinGeckoPrices(){
-  const url='/api/v3/simple/price?ids=alchemix-usd,ethereum,alchemix&vs_currencies=usd&precision=4';
+  // alchemix-usd → alUSD stablecoin price (near $1, can depeg)
+  // ethereum     → spot ETH price (schmeckles peg)
+  // alchemix-eth → alETH liquid-staking token price (slightly different from spot ETH → arbitrage)
+  // alchemix     → ALCX governance token
+  const url='/api/v3/simple/price?ids=alchemix-usd,ethereum,alchemix-eth,alchemix&vs_currencies=usd&precision=4';
   const opts={hostname:'api.coingecko.com',path:url,headers:{'User-Agent':'vequeue-game/1.0','Accept':'application/json'}};
   const req=https.get(opts,res=>{
     let raw='';
@@ -227,7 +232,9 @@ function fetchCoinGeckoPrices(){
         const j=JSON.parse(raw);
         prevPrices={...livePrices};
         if(j['alchemix-usd']?.usd) livePrices.alUSD=j['alchemix-usd'].usd;
-        if(j['ethereum']?.usd)     livePrices.alETH=j['ethereum'].usd;
+        if(j['ethereum']?.usd)     livePrices.ETH=j['ethereum'].usd;    // spot ETH → schmeckles
+        if(j['alchemix-eth']?.usd) livePrices.alETH=j['alchemix-eth'].usd; // alETH token
+        else if(j['ethereum']?.usd) livePrices.alETH=j['ethereum'].usd; // fallback if alETH unlisted
         if(j['alchemix']?.usd)     livePrices.alcx=j['alchemix'].usd;
         io.emit('price_update',{prices:livePrices});
         checkPriceEvents();
@@ -246,12 +253,18 @@ function checkPriceEvents(){
     evts.push({type:'depeg',msg:`🚨 alUSD depegged to $${livePrices.alUSD.toFixed(4)}! Transmuter arbitrage window is OPEN — deposit alUSD now for 1:1 Spacebucks!`});
   else if(livePrices.alUSD>=0.995&&prevPrices.alUSD<0.995)
     evts.push({type:'repeg',msg:`✅ alUSD recovered to $${livePrices.alUSD.toFixed(4)}. Peg restored. Arbitrage window closed.`});
-  // alETH / ETH moves
-  const ethChg=(livePrices.alETH-prevPrices.alETH)/prevPrices.alETH;
+  // ETH (spot) moves — affects schmeckles value
+  const ethChg=prevPrices.ETH>0?(livePrices.ETH-prevPrices.ETH)/prevPrices.ETH:0;
   if(ethChg<-0.05)
-    evts.push({type:'eth_drop',msg:`📉 ETH dropped ${(Math.abs(ethChg)*100).toFixed(1)}% to $${livePrices.alETH.toFixed(0)}. alETH borrowing now cheaper!`});
+    evts.push({type:'eth_drop',msg:`📉 ETH dropped ${(Math.abs(ethChg)*100).toFixed(1)}% to $${livePrices.ETH.toFixed(0)}. Schmeckles (💀) lost value — alETH borrow now cheaper!`});
   else if(ethChg>0.05)
-    evts.push({type:'eth_pump',msg:`📈 ETH surged ${(ethChg*100).toFixed(1)}% to $${livePrices.alETH.toFixed(0)}! Schmeckles collateral worth more.`});
+    evts.push({type:'eth_pump',msg:`📈 ETH surged ${(ethChg*100).toFixed(1)}% to $${livePrices.ETH.toFixed(0)}! Schmeckles (💀) worth more — good time to exchange.`});
+  // alETH vs ETH spread (arbitrage signal)
+  if(livePrices.ETH>0&&livePrices.alETH>0){
+    const spread=((livePrices.alETH-livePrices.ETH)/livePrices.ETH)*100;
+    if(Math.abs(spread)>1.5)
+      evts.push({type:'aleth_spread',msg:`⚗ alETH is trading at ${spread>0?'+':''}${spread.toFixed(2)}% vs spot ETH ($${livePrices.alETH.toFixed(0)} vs $${livePrices.ETH.toFixed(0)}). Arbitrage opportunity!`});
+  }
   // ALCX moves
   const alcxChg=(livePrices.alcx-prevPrices.alcx)/prevPrices.alcx;
   if(alcxChg>0.10)
@@ -578,16 +591,17 @@ io.on('connection',socket=>{
     if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0){
       console.log(`[Exchange] REJECTED invalid params`);
       return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});}
-    // spacebucks = $1 (hardcoded stable), schmeckles = pegged to ETH price
-    const rates={spacebucks:1,schmeckles:livePrices.alETH,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
+    // spacebucks=$1 hardcoded | alUSD=live stablecoin price | schmeckles=spot ETH | alETH=alETH token | alcx=live
+    const rates={spacebucks:1,schmeckles:livePrices.ETH,alUSD:livePrices.alUSD,alETH:livePrices.alETH,alcx:livePrices.alcx};
     const bal=d[from]||0;
     if(bal<amt-0.0001){
       console.log(`[Exchange] REJECTED insufficient: bal=${bal} < amt=${amt}`);
       return socket.emit('currency_exchange_result',{ok:false,error:'Insufficient balance.'});}
     const gross=amt*(rates[from]/rates[to]);
     const fee=gross*0.003;
-    const dp_to=(to==='alETH'||to==='alcx')?4:2;
-    const dp_from=(from==='alETH'||from==='alcx')?4:2;
+    // schmeckles is ETH-pegged → use 4dp like alETH
+    const dp_to=(to==='alETH'||to==='alcx'||to==='schmeckles')?4:2;
+    const dp_from=(from==='alETH'||from==='alcx'||from==='schmeckles')?4:2;
     const received=parseFloat((gross-fee).toFixed(dp_to));
     d[from]=parseFloat(Math.max(0,bal-amt).toFixed(dp_from));
     d[to]=parseFloat(((d[to]||0)+received).toFixed(dp_to));

@@ -398,8 +398,9 @@ describe('Exchange rate calculations (unit)', () => {
    * rates: spacebucks=1, schmeckles=1, alUSD=1, alETH & alcx use livePrices.
    */
   function calcExchange(from, to, amount, livePrices) {
+    // schmeckles pegged to ETH price (same as alETH)
     const rates = {
-      spacebucks: 1, schmeckles: 1, alUSD: 1,
+      spacebucks: 1, schmeckles: livePrices.alETH, alUSD: 1,
       alETH: livePrices.alETH, alcx: livePrices.alcx,
     };
     const gross    = amount * (rates[from] / rates[to]);
@@ -419,6 +420,21 @@ describe('Exchange rate calculations (unit)', () => {
   it('alUSD → spacebucks: 1:1 rate minus 0.3% fee', () => {
     const { received } = calcExchange('alUSD', 'spacebucks', 10, { alETH: 2000, alcx: 5 });
     assert.equal(received, 9.97);
+  });
+
+  it('schmeckles → alUSD: ETH-pegged rate minus 0.3% fee', () => {
+    // 1 schmeckle = 1 ETH = $2000; swapping 1 schmeckle should yield ~$2000 alUSD
+    const prices = { alETH: 2000, alcx: 5 };
+    const { received } = calcExchange('schmeckles', 'alUSD', 1, prices);
+    // gross = 1 * (2000/1) = 2000; fee = 6; received = 1994
+    assert.equal(received, 1994.00);
+  });
+
+  it('alUSD → schmeckles: correct scaling (alUSD buys fraction of schmeckle)', () => {
+    const prices = { alETH: 2000, alcx: 5 };
+    const { received } = calcExchange('alUSD', 'schmeckles', 2000, prices);
+    // gross = 2000 * (1/2000) = 1; fee = 0.003; received = 0.997 → toFixed(4) = 0.9970
+    assert.equal(received, 0.9970);
   });
 
   it('alETH → alUSD: correct scaling', () => {
