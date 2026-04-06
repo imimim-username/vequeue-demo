@@ -657,13 +657,17 @@ io.on('connection',socket=>{
     data.xp           =clamp(data.xp,0,1_000_000);
     data.kills        =clamp(data.kills,0,999_999);
     data.zoneSeniority=clamp(data.zoneSeniority,0,999);
-    // All economy fields are server-authoritative — always restore from pdb,
-    // ignoring whatever the client sent. Eliminates the need for anti-cheat guards.
+    // All economy fields are server-authoritative — always restore from pdb.
+    // For new accounts (no prior data) fall back to safe defaults so a malicious
+    // first save_character call cannot seed the account with free currency.
     const existing=pdb[socket.accountId].data||{};
-    const SERVER_OWNED=['spacebucks','schmeckles','alUSD','alETH','alcx',
-      'lockedAlcx','bankPositions','transmuterDeposits',
-      'alcxVoteLocks','_lastZoneYield','_lastQueueYield'];
-    SERVER_OWNED.forEach(f=>{if(f in existing)data[f]=existing[f];});
+    // Currencies & positions: use existing value OR a safe zero/empty default.
+    const CURRENCY_DEFAULTS={spacebucks:0,schmeckles:0,alUSD:0,alETH:0,alcx:0,lockedAlcx:0};
+    const ARRAY_DEFAULTS={bankPositions:[],transmuterDeposits:[]};
+    Object.keys(CURRENCY_DEFAULTS).forEach(f=>{data[f]=(f in existing)?existing[f]:CURRENCY_DEFAULTS[f];});
+    Object.keys(ARRAY_DEFAULTS).forEach(f=>{data[f]=(f in existing)?existing[f]:ARRAY_DEFAULTS[f];});
+    // Server-only tracking fields: only restore if they already exist in pdb.
+    ['alcxVoteLocks','_lastZoneYield','_lastQueueYield'].forEach(f=>{if(f in existing)data[f]=existing[f];});
     pdb[socket.accountId].data=data;
     pdb[socket.accountId].updated=Date.now();
     saveDb();
