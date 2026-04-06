@@ -413,12 +413,25 @@ export function distributeTransmuterPool(sbAmount,ethAmount){
 
 // ── EXCHANGE ──────────────────────────────────────────────────────────────────
 // Exchange rates (relative to alUSD)
-export const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5};
+// spacebucks = $1 hardcoded stable. schmeckles pegged to ETH price (updated on price_update).
+export const EXCHANGE_RATES={spacebucks:1,schmeckles:2000,alUSD:1,alETH:2000,alcx:5};
 
 // ── CHANGELOG ─────────────────────────────────────────────────────────────────
 // Add new entries at the TOP. Each entry has: version, date, sections[].
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 export const CHANGELOG=[
+  {
+    version:'1.0.8', date:'Apr 6 2026',
+    sections:[
+      {title:'Economy — Schmeckles Now ETH-Pegged',items:[
+        'Schmeckles are now pegged to the live ETH price (same rate as alETH). Previously treated as $1 in-game tokens.',
+        'Spacebucks remain hardcoded at $1, matching alUSD. Schmeckles and alETH now reflect real ETH market value.',
+        'Currency exchange: swapping schmeckles ↔ alUSD now uses the ETH/USD rate (~$2,100 per schmeckle at current prices).',
+        'Exchange UI now shows schmeckle holdings with approximate USD value (e.g. "2.50 💀 (≈$5,250)").',
+        'HUD alUSD display now shows 2 decimal places ($164.57 instead of $164) so small credits are visible.',
+      ]},
+    ],
+  },
   {
     version:'1.0.7', date:'Apr 5 2026',
     sections:[
@@ -693,9 +706,9 @@ export function closeChangelog(){
 })();
 // Updated from server on price_update events
 export function applyLivePrices(prices){
-  if(prices.alETH)EXCHANGE_RATES.alETH=prices.alETH;
+  if(prices.alETH){EXCHANGE_RATES.alETH=prices.alETH;EXCHANGE_RATES.schmeckles=prices.alETH;}
   if(prices.alcx) EXCHANGE_RATES.alcx=prices.alcx;
-  // alUSD stays at 1 (peg), spacebucks/schmeckles are in-game tokens
+  // spacebucks = $1 stable; alUSD = $1 peg; schmeckles tracks ETH price
   G.livePrices={...prices};
 }
 export function openExchange(){
@@ -721,8 +734,12 @@ export function doExchange(){
   socket?.emit('currency_exchange',{from,to,amount:amt});
 }
 export function renderExchangeUI(){
+  const smRate=EXCHANGE_RATES.schmeckles||2000;
   document.getElementById('ex-sb').textContent=G.spacebucks;
-  document.getElementById('ex-sm').textContent=G.schmeckles.toFixed?G.schmeckles.toFixed(2):G.schmeckles;
+  // Schmeckles are ETH-pegged — show quantity and approximate USD value
+  const smVal=(G.schmeckles*smRate);
+  document.getElementById('ex-sm').textContent=
+    `${G.schmeckles.toFixed?G.schmeckles.toFixed(4):G.schmeckles} (≈$${smVal.toFixed(0)})`;
   document.getElementById('ex-alusd').textContent=G.alUSD.toFixed(2);
   document.getElementById('ex-aleth').textContent=G.alETH.toFixed(4);
   document.getElementById('ex-alcx').textContent=(G.alcx||0).toFixed(2);
@@ -1305,7 +1322,7 @@ export function renderHUD(){
     mpEl.appendChild(s);
   }
   document.getElementById('hud-spacebucks').textContent = `🪙${G.spacebucks}`;
-  document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(0)}`;
+  document.getElementById('hud-alusd').textContent = `$${G.alUSD.toFixed(2)}`;
   // lockedAlcx = queue stake; alcxVoteLock = subset of that committed to active vote
   const alcxTxt = G.lockedAlcx>0
     ? `⚗${G.alcx} 🔒${G.lockedAlcx}${G.alcxVoteLock>0?`(🗳${G.alcxVoteLock.toFixed(1)})`:''}`

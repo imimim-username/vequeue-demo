@@ -578,7 +578,8 @@ io.on('connection',socket=>{
     if(!VALID.includes(from)||!VALID.includes(to)||from===to||amt<=0){
       console.log(`[Exchange] REJECTED invalid params`);
       return socket.emit('currency_exchange_result',{ok:false,error:'Invalid exchange parameters.'});}
-    const rates={spacebucks:1,schmeckles:1,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
+    // spacebucks = $1 (hardcoded stable), schmeckles = pegged to ETH price
+    const rates={spacebucks:1,schmeckles:livePrices.alETH,alUSD:1,alETH:livePrices.alETH,alcx:livePrices.alcx};
     const bal=d[from]||0;
     if(bal<amt-0.0001){
       console.log(`[Exchange] REJECTED insufficient: bal=${bal} < amt=${amt}`);
