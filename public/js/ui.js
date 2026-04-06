@@ -419,6 +419,23 @@ export const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 export const CHANGELOG=[
   {
+    version:'1.0.5', date:'Apr 5 2026',
+    sections:[
+      {title:'Bug Fixes — ES Module Runtime Errors',items:[
+        'Fixed "G is not defined" error firing every game-loop frame: render.js was using the player state object without importing it from state.js.',
+        'Fixed "clearRect on undefined" crash: ui.js had a stale local let ctxTiles declaration that shadowed the properly-initialised canvas context exported by game.js.',
+        'Fixed "WORLD_H / DUNGEON_MAP is not defined" at startup: maps.js was missing several constants from its data.js import.',
+        'Fixed "lighten / darken is not defined" in render.js: colour utility helpers were private in data.js and not exported.',
+        'Fixed "T / RARITY_COLOR / RESPAWN_TX / musPlay / ZONES" not defined in combat.js: completed missing imports from data.js, audio.js, and maps.js.',
+        'Fixed "degradeItem / itemEffDmg / itemMaxDur" not defined in combat.js: functions were unexported from ui.js.',
+        'Fixed "hasRaft / hasForestPass" not defined in combat.js: helper functions in game.js were not exported.',
+        'Fixed "MAP_W / MAP_H" wrong import source in game.js and ui.js (live in maps.js, not data.js).',
+        'Fixed "saveToServer / socket / others / xpForLevel" wrong import source in ui.js (live in socket.js / combat.js).',
+        'Game now loads and runs without any ReferenceError or TypeError on startup.',
+      ]},
+    ]
+  },
+  {
     version:'1.0.4', date:'Apr 5 2026',
     sections:[
       {title:'Engineering — Vite Build & ES Module Split',items:[
