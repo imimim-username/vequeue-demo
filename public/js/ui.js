@@ -420,6 +420,18 @@ export const EXCHANGE_RATES={spacebucks:1,schmeckles:1,alUSD:1,alETH:1800,alcx:5
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 export const CHANGELOG=[
   {
+    version:'1.0.6', date:'Apr 5 2026',
+    sections:[
+      {title:'Critical Fix — Currency Exchange & Data Persistence',items:[
+        'Fixed root cause of currency exchange losses: server-side handlers (currency_exchange, bank_borrow, bank_claim, transmuter_withdraw, loot_pickup, market_buy, alcx_yield, quest_reward, queue_join/leave, governance settlement) were mutating pdb currency values and calling saveDb() without recalculating the HMAC signature.',
+        'Result: after any server-authoritative transaction, the on-disk save had mismatched data vs. signature. If the server restarted before the client\'s follow-up save_character arrived (which was the only save that re-signed), HMAC tamper detection fired at next login and wiped all player data.',
+        'Fix: added d._sig=signPlayerData(d) immediately before saveDb() in all 14 affected handlers so every write is always self-consistent.',
+        'Also fixed race condition guard: auto-save timer (every 5 s) is now blocked during in-flight server-authoritative transactions via G._txPending flag, preventing the client from sending stale currency values between exchange/bank/transmuter request and response.',
+        'Also fixed doAuctionBid ALCX deduction not being persisted across restarts (saveDb was missing from queue_auction_bid handler).',
+      ]},
+    ]
+  },
+  {
     version:'1.0.5', date:'Apr 5 2026',
     sections:[
       {title:'Bug Fixes — ES Module Runtime Errors',items:[
