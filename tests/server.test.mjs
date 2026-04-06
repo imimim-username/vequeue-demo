@@ -150,7 +150,7 @@ describe('save_character — client-authoritative fields', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { nickname: 'Herobot', level: 7, xp: 3500, kills: 99 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -167,7 +167,7 @@ describe('save_character — client-authoritative fields', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { level: 99999 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -181,7 +181,7 @@ describe('save_character — client-authoritative fields', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { xp: 9_999_999 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -195,7 +195,7 @@ describe('save_character — client-authoritative fields', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { kills: 5_000_000 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -209,7 +209,7 @@ describe('save_character — client-authoritative fields', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { zoneSeniority: 5000 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -227,7 +227,7 @@ describe('save_character — server-owned fields are protected', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { spacebucks: 999_999 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -241,7 +241,7 @@ describe('save_character — server-owned fields are protected', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { alUSD: 999_999 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -255,7 +255,7 @@ describe('save_character — server-owned fields are protected', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { alcx: 999_999 });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -269,7 +269,7 @@ describe('save_character — server-owned fields are protected', () => {
     const s1 = await loginSocket();
     try {
       saveChar(s1, { bankPositions: [{ collateral: 'spacebucks', deposited: 9999, borrowed: 8999, debt: 0, claimed: false }] });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
     } finally { s1.disconnect(); }
 
     const s2 = await mkSocket();
@@ -408,8 +408,9 @@ describe('Exchange rate calculations (unit)', () => {
     };
     const gross    = amount * (rates[from] / rates[to]);
     const fee      = gross * 0.003;
-    const dpTo     = (to   === 'alETH' || to   === 'alcx') ? 4 : 2;
-    const dpFrom   = (from === 'alETH' || from === 'alcx') ? 4 : 2;
+    // schmeckles is ETH-pegged → 4dp like alETH
+    const dpTo     = (to   === 'alETH' || to   === 'alcx' || to   === 'schmeckles') ? 4 : 2;
+    const dpFrom   = (from === 'alETH' || from === 'alcx' || from === 'schmeckles') ? 4 : 2;
     const received = parseFloat((gross - fee).toFixed(dpTo));
     return { gross, fee, received, dpFrom, dpTo };
   }
