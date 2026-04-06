@@ -161,6 +161,7 @@ setInterval(()=>{
       acct.data.alcx=parseFloat(((acct.data.alcx||0)+voteAmt).toFixed(4));
       acct.data.lockedAlcx=Math.max(0,parseFloat(((acct.data.lockedAlcx||0)-voteAmt).toFixed(4)));
       delete acct.data.alcxVoteLocks[p.id];
+      acct.data._sig=signPlayerData(acct.data);
       const sid=socketsByAccount[id];
       if(sid)io.to(sid).emit('gov_vote_released',{proposalId:p.id,refundAmt:voteAmt});
     });
@@ -514,7 +515,7 @@ io.on('connection',socket=>{
       d.alUSD=parseFloat(((d.alUSD||0)+borrow).toFixed(2));
       d.bankPositions=d.bankPositions||[];
       d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
       socket.emit('bank_borrow_result',{ok:true,spacebucks:d.spacebucks,alUSD:d.alUSD,bankPositions:d.bankPositions});
     }else if(collateral==='schmeckles'){
       if((d.schmeckles||0)<amt)return socket.emit('bank_borrow_result',{ok:false,error:'Not enough Schmeckles.'});
@@ -523,7 +524,7 @@ io.on('connection',socket=>{
       d.alETH=parseFloat(((d.alETH||0)+borrow).toFixed(4));
       d.bankPositions=d.bankPositions||[];
       d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
       socket.emit('bank_borrow_result',{ok:true,schmeckles:d.schmeckles,alETH:d.alETH,bankPositions:d.bankPositions});
     }else{
       socket.emit('bank_borrow_result',{ok:false,error:'Unknown collateral type.'});
@@ -543,7 +544,7 @@ io.on('connection',socket=>{
     pos.claimed=true;pos.interestAccrued=0;
     if(pos.collateral==='spacebucks')d.spacebucks=Math.floor((d.spacebucks||0)+total);
     else d.schmeckles=Math.floor((d.schmeckles||0)+total);
-    saveDb();
+    d._sig=signPlayerData(d);saveDb();
     socket.emit('bank_claim_result',{ok:true,collateral:pos.collateral,total,spacebucks:d.spacebucks,schmeckles:d.schmeckles,bankPositions:d.bankPositions});
   });
 
@@ -567,7 +568,7 @@ io.on('connection',socket=>{
     const claimed=Math.floor(amt);
     if(dep.type==='alUSD')d.spacebucks=Math.floor((d.spacebucks||0)+claimed);
     else d.schmeckles=Math.floor((d.schmeckles||0)+claimed);
-    saveDb();
+    d._sig=signPlayerData(d);saveDb();
     socket.emit('transmuter_claim_result',{ok:true,type:dep.type,claimed,spacebucks:d.spacebucks,schmeckles:d.schmeckles,transmuterDeposits:d.transmuterDeposits});
   });
 
@@ -586,7 +587,7 @@ io.on('connection',socket=>{
     dep.amount=0;
     if(isUSD){d.alUSD=parseFloat(((d.alUSD||0)+returned).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+fee).toFixed(2));}
     else{d.alETH=parseFloat(((d.alETH||0)+returned).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+fee).toFixed(4));}
-    saveDb();broadcastTreasury();
+    d._sig=signPlayerData(d);saveDb();broadcastTreasury();
     socket.emit('transmuter_withdraw_result',{ok:true,type:dep.type,returned,fee,alETH:d.alETH,alUSD:d.alUSD,transmuterDeposits:d.transmuterDeposits});
   });
 
@@ -612,6 +613,7 @@ io.on('connection',socket=>{
     // Fee → treasury (fee is in the "to" currency denomination)
     if(to==='alUSD'||from==='alUSD'){const f=parseFloat((fee*(to==='alUSD'?1:(rates.alUSD/rates[to]))).toFixed(2));treasury.alUSD=parseFloat((treasury.alUSD+Math.abs(f)).toFixed(2));}
     else if(to==='alETH'||from==='alETH'){const f=parseFloat((fee*(to==='alETH'?1:(rates.alETH/rates[to]))).toFixed(4));treasury.alETH=parseFloat((treasury.alETH+Math.abs(f)).toFixed(4));}
+    d._sig=signPlayerData(d);
     console.log(`[exchange] ${socket.accountId}: pdb after: sb=${d.spacebucks} sm=${d.schmeckles} alUSD=${d.alUSD} alETH=${d.alETH} | emitting received=${received}`);
     saveDb();broadcastTreasury();
     socket.emit('currency_exchange_result',{ok:true,from,to,amount:amt,received,fee,
@@ -646,7 +648,7 @@ io.on('connection',socket=>{
       const seniority=Math.max(0,parseInt(d.zoneSeniority||0));
       const drip=1+Math.floor(seniority/3);
       d.alcx=parseFloat(((d.alcx||0)+drip).toFixed(4));
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
       socket.emit('alcx_yield',{amount:drip,seniority,source:'zone'});
     }else if(src==='queue'){
       // Queue patience yield: must actually be in a queue
@@ -655,7 +657,7 @@ io.on('connection',socket=>{
       if(d._lastQueueYield&&now-d._lastQueueYield<8000)return;
       d._lastQueueYield=now;
       d.alcx=parseFloat(((d.alcx||0)+1).toFixed(4));
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
       socket.emit('alcx_yield',{amount:1,source:'queue'});
     }
   });
@@ -670,7 +672,7 @@ io.on('connection',socket=>{
     if(dAlUSD>0) stored.alUSD =parseFloat(((stored.alUSD||0)+dAlUSD).toFixed(2));
     if(dAlETH>0) stored.alETH =parseFloat(((stored.alETH||0)+dAlETH).toFixed(4));
     if(dAlcx >0) stored.alcx  =parseFloat(((stored.alcx ||0)+dAlcx ).toFixed(4));
-    saveDb();
+    stored._sig=signPlayerData(stored);saveDb();
   });
 
   socket.on('save_character',data=>{
@@ -810,7 +812,7 @@ io.on('connection',socket=>{
       const d=pdb[socket.accountId].data;
       d.alcx=Math.max(0,parseFloat(((d.alcx||0)-lockAmt).toFixed(4)));
       d.lockedAlcx=parseFloat(((d.lockedAlcx||0)+lockAmt).toFixed(4));
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
     }
     socket.emit('queue_joined',{zone,queueType,ticket,serving:side.serving});
     broadcastQueueState(zone);
@@ -832,7 +834,7 @@ io.on('connection',socket=>{
       const refund=Math.max(0,parseFloat((lockedNow-voteLocked).toFixed(4)));
       d.alcx=parseFloat(((d.alcx||0)+refund).toFixed(4));
       d.lockedAlcx=voteLocked; // retain only vote-committed portion
-      saveDb();
+      d._sig=signPlayerData(d);saveDb();
     }
     serveNext(zone,queueType);
     broadcastQueueState(zone);
@@ -913,7 +915,7 @@ io.on('connection',socket=>{
           if(slot!==-1)pd.inventory[slot]=item;
         });
       }
-      saveDb();
+      pd._sig=signPlayerData(pd);saveDb();
     }
     socket.emit('loot_claimed',{ok:true,lootId,items:decayedItems,currencies:pile.currencies,decayPct:DECAY,fromPlayer:pile.ownerName});
     io.to(pile.zone).emit('world_loot_removed',{id:pile.id});
@@ -957,7 +959,7 @@ io.on('connection',socket=>{
     if(listing.currency==='alETH')buyerData.alETH=parseFloat(((buyerData.alETH||0)-listing.price).toFixed(4));
     else buyerData.alUSD=parseFloat(((buyerData.alUSD||0)-listing.price).toFixed(2));
     buyerInv[freeSlot]=listing.item;
-    saveDb();
+    buyerData._sig=signPlayerData(buyerData);saveDb();
     const fee=parseFloat((listing.price*0.05).toFixed(listing.currency==='alETH'?4:2));
     const payout=parseFloat((listing.price-fee).toFixed(listing.currency==='alETH'?4:2));
     // 5% marketplace fee → treasury
@@ -968,7 +970,7 @@ io.on('connection',socket=>{
     if(sellerData){
       if(listing.currency==='alETH')sellerData.alETH=parseFloat(((sellerData.alETH||0)+payout).toFixed(4));
       else sellerData.alUSD=parseFloat(((sellerData.alUSD||0)+payout).toFixed(2));
-      saveDb();
+      sellerData._sig=signPlayerData(sellerData);saveDb();
     }
     const sellerSid=socketsByAccount[listing.sellerId];
     if(sellerSid)io.to(sellerSid).emit('market_sale_notify',{item:listing.item,price:listing.price,payout,currency:listing.currency});
@@ -1118,7 +1120,7 @@ io.on('connection',socket=>{
     const myEntry=side.entries.find(e=>e.id===socket.id);
     if(!myEntry)return socket.emit('auction_result',{ok:false,error:'You are not in this queue.'});
     // Deduct ALCX server-side so reconnect doesn't restore the bid amount
-    if(bidderData)bidderData.alcx=parseFloat(Math.max(0,(bidderData.alcx||0)-bidAmt).toFixed(4));
+    if(bidderData){bidderData.alcx=parseFloat(Math.max(0,(bidderData.alcx||0)-bidAmt).toFixed(4));bidderData._sig=signPlayerData(bidderData);saveDb();}
     // Move to front: give ticket value just below current serving+1
     side.entries=side.entries.filter(e=>e.id!==socket.id);
     const frontTicket=side.serving+0.5; // sorts before next integer ticket
