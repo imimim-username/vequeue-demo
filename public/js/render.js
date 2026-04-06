@@ -1,4 +1,5 @@
 import { T, TS, WORLD_W, WORLD_H, TOWN_OX, TOWN_OY, SOLID_TILES, PLAYER_COLORS, HAIR_COLORS, SKIN_TONES, SPECIES, RARITY_COLOR, RARITY_LABEL, CFG, lighten, darken } from './data.js';
+import { G } from './state.js';
 import { ZONES, NPCS, ZONE_DOORS, MAP_W, MAP_H, ZONE_MAPS, TOWN_MAP } from './maps.js';
 
 // ── TILE CACHE ───────────────────────────────────────────────────────────────
