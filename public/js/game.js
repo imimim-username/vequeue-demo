@@ -1035,7 +1035,7 @@ export function gameLoop(ts){
     }
     // persist
     if(G.tick%90===0&&G.mp<G.maxMp){G.mp=Math.min(G.maxMp,G.mp+1);}
-    if(G.tick%300===0){if(G.persist)saveState(); saveToServer();}
+    if(G.tick%300===0&&!G._txPending){if(G.persist)saveState(); saveToServer();}
   }
   // Battle screen renders while paused (transition phases handled by their own rAF)
   if(G.battle&&(G.battle.phase==='player_turn'||G.battle.phase==='enemy_turn')){

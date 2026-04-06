@@ -241,6 +241,7 @@ export function initSocket(){
 
     // ── Bank / Transmuter / Exchange server-authoritative results ─────────────
     socket.on('bank_borrow_result',data=>{
+      G._txPending=false;
       if(!data.ok){chatLog('🏦 Bank error: '+data.error,'#FF4444');SFX.error();return;}
       if(data.spacebucks!=null)G.spacebucks=data.spacebucks;
       if(data.schmeckles!=null)G.schmeckles=data.schmeckles;
@@ -252,6 +253,7 @@ export function initSocket(){
       SFX.buy();renderHUD();renderBankUI();saveToServer();
     });
     socket.on('bank_claim_result',data=>{
+      G._txPending=false;
       if(!data.ok){chatLog('🏦 Claim error: '+data.error,'#FF4444');return;}
       G.spacebucks=data.spacebucks;G.schmeckles=data.schmeckles;G.bankPositions=data.bankPositions;
       const icon=data.collateral==='spacebucks'?'🪙':'💀';
@@ -273,6 +275,7 @@ export function initSocket(){
       SFX.error();renderHUD();renderTransmuterUI();saveToServer();
     });
     socket.on('currency_exchange_result',data=>{
+      G._txPending=false; // unblock auto-save (set in doExchange)
       if(!data.ok){chatLog('⚗ Exchange error: '+data.error,'#FF4444');SFX.error();return;}
       G.spacebucks=data.spacebucks;G.schmeckles=data.schmeckles;
       G.alUSD=data.alUSD;G.alETH=data.alETH;G.alcx=data.alcx;

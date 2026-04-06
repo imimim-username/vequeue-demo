@@ -313,12 +313,13 @@ export function depositBank(collateral){
   if(collateral==='schmeckles'&&G.schmeckles<amt){chatLog('Not enough Schmeckles!','#FF4444');return;}
   // Server-authoritative: pdb is updated first so anti-cheat won't block the resulting
   // alETH/alUSD increase when save_character fires.
+  G._txPending=true;
   socket?.emit('bank_borrow',{collateral,amount:amt});
 }
 export function claimBankPosition(idx){
   const pos=G.bankPositions[idx];
   if(!pos||pos.debt>0.001||pos.claimed)return;
-  // Server-authoritative: pdb gets spacebucks/schmeckles before save_character fires.
+  G._txPending=true;
   socket?.emit('bank_claim',{idx});
 }
 
@@ -690,6 +691,8 @@ export function doExchange(){
   const bal={spacebucks:G.spacebucks,schmeckles:G.schmeckles,alUSD:G.alUSD,alETH:G.alETH,alcx:G.alcx}[from];
   if(bal<amt){chatLog('Insufficient balance!','#FF4444');SFX.error();return;}
   // Server-authoritative: server validates, executes exchange, updates pdb, responds with new balances.
+  // Block auto-save until result arrives to prevent race-condition currency revert.
+  G._txPending = true;
   socket?.emit('currency_exchange',{from,to,amount:amt});
 }
 export function renderExchangeUI(){
