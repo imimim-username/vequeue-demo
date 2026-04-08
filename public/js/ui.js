@@ -481,6 +481,21 @@ export const EXCHANGE_RATES={spacebucks:1,schmeckles:2000,alUSD:1,alETH:2000,alc
 // Each section has a title and items[]. LATEST_VERSION drives the "NEW" badge.
 export const CHANGELOG=[
   {
+    version:'1.0.9', date:'Apr 8 2026',
+    sections:[
+      {title:'Bug Fixes — Queue & Input',items:[
+        'Mobile ESC button now correctly dismisses queue confirm dialogs (Y/N prompt). Previously only the keyboard Escape key worked; the on-screen ESC button called handleEsc() which skipped the pending-confirm check entirely, leaving mobile players unable to decline queue entry.',
+        'Fixed a trap: after declining queue entry at the Marketplace or Treasury gate, players are now nudged back to the E-W road. Previously the player was left inside the solid fence box — moving north cleared the decline flag and moving south re-triggered the dialog in a loop with no lateral escape.',
+        'How To Play guide: corrected gate directions for Marketplace (was "east gate", now "south-west gate") and Treasury (was "south gate", now "south-east gate").',
+      ]},
+      {title:'Visual — Governance Hall',items:[
+        'Removed interior ceiling renders. The ceiling strip was painting a dark band over north-wall doors, obscuring exits and NPC tooltips when approaching from the south.',
+        'Chamber Warden NPC repositioned to stand directly in front of the locked Chamber door (was offset to the right, partially hidden).',
+        'Added a velvet carpet strip at the approach to the Chamber door to visually signal the guarded zone boundary.',
+      ]},
+    ],
+  },
+  {
     version:'1.0.8', date:'Apr 6 2026',
     sections:[
       {title:'Economy — Four-Currency Price Feeds & Arbitrage',items:[
