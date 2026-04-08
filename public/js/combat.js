@@ -322,6 +322,12 @@ function drawEnemySprite(ctx,type,x,y){
     case'voidMage':    drawBattleVoidMage(ctx,S);    break;
     case'stoneGolem':  drawBattleStoneGolem(ctx,S);  break;
     case'shadowMage':  drawBattleShadowMage(ctx,S);  break;
+    case'riverSprite': drawBattleRiverSprite(ctx,S); break;
+    case'murkCrawler': drawBattleMurkCrawler(ctx,S); break;
+    case'serpentine':  drawBattleSerpentine(ctx,S);  break;
+    case'treeSpirit':  drawBattleTreeSpirit(ctx,S);  break;
+    case'forestWarden':drawBattleForestWarden(ctx,S);break;
+    case'thornBeast':  drawBattleThornBeast(ctx,S);  break;
   }
   ctx.restore();
 }
@@ -858,6 +864,275 @@ function drawBattleDarkKnight(ctx,S){
   // horns
   ctx.fillStyle=arm;ctx.fillRect(S*4,-S*2,S*2,S*3);ctx.fillRect(S*12,-S*2,S*2,S*3);
   ctx.fillStyle=lit;ctx.fillRect(S*4,-S,S*2,S*2);ctx.fillRect(S*12,-S,S*2,S*2);
+}
+
+function drawBattleRiverSprite(ctx,S){
+  // Small wispy water fairy — aqua/cyan body, dragonfly wings, trailing water form
+  const body='#4090CC',light='#80D0FF',dark='#1050A0',glow='#AAEEFF',eye='#FFFFFF';
+  // glow aura
+  ctx.fillStyle='#40A0FF18';
+  ctx.beginPath();ctx.arc(S*9,S*9,S*9,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#80D0FF10';
+  ctx.beginPath();ctx.arc(S*9,S*9,S*12,0,Math.PI*2);ctx.fill();
+  // wings (translucent dragonfly-style)
+  ctx.fillStyle='#AAEEFF40';
+  ctx.fillRect(0,S*4,S*7,S*4);ctx.fillRect(S*11,S*4,S*7,S*4);
+  ctx.fillRect(S,S*7,S*6,S*3);ctx.fillRect(S*11,S*7,S*6,S*3);
+  ctx.fillStyle='#80D0FF60';
+  ctx.fillRect(S*2,S*5,S*4,S*2);ctx.fillRect(S*12,S*5,S*4,S*2);
+  // water trailing form (wispy bottom)
+  ctx.fillStyle=dark;
+  ctx.fillRect(S*5,S*17,S*8,S*5);ctx.fillRect(S*6,S*21,S*6,S*4);ctx.fillRect(S*7,S*24,S*4,S*3);
+  ctx.fillStyle=body;
+  ctx.fillRect(S*4,S*17,S*10,S*4);ctx.fillRect(S*5,S*20,S*8,S*3);
+  ctx.fillStyle=light;ctx.fillRect(S*5,S*17,S*6,S*2);
+  ctx.fillStyle=glow;
+  ctx.fillRect(S*4,S*22,S*2,S*4);ctx.fillRect(S*12,S*22,S*2,S*4);ctx.fillRect(S*7,S*25,S*2,S*3);
+  // body
+  ctx.fillStyle=dark;ctx.fillRect(S*5,S*8,S*8,S*10);
+  ctx.fillStyle=body;ctx.fillRect(S*6,S*9,S*6,S*8);
+  ctx.fillStyle=light;ctx.fillRect(S*7,S*10,S*4,S*4);
+  // arms (wispy)
+  ctx.fillStyle=body;ctx.fillRect(S*3,S*10,S*3,S*4);ctx.fillRect(S*12,S*10,S*3,S*4);
+  ctx.fillStyle=glow;ctx.fillRect(S*2,S*11,S*2,S*3);ctx.fillRect(S*14,S*11,S*2,S*3);
+  // head
+  ctx.fillStyle=dark;ctx.fillRect(S*5,S*3,S*8,S*6);
+  ctx.fillStyle=body;ctx.fillRect(S*6,S*4,S*6,S*5);
+  ctx.fillStyle=light;ctx.fillRect(S*7,S*5,S*4,S*3);
+  // eyes (white glow)
+  ctx.fillStyle=eye;ctx.fillRect(S*6,S*5,S*2,S*2);ctx.fillRect(S*10,S*5,S*2,S*2);
+  ctx.fillStyle=glow;ctx.fillRect(S*6,S*5,S,S);ctx.fillRect(S*10,S*5,S,S);
+  ctx.fillStyle=dark;ctx.fillRect(S*7,S*5,S,S);ctx.fillRect(S*11,S*5,S,S);
+  // water droplet crown
+  ctx.fillStyle=glow;ctx.fillRect(S*8,0,S*2,S*3);
+  ctx.fillStyle=light;ctx.fillRect(S*8,S,S*2,S);
+}
+
+function drawBattleMurkCrawler(ctx,S){
+  // Wide low-slung swamp crab — dark olive, eye-stalks, pincer claws
+  const shell='#3A4820',dark='#1A2810',slime='#5A7028',eye='#FF4400',claw='#607030';
+  ctx.fillStyle='#00000040';ctx.fillRect(0,S*16,S*24,S*2); // shadow
+  // legs (3 pairs, splayed wide)
+  [S*4,S*9,S*14].forEach(lx=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx-S*2,S*12,S*2,S*5);ctx.fillRect(lx+S*2,S*12,S*2,S*5);
+    ctx.fillStyle=slime;ctx.fillRect(lx-S*2,S*12,S,S*4);ctx.fillRect(lx+S*2,S*12,S,S*4);
+    ctx.fillStyle=dark;ctx.fillRect(lx-S*3,S*16,S*3,S*2);ctx.fillRect(lx+S*2,S*16,S*3,S*2);
+  });
+  // main body
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*7,S*20,S*7);
+  ctx.fillStyle=shell;ctx.fillRect(S*3,S*8,S*18,S*5);
+  ctx.fillStyle=slime;ctx.fillRect(S*4,S*8,S*10,S*2);
+  ctx.fillStyle=dark;ctx.fillRect(S*16,S*8,S*4,S*4);
+  // shell ridges
+  ctx.fillStyle=dark;[S*6,S*10,S*14].forEach(rx=>ctx.fillRect(rx,S*8,S,S*4));
+  // front claws
+  ctx.fillStyle=dark;ctx.fillRect(0,S*8,S*4,S*5);ctx.fillRect(S*20,S*8,S*4,S*5);
+  ctx.fillStyle=claw;ctx.fillRect(S,S*9,S*3,S*4);ctx.fillRect(S*20,S*9,S*3,S*4);
+  ctx.fillStyle=dark;ctx.fillRect(0,S*12,S*3,S*3);ctx.fillRect(0,S*7,S*3,S*3);
+  ctx.fillStyle=claw;ctx.fillRect(0,S*12,S*2,S*2);ctx.fillRect(0,S*8,S*2,S*2);
+  ctx.fillStyle=dark;ctx.fillRect(S*21,S*12,S*3,S*3);ctx.fillRect(S*21,S*7,S*3,S*3);
+  ctx.fillStyle=claw;ctx.fillRect(S*22,S*12,S*2,S*2);ctx.fillRect(S*22,S*8,S*2,S*2);
+  // head
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*4,S*12,S*5);
+  ctx.fillStyle=shell;ctx.fillRect(S*4,S*5,S*10,S*4);
+  ctx.fillStyle=slime;ctx.fillRect(S*5,S*5,S*6,S*2);
+  // eye stalks
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*2,S*2,S*4);ctx.fillRect(S*10,S*2,S*2,S*4);
+  ctx.fillStyle=slime;ctx.fillRect(S*5,S*2,S,S*4);ctx.fillRect(S*11,S*2,S,S*4);
+  ctx.fillStyle=eye;ctx.fillRect(S*4,S,S*2,S*2);ctx.fillRect(S*10,S,S*2,S*2);
+  ctx.fillStyle='#FF8800';ctx.fillRect(S*4,S,S,S);ctx.fillRect(S*10,S,S,S);
+  ctx.fillStyle='#000';ctx.fillRect(S*5,S,S,S);ctx.fillRect(S*11,S,S,S);
+  // mandibles
+  ctx.fillStyle=dark;ctx.fillRect(S*6,S*7,S*2,S*3);ctx.fillRect(S*9,S*7,S*2,S*3);
+  ctx.fillStyle=claw;ctx.fillRect(S*6,S*9,S*2,S);ctx.fillRect(S*9,S*9,S*2,S);
+}
+
+function drawBattleSerpentine(ctx,S){
+  // Coiled river serpent — blue-green scales, raised head, forked tongue, fangs
+  const scale='#2A7048',dark='#143824',light='#3DA060',belly='#A0C870',eye='#FF8000';
+  ctx.fillStyle='#00000040';ctx.fillRect(S*2,S*24,S*22,S*2); // shadow
+  // rear coil
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*16,S*20,S*8);
+  ctx.fillStyle=scale;ctx.fillRect(S*5,S*17,S*18,S*6);
+  ctx.fillStyle=light;ctx.fillRect(S*6,S*17,S*10,S*2);
+  ctx.fillStyle=belly;ctx.fillRect(S*8,S*18,S*10,S*4);
+  ctx.fillStyle=dark;[S*6,S*10,S*14,S*18].forEach(sx=>ctx.fillRect(sx,S*19,S*2,S*3));
+  // mid coil
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*12,S*18,S*6);
+  ctx.fillStyle=scale;ctx.fillRect(S*3,S*13,S*16,S*4);
+  ctx.fillStyle=belly;ctx.fillRect(S*5,S*14,S*10,S*3);
+  ctx.fillStyle=dark;[S*4,S*8,S*12,S*16].forEach(sx=>ctx.fillRect(sx,S*13,S*2,S*3));
+  // tail tip (curled right)
+  ctx.fillStyle=dark;ctx.fillRect(S*20,S*9,S*4,S*8);
+  ctx.fillStyle=scale;ctx.fillRect(S*21,S*10,S*3,S*6);
+  ctx.fillStyle=light;ctx.fillRect(S*21,S*10,S,S*4);
+  // neck rising
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*6,S*8,S*8);
+  ctx.fillStyle=scale;ctx.fillRect(S*3,S*7,S*6,S*6);
+  ctx.fillStyle=belly;ctx.fillRect(S*4,S*8,S*4,S*5);
+  // head (wide, triangular)
+  ctx.fillStyle=dark;ctx.fillRect(0,S*2,S*12,S*6);
+  ctx.fillStyle=scale;ctx.fillRect(S,S*3,S*10,S*4);
+  ctx.fillStyle=light;ctx.fillRect(S*2,S*3,S*5,S*2);
+  // eye
+  ctx.fillStyle='#0A1408';ctx.fillRect(S*3,S*3,S*3,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*3,S*3,S*2,S*2);
+  ctx.fillStyle='#FFCC00';ctx.fillRect(S*3,S*3,S,S);
+  ctx.fillStyle='#000';ctx.fillRect(S*4,S*4,S,S); // slit pupil
+  // fangs
+  ctx.fillStyle='#EEEECC';ctx.fillRect(S*2,S*6,S,S*3);ctx.fillRect(S*5,S*6,S,S*3);
+  ctx.fillStyle='#AAFFAA';ctx.fillRect(S*2,S*8,S,S); // venom
+  // forked tongue
+  ctx.fillStyle='#FF2040';
+  ctx.fillRect(0,S*5,S*3,S);ctx.fillRect(0,S*4,S,S);ctx.fillRect(S*2,S*6,S,S);
+}
+
+function drawBattleTreeSpirit(ctx,S){
+  // Ghostly tree spirit — gnarled bark body, glowing green aura, root tendrils
+  const wood='#5A4828',dark='#2A2010',bark='#7A6840',spirit='#60FF40',eye='#CCFF88';
+  // spirit glow aura
+  ctx.fillStyle='#40FF2018';
+  ctx.beginPath();ctx.arc(S*10,S*10,S*10,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#80FF4010';
+  ctx.beginPath();ctx.arc(S*10,S*10,S*13,0,Math.PI*2);ctx.fill();
+  // root tendrils
+  ctx.fillStyle=dark;
+  [[S*2,S*20,S*2,S*6],[S*5,S*19,S*2,S*7],[S*9,S*20,S*2,S*6],[S*13,S*19,S*2,S*7],[S*16,S*20,S*2,S*5]]
+    .forEach(([x,y,w,h])=>ctx.fillRect(x,y,w,h));
+  ctx.fillStyle=spirit;
+  [S*2,S*5,S*9,S*13,S*16].forEach(tx=>ctx.fillRect(tx,S*25,S*2,S*2));
+  // trunk/lower body
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*12,S*12,S*9);
+  ctx.fillStyle=wood;ctx.fillRect(S*5,S*13,S*10,S*7);
+  ctx.fillStyle=bark;ctx.fillRect(S*6,S*13,S*5,S*3);
+  ctx.fillStyle=spirit;ctx.fillRect(S*7,S*14,S*3,S*2);
+  ctx.fillStyle=dark;[S*14,S*17,S*19].forEach(ry=>ctx.fillRect(S*5,ry,S*10,S));
+  // branch arms
+  ctx.fillStyle=dark;ctx.fillRect(0,S*8,S*6,S*3);ctx.fillRect(S*14,S*8,S*6,S*3);
+  ctx.fillStyle=wood;ctx.fillRect(0,S*8,S*5,S*2);ctx.fillRect(S*15,S*8,S*5,S*2);
+  ctx.fillStyle=spirit;
+  ctx.fillRect(0,S*7,S*2,S*2);ctx.fillRect(S*3,S*6,S*2,S*3);
+  ctx.fillRect(S*18,S*7,S*2,S*2);ctx.fillRect(S*15,S*6,S*2,S*3);
+  // torso
+  ctx.fillStyle=dark;ctx.fillRect(S*4,S*6,S*12,S*7);
+  ctx.fillStyle=wood;ctx.fillRect(S*5,S*7,S*10,S*5);
+  ctx.fillStyle=spirit;ctx.fillRect(S*7,S*8,S*6,S*3);
+  // head (knotted)
+  ctx.fillStyle=dark;ctx.fillRect(S*4,0,S*12,S*7);
+  ctx.fillStyle=wood;ctx.fillRect(S*5,S,S*10,S*5);
+  ctx.fillStyle=bark;ctx.fillRect(S*6,S*2,S*4,S*2);
+  // hollow eye knots
+  ctx.fillStyle='#0A0C06';ctx.fillRect(S*5,S*2,S*3,S*3);ctx.fillRect(S*12,S*2,S*3,S*3);
+  ctx.fillStyle=eye;ctx.fillRect(S*6,S*2,S*2,S*2);ctx.fillRect(S*12,S*2,S*2,S*2);
+  ctx.fillStyle='#EEFFCC';ctx.fillRect(S*6,S*2,S,S);ctx.fillRect(S*12,S*2,S,S);
+  // knothole mouth
+  ctx.fillStyle=dark;ctx.fillRect(S*6,S*5,S*8,S*2);ctx.fillStyle='#101408';ctx.fillRect(S*7,S*5,S*6,S);
+  // crown branches
+  ctx.fillStyle=dark;[S*5,S*9,S*13].forEach(cx=>ctx.fillRect(cx,0,S*2,S*3));
+  ctx.fillStyle=spirit;[S*5,S*9,S*13].forEach(cx=>ctx.fillRect(cx,0,S,S*2));
+}
+
+function drawBattleForestWarden(ctx,S){
+  // Tall bark-armoured forest guardian — leaf cloak, amber eyes, great club
+  const bark='#4A3820',dark='#1E1408',wood='#7A6040',leaf='#4A8030',eye='#FFCC00',moss='#608040';
+  ctx.fillStyle='#00000040';ctx.fillRect(S,S*30,S*18,S*2); // shadow
+  // root boots
+  [[S*2,S*24],[S*9,S*24]].forEach(([bx,by])=>{
+    ctx.fillStyle=dark;ctx.fillRect(bx,by,S*5,S*7);
+    ctx.fillStyle=bark;ctx.fillRect(bx,by,S*4,S*6);
+    ctx.fillStyle=wood;ctx.fillRect(bx,by,S*4,S*2);
+    ctx.fillStyle=dark;ctx.fillRect(bx-S,by+S*5,S*7,S*2);
+    ctx.fillStyle=moss;ctx.fillRect(bx-S,by+S*6,S*7,S);
+  });
+  // legs
+  [[S*3,S*15],[S*10,S*15]].forEach(([lx,ly])=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx-1,ly,S*5,S*10);
+    ctx.fillStyle=bark;ctx.fillRect(lx,ly,S*4,S*9);
+    ctx.fillStyle=wood;ctx.fillRect(lx,ly,S*4,S*3);
+  });
+  // leaf cloak (behind torso)
+  ctx.fillStyle=leaf;ctx.fillRect(0,S*8,S*3,S*14);ctx.fillRect(S*17,S*8,S*3,S*14);
+  ctx.fillStyle=dark;ctx.fillRect(0,S*8,S,S*14);ctx.fillRect(S*19,S*8,S,S*14);
+  // torso
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*8,S*16,S*8);
+  ctx.fillStyle=bark;ctx.fillRect(S*3,S*9,S*14,S*7);
+  ctx.fillStyle=wood;ctx.fillRect(S*4,S*9,S*8,S*3);
+  ctx.fillStyle=dark;ctx.fillRect(S*14,S*10,S*3,S*5);
+  ctx.fillStyle=dark;[S*11,S*13,S*15].forEach(ry=>ctx.fillRect(S*3,ry,S*14,S));
+  ctx.fillStyle=moss;ctx.fillRect(S*5,S*12,S*6,S);
+  // arms
+  ctx.fillStyle=dark;ctx.fillRect(0,S*10,S*4,S*10);ctx.fillRect(S*16,S*10,S*4,S*10);
+  ctx.fillStyle=bark;ctx.fillRect(S,S*10,S*3,S*9);ctx.fillRect(S*16,S*10,S*3,S*9);
+  ctx.fillStyle=wood;ctx.fillRect(S,S*10,S*3,S*3);ctx.fillRect(S*16,S*10,S*3,S*3);
+  // great club
+  ctx.fillStyle=dark;ctx.fillRect(0,0,S*3,S*12);
+  ctx.fillStyle=wood;ctx.fillRect(S,0,S*2,S*11);
+  ctx.fillStyle=bark;ctx.fillRect(0,0,S*4,S*4);
+  ctx.fillStyle=wood;ctx.fillRect(S,0,S*3,S*3);ctx.fillStyle=dark;ctx.fillRect(0,0,S,S*4);
+  // shoulder plates
+  ctx.fillStyle=dark;ctx.fillRect(S,S*7,S*6,S*4);ctx.fillRect(S*13,S*7,S*6,S*4);
+  ctx.fillStyle=bark;ctx.fillRect(S,S*7,S*6,S*3);ctx.fillRect(S*13,S*7,S*6,S*3);
+  ctx.fillStyle=wood;ctx.fillRect(S*2,S*7,S*4,S);ctx.fillRect(S*14,S*7,S*4,S);
+  // head
+  ctx.fillStyle=dark;ctx.fillRect(S*3,S*2,S*14,S*7);
+  ctx.fillStyle=bark;ctx.fillRect(S*4,S*3,S*12,S*6);
+  ctx.fillStyle=wood;ctx.fillRect(S*5,S*3,S*8,S*2);
+  ctx.fillStyle=dark;ctx.fillRect(S*14,S*4,S*2,S*5);
+  // eyes
+  ctx.fillStyle='#0A0800';ctx.fillRect(S*5,S*4,S*3,S*2);ctx.fillRect(S*12,S*4,S*3,S*2);
+  ctx.fillStyle=eye;ctx.fillRect(S*5,S*4,S*2,S*2);ctx.fillRect(S*12,S*4,S*2,S*2);
+  ctx.fillStyle='#FFEEAA';ctx.fillRect(S*5,S*4,S,S);ctx.fillRect(S*12,S*4,S,S);
+  // bark crown
+  ctx.fillStyle=dark;[S*4,S*7,S*10,S*13,S*16].forEach(cx=>ctx.fillRect(cx,0,S*2,S*4));
+  ctx.fillStyle=wood;[S*5,S*8,S*11,S*14].forEach(cx=>ctx.fillRect(cx,0,S,S*3));
+  ctx.fillStyle=leaf;[S*4,S*8,S*12,S*16].forEach(cx=>ctx.fillRect(cx,0,S,S*2));
+}
+
+function drawBattleThornBeast(ctx,S){
+  // Heavy quadruped with thorn-spine ridge — dark forest predator, red slit eyes
+  const hide='#2A3818',dark='#121808',scale='#3A5020',thorn='#608030',eye='#FF2000';
+  ctx.fillStyle='#00000050';ctx.fillRect(0,S*19,S*26,S*2); // shadow
+  // legs (4 thick)
+  [[S*3,S*13],[S*8,S*14],[S*15,S*14],[S*20,S*13]].forEach(([lx,ly])=>{
+    ctx.fillStyle=dark;ctx.fillRect(lx,ly,S*4,S*7);
+    ctx.fillStyle=hide;ctx.fillRect(lx,ly,S*3,S*6);
+    ctx.fillStyle='#0A0C06';ctx.fillRect(lx-S,ly+S*5,S*5,S*2);
+  });
+  // body (heavy, low-slung)
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*7,S*22,S*8);
+  ctx.fillStyle=hide;ctx.fillRect(S*3,S*8,S*20,S*6);
+  ctx.fillStyle=scale;ctx.fillRect(S*4,S*8,S*12,S*2);
+  ctx.fillStyle=dark;ctx.fillRect(S*20,S*9,S*3,S*5);
+  // thorn spine ridge
+  ctx.fillStyle=dark;[S*5,S*8,S*11,S*14,S*17,S*20].forEach(sx=>ctx.fillRect(sx,S*4,S*2,S*5));
+  ctx.fillStyle=thorn;[S*5,S*8,S*11,S*14,S*17,S*20].forEach(sx=>ctx.fillRect(sx,S*3,S,S*4));
+  ctx.fillStyle='#A0D060';[S*5,S*8,S*11,S*14,S*17,S*20].forEach(sx=>ctx.fillRect(sx,S*2,S,S*2));
+  // tail (thorn-tipped)
+  ctx.fillStyle=dark;ctx.fillRect(S*22,S*8,S*5,S*4);ctx.fillRect(S*24,S*5,S*3,S*4);
+  ctx.fillStyle=hide;ctx.fillRect(S*22,S*8,S*4,S*3);ctx.fillRect(S*24,S*6,S*2,S*3);
+  ctx.fillStyle=thorn;ctx.fillRect(S*25,S*4,S*2,S*3);
+  ctx.fillStyle='#A0D060';ctx.fillRect(S*25,S*3,S*2,S*2);
+  // neck
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*6,S*6,S*5);
+  ctx.fillStyle=hide;ctx.fillRect(S*3,S*7,S*4,S*4);
+  // head (wide, low)
+  ctx.fillStyle=dark;ctx.fillRect(0,S*4,S*8,S*5);
+  ctx.fillStyle=hide;ctx.fillRect(S,S*5,S*6,S*4);
+  ctx.fillStyle=scale;ctx.fillRect(S*2,S*5,S*4,S*2);
+  // jaw
+  ctx.fillStyle=dark;ctx.fillRect(0,S*7,S*6,S*3);
+  ctx.fillStyle=hide;ctx.fillRect(S,S*8,S*4,S*2);
+  // fangs
+  ctx.fillStyle='#DDEEBB';ctx.fillRect(S,S*9,S,S*2);ctx.fillRect(S*3,S*9,S,S*2);
+  ctx.fillStyle='#AACCAA';ctx.fillRect(S*2,S*9,S,S);
+  // eye (red slit)
+  ctx.fillStyle='#0A0600';ctx.fillRect(S*2,S*5,S*3,S*2);
+  ctx.fillStyle=eye;ctx.fillRect(S*3,S*5,S*2,S*2);
+  ctx.fillStyle='#FF6040';ctx.fillRect(S*3,S*5,S,S);
+  ctx.fillStyle='#000';ctx.fillRect(S*4,S*6,S,S);
+  // horn nubs
+  ctx.fillStyle=dark;ctx.fillRect(S*2,S*3,S*2,S*3);ctx.fillRect(S*5,S*3,S*2,S*3);
+  ctx.fillStyle=thorn;ctx.fillRect(S*2,S*3,S,S*2);ctx.fillRect(S*5,S*3,S,S*2);
 }
 
 // ── Battle screen renderer (drawn to ctxUI each frame) ────────────────────────
