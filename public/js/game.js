@@ -705,7 +705,7 @@ export function animateTitle(){
 // ── CHARACTER CREATION ────────────────────────────────────────────────────────
 export function buildCreateScreen(){
   const statNames=['str','vit','agi','end','lck'];
-  const statLabels={str:'STR  (Attack)',vit:'VIT  (Max HP)',agi:'AGI  (Speed)',end:'END  (Defense)',lck:'LCK  (Drop)'};
+  const statLabels={str:'STR  (Attack)',vit:'VIT  (Max HP)',agi:'AGI  (Speed)',end:'END  (Defense)',lck:'LCK  (Crit / MP)'};
   const BASE_PTS=10;
   // floor() returns the class-locked minimums for current class
   function floor(){return CLASSES[G.class_||'warrior'].classFloor||{};}
@@ -733,7 +733,7 @@ export function buildCreateScreen(){
     document.getElementById('preview-stats').innerHTML=
       `<b style="color:#FFD700">${document.getElementById('inp-name').value||'Hero'}</b><br>`+
       `${sp2.label} ${cl.label}<br>`+
-      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str}<br>`+
+      `♥ ${Math.max(2,finalHp)}  ⚔ ${alloc.str}  ◆ ${4+alloc.lck}mp<br>`+
       `${cl.startWeapon.name}`;
   }
 

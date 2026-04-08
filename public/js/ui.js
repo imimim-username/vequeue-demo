@@ -1808,7 +1808,7 @@ export function renderInventoryScreen(){
   const pd=G.pendingStats||{};
   const statRows=[
     ['str','STR (Attack)'],['vit','VIT (HP / Regen)'],['agi','AGI (Speed / Dodge)'],
-    ['end','END (Defense)'],['lck','LCK (Crit / Drop)'],
+    ['end','END (Defense)'],['lck','LCK (Crit / MP / Drop)'],
   ].map(([k,label])=>{
     const canRefund=(pd[k]||0)>0;
     const btnSub=canRefund
