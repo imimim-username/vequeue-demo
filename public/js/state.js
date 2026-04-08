@@ -66,7 +66,7 @@ export const G = {
   worldLoot:[],
   marketListings:[],
   worldEvent:null,      // active world event or null
-  livePrices:{alUSD:1.00,alETH:1800.0,alcx:5.0},
+  livePrices:{alUSD:1.00,alETH:1800.0,ETH:1800.0,alcx:5.0},
   treasury:{alUSD:0,alETH:0},
   accessory:null,       // 'cape' | 'hat' | 'glasses' | null
   equippedArmor:null,   // armor item object or null
