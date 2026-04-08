@@ -4,6 +4,21 @@
 // LATEST_VERSION in ui.js is driven by CHANGELOG[0].version.
 export const CHANGELOG=[
   {
+    version:'1.1.0', date:'Apr 8 2026',
+    sections:[
+      {title:'Content — Battle Sprites',items:[
+        'Added battle sprites for all 6 previously invisible enemies: River Sprite (aqua fairy with dragonfly wings and water-trail form), Murk Crawler (wide swamp crab with eye-stalks and pincers), River Serpent (coiled blue-green snake with slit eye and forked tongue), Tree Spirit (spectral bark creature with green aura and root tendrils), Forest Warden (tall bark-armoured guardian with leaf cloak and great club), Thorn Beast (heavy quadruped with spine ridge and red slit eyes). All 19 enemy types now have full pixel-art battle sprites.',
+      ]},
+      {title:'Bug Fix — Inventory',items:[
+        'Fixed crash when unequipping any weapon, shield, or armour. The UNEQUIP button was embedding the callback function as a serialised string in an inline onclick attribute — Vite\'s minifier renamed closure variables (e.g. G → O) inside the bundle, so those names were undefined when the inline handler ran in global scope. Button now attaches the callback via addEventListener, keeping it inside the module closure where all names resolve correctly.',
+      ]},
+      {title:'UI — Stat Labels',items:[
+        'LCK now correctly shows all three things it drives in every stat display: character creation row (was "LCK (Drop)", now "LCK (Crit / MP)"), in-game character screen (was "LCK (Crit / Drop)", now "LCK (Crit / MP / Drop)"). The How To Play guide already had this correct.',
+        'Character creation preview card now shows the starting MP pool alongside HP (e.g. "♥ 5  ⚔ 2  ◆ 4mp"), updating live as you allocate LCK points.',
+      ]},
+    ],
+  },
+  {
     version:'1.0.9', date:'Apr 8 2026',
     sections:[
       {title:'Bug Fixes — Queue & Input',items:[
