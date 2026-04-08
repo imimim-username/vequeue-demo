@@ -10,6 +10,9 @@ export const KEYS={};
 const konamiSeq=[];
 window.addEventListener('keydown',e=>{
   KEYS[e.key]=true;KEYS[e.keyCode]=true;
+  // Don't intercept game hotkeys when user is typing in any input field
+  const _tag=document.activeElement?.tagName;
+  if(_tag==='INPUT'||_tag==='TEXTAREA'||_tag==='SELECT'||document.activeElement?.isContentEditable) return;
   // Konami
   konamiSeq.push(e.keyCode);
   if(konamiSeq.length>CFG.KONAMI.length)konamiSeq.shift();
