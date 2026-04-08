@@ -705,6 +705,15 @@ export const NPCS = {
        'Your queue-locked ALCX is your ballot weight.',
      ],
      govBoard:true},
+    { id:'actuary_venn', x:5, y:6, type:'wizard', face:0, name:'Actuary Venn',
+      dialog:[
+        "Ah, a curious soul! I model the flows of collateral through the Alchemix system.",
+        "The yield rate determines how fast your deposited collateral grows each tick.",
+        "The redemption rate controls how quickly a slice is sent to the Transmuter, paying down your debt.",
+        "Talk to me to open my collateral simulator — plug in numbers and see how your position evolves over time.",
+      ],
+      simulator:true
+    },
   ],
   marketplace:[
     { id:'vendor', x:5, y:5, type:'merchant', face:1, name:'Vendor Zelda', shop:'zelda',
@@ -847,16 +856,8 @@ export const NPCS = {
         "The Governance Chamber is just through the east door.",
         "Bring your queue-locked ALCX — vote weight equals how much you locked when you joined.",
         "Current vote: redemption rate, which controls how quickly Alchemix loans self-repay.",
+        "The Governance Hall also has a live rates panel and Actuary Venn's collateral simulator.",
       ]
-    },
-    { id:'actuary_venn', x:10, y:9, type:'wizard', face:0, name:'Actuary Venn',
-      dialog:[
-        "Ah, a curious soul! I model the flows of collateral through the Alchemix system.",
-        "The yield rate determines how fast your deposited collateral grows each tick.",
-        "The redemption rate determines how quickly a slice of your deposit is sent to the Transmuter, paying down your debt.",
-        "Talk to me again to open my collateral simulator — plug in some numbers and see how your position evolves.",
-      ],
-      simulator:true
     },
   ],
   gov_chamber:[

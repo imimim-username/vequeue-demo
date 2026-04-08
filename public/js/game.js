@@ -1004,7 +1004,7 @@ export function gameLoop(ts){
     renderHUD();
     ctxUI.clearRect(0,0,W,H);
     renderMinimap(ctxUI);
-    // Governance Hall / Governance Chamber: show treasury + live prices panel
+    // Governance Hall / Governance Chamber: show treasury + live prices + rate panel
     if(G.zone==='governance'||G.zone==='gov_chamber')renderGovernancePanel(ctxUI);
     // ── ALCX yield: request server authorisation — server pre-updates pdb ──────
     // Seniority tick: every ~5s while physically inside an economic zone
