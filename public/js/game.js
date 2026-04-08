@@ -371,6 +371,13 @@ function checkDoorTrigger(){
       if(door.queue){
         // Only prompt if the player hasn't already declined on this exact tile this visit
         if(!G._queueDeclinedTile) handleQueueDoor(key,door);
+      } else if(door.requiresAlcx){
+        if(G.lockedAlcx>0){
+          if(door.msg)chatLog(door.msg,'#B0BEC5');
+          changeZone(door.to,door.sx,door.sy);
+        } else {
+          chatLog('🔒 Chamber Warden: The Governance Chamber is for veQueue members only. Join the Marketplace or Treasury entry queue to lock your ALCX and gain access.','#FF8800');
+        }
       } else{
         if(door.msg)chatLog(door.msg,'#B0BEC5');
         changeZone(door.to,door.sx,door.sy);

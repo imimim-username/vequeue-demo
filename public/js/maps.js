@@ -519,10 +519,15 @@ function makeGovernance(){
   m[9][4]=T.TICKET;m[9][9]=T.TICKET;m[9][14]=T.TICKET;
   // columns
   m[2][2]=T.COLUMN;m[2][18]=T.COLUMN;m[10][2]=T.COLUMN;m[10][18]=T.COLUMN;
-  // door
+  // south entrance door
   m[12][9]=T.DOOR_O;m[12][10]=T.DOOR_O;m[12][11]=T.DOOR_O;
   // exit queue at back
   fill(11,7,11,12,T.QUEUE_OUT);
+  // ── Chamber shortcut door (north wall) ───────────────────────────────────
+  // Velvet carpet leads to the locked door at the back of the hall
+  fill(1,8,1,11,T.VELVET);
+  // The door itself — locked for non-veQueue members, shortcut for members
+  m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
   return m;
 }
 
@@ -689,6 +694,14 @@ export const NPCS = {
     },
   ],
   governance:[
+    { id:'chamber_warden_hall', x:13, y:2, type:'guard', face:2, name:'Chamber Warden',
+      dialog:[
+        'This door leads to the Governance Chamber — the veQueue voting floor.',
+        'Only citizens with ALCX locked inside the veQueue district may pass.',
+        'To gain access: join the Marketplace or Treasury entry queue, lock your ALCX, then head east through the Treasury portal to reach the Chamber.',
+        'If you already have ALCX locked in the district, just walk up to the door and it will open for you.',
+      ]
+    },
     { id:'clerk', x:10, y:3, type:'clerk', face:2, name:'Senior Clerk Praxis', questId:'lich_quest',
       dialog:[
         "Welcome to the Governance Hall. All records and civic matters are kept here.",
@@ -897,6 +910,10 @@ export const ZONE_DOORS = {
   // From building interiors → world
   tavern_exit:           {from:'tavern',      tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
   governance_exit:       {from:'governance',  tileRows:[12],  tileCols:[9,10,11],   to:'world', sx:TOWN_OX+29, sy:TOWN_OY+12},
+  // Shortcut: Governance Hall → Chamber for veQueue members only
+  governance_to_chamber: {from:'governance', tileRows:[0], tileCols:[9,10], to:'gov_chamber', sx:10, sy:2,
+                           requiresAlcx:true,
+                           msg:'🏛 Chamber Warden nods and the door swings open — welcome, veQueue member.'},
   // Marketplace: south exit (far from entry) + north exit (back through entry door)
   marketplace_exit:      {from:'marketplace', tileRows:[12],  tileCols:[8,9,10,11], to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+12},
   marketplace_north_exit:{from:'marketplace', tileRows:[0],   tileCols:[9,10],      to:'world', sx:TOWN_OX+8,  sy:TOWN_OY+14},
