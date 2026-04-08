@@ -105,9 +105,9 @@ textarea{background:#111;border:1px solid #5A3A80;color:#eee;padding:8px;border-
     <div id="panel-config" class="panel">
       <div class="section-title">Server Parameters</div>
       <div class="config-row">
-        <label>Earmark Rate (EARMARK_RATE_LIVE)</label>
+        <label>Redemption Rate (REDEMPTION_RATE_LIVE)</label>
         <input type="number" id="cfg-earmark" min="0.1" max="5" step="0.1" value="0.5">
-        <span style="color:#888;font-size:.72rem">% (0.1–5.0)</span>
+        <span style="color:#888;font-size:.72rem">% of deposited/tick (0.1–5.0) — sent to transmuter while debt > 0</span>
         <button class="btn btn-purple" onclick="setEarmark()">Set</button>
       </div>
       <div class="config-row">
@@ -197,7 +197,8 @@ function renderDashboard(){
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-card"><div class="lbl">Online Players</div><div class="val" style="color:#4CAF50">${s.onlineCount||0}</div></div>
     <div class="stat-card"><div class="lbl">Registered Accounts</div><div class="val">${s.accountCount||0}</div></div>
-    <div class="stat-card"><div class="lbl">Earmark Rate</div><div class="val" style="color:#B080FF">${((s.earmarkRate||0.005)*100).toFixed(2)}%</div></div>
+    <div class="stat-card"><div class="lbl">Redemption Rate</div><div class="val" style="color:#FF8800">${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2)}%/tick</div></div>
+    <div class="stat-card"><div class="lbl">Yield Rate</div><div class="val" style="color:#4FC3F7">${((s.yieldRate||0.002)*100).toFixed(1)}%/tick</div></div>
     <div class="stat-card"><div class="lbl">Loot TTL</div><div class="val" style="color:#FFD700">${s.lootTtlMin||10} min</div></div>
     <div class="stat-card"><div class="lbl">Snowball Chance</div><div class="val" style="color:#FF6030">${Math.round((s.snowballChance||0.4)*100)}%</div></div>
     <div class="stat-card"><div class="lbl">Whale Chance</div><div class="val" style="color:#60AAFF">${Math.round((s.whaleChance||0.35)*100)}%</div></div>
@@ -206,7 +207,7 @@ function renderDashboard(){
   document.getElementById('treasury-display').innerHTML =
     `alUSD collected: <b>$${(t.alUSD||0).toFixed(2)}</b> &nbsp;|&nbsp; alETH collected: <b>⟠${(t.alETH||0).toFixed(4)}</b>`;
   document.getElementById('config-display').innerHTML =
-    `Earmark Rate: ${((s.earmarkRate||0.005)*100).toFixed(2)}% &nbsp;·&nbsp; Loot TTL: ${s.lootTtlMin||10}m &nbsp;·&nbsp; Snowball: ${Math.round((s.snowballChance||0.4)*100)}% &nbsp;·&nbsp; Whale: ${Math.round((s.whaleChance||0.35)*100)}%`;
+    `Redemption Rate: ${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2)}%/tick &nbsp;·&nbsp; Yield Rate: ${((s.yieldRate||0.002)*100).toFixed(1)}%/tick &nbsp;·&nbsp; Loot TTL: ${s.lootTtlMin||10}m &nbsp;·&nbsp; Snowball: ${Math.round((s.snowballChance||0.4)*100)}% &nbsp;·&nbsp; Whale: ${Math.round((s.whaleChance||0.35)*100)}%`;
 }
 
 function renderPlayers(){
@@ -260,7 +261,7 @@ function renderHof(){
 function syncConfigInputs(){
   const s = state;
   const v = (id, val) => { const el=document.getElementById(id); if(el&&document.activeElement!==el) el.value=val; };
-  v('cfg-earmark', ((s.earmarkRate||0.005)*100).toFixed(2));
+  v('cfg-earmark', ((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2));
   v('cfg-loot-ttl', s.lootTtlMin||10);
   v('cfg-snowball', Math.round((s.snowballChance||0.4)*100));
   v('cfg-whale', Math.round((s.whaleChance||0.35)*100));

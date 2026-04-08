@@ -19,7 +19,8 @@ export function openGovernance(){G.paused=true;renderGovernanceUI();document.get
 export function closeGovernance(){G.paused=false;document.getElementById('governance-ui').style.display='none';}
 export function renderGovernanceUI(){
   const el=document.getElementById('gov-content');if(!el)return;
-  const rate=(G.earmarkRate||0.005)*100;
+  const redemptionRate=(G.redemptionRate||0.005)*100;
+  const yieldRate=(G.yieldRate||0.002)*100;
   const quorum=G.govQuorum||50;
   const prop=G.govProposals.find(p=>p.passed===null);
   // Voting stake = ALCX locked inside a veQueue zone (queue entry stake)
@@ -27,8 +28,18 @@ export function renderGovernanceUI(){
   const voteCommitted=G.alcxVoteLock||0;
   const voteAvailable=Math.max(0,parseFloat((queueStake-voteCommitted).toFixed(4)));
 
-  let html=`<div style="color:#FFD700;margin-bottom:6px">Current Earmark Rate: <b>${rate.toFixed(2)}%</b></div>`;
-  html+=`<div style="color:#888;font-size:.72rem;margin-bottom:8px">% of debt redeemed per 5-min tick. Higher = faster repayment & more transmuter yield.</div>`;
+  // Rate summary box showing both rates and net effect
+  const netRate=yieldRate-redemptionRate;
+  const netColor=netRate>=0?'#4CAF50':'#FF8800';
+  let html=`<div style="background:#0D0020;border:1px solid #3A2060;border-radius:4px;padding:8px;margin-bottom:8px;font-size:.75rem">`;
+  html+=`<div style="color:#FFD700;font-weight:bold;margin-bottom:4px">⚗ Bank Rate Parameters</div>`;
+  html+=`<div style="display:flex;gap:16px;flex-wrap:wrap">`;
+  html+=`<div><span style="color:#4FC3F7">Yield rate:</span> <b style="color:#eee">+${yieldRate.toFixed(1)}%</b><span style="color:#555;font-size:.68rem">/tick</span> <span style="color:#888;font-size:.68rem">(collateral grows, always)</span></div>`;
+  html+=`<div><span style="color:#FF8800">Redemption rate:</span> <b style="color:#eee">${redemptionRate.toFixed(2)}%</b><span style="color:#555;font-size:.68rem">/tick</span> <span style="color:#888;font-size:.68rem">(collateral sent to transmuter while debt > 0)</span></div>`;
+  html+=`<div><span style="color:#aaa">Net while repaying:</span> <b style="color:${netColor}">${netRate>=0?'+':''}${netRate.toFixed(2)}%</b><span style="color:#555;font-size:.68rem">/tick</span></div>`;
+  html+=`</div>`;
+  html+=`<div style="color:#888;font-size:.68rem;margin-top:4px">Governance controls the redemption rate (0.1–2.0%). Higher = faster debt repayment &amp; more transmuter yield for depositors.</div>`;
+  html+=`</div>`;
 
   // Voting stake status panel
   html+=`<div style="background:#0D0020;border:1px solid #3A2060;border-radius:4px;padding:7px;margin-bottom:10px;font-size:.73rem">`;
@@ -55,7 +66,7 @@ export function renderGovernanceUI(){
     html+=`<div style="border:1px solid #5A3A80;border-radius:6px;padding:10px;margin-bottom:10px">`;
     html+=`<div style="color:#B080FF;font-weight:bold;margin-bottom:4px">📜 Active Proposal #${prop.id}</div>`;
     html+=`<div style="font-size:.75rem;color:#ccc">Proposer: ${prop.proposerName}</div>`;
-    html+=`<div style="font-size:.8rem;margin:4px 0">New earmark rate: <b style="color:#FFD700">${(prop.value*100).toFixed(2)}%</b></div>`;
+    html+=`<div style="font-size:.8rem;margin:4px 0">Proposed redemption rate: <b style="color:#FFD700">${(prop.value*100).toFixed(2)}%</b>/tick</div>`;
     html+=`<div style="color:#aaa;font-size:.72rem;margin-bottom:6px">⏱ ${timeStr} remaining</div>`;
     // Vote bars
     html+=`<div style="font-size:.72rem;margin-bottom:3px">`;
@@ -88,10 +99,10 @@ export function renderGovernanceUI(){
     html+=`</div>`;
   }else{
     // Propose panel
-    html+=`<div style="color:#888;margin-bottom:8px;font-size:.75rem">No active proposal. Propose a new earmark rate:</div>`;
+    html+=`<div style="color:#888;margin-bottom:8px;font-size:.75rem">No active proposal. Propose a new redemption rate (0.1–2.0%):</div>`;
     html+=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">`;
-    html+=`<span style="color:#aaa;font-size:.8rem">Rate (%):</span>`;
-    html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${rate.toFixed(2)}" style="width:65px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
+    html+=`<span style="color:#aaa;font-size:.8rem">Redemption rate (%):</span>`;
+    html+=`<input id="gov-rate-inp" type="number" min="0.1" max="2.0" step="0.1" value="${redemptionRate.toFixed(2)}" style="width:65px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
     if(queueStake>0){
       html+=`<span style="color:#aaa;font-size:.8rem">Stake:</span>`;
       html+=`<input id="gov-propose-amt" type="number" min="1" max="${voteAvailable.toFixed(4)}" step="1" value="${voteAvailable.toFixed(1)}" style="width:65px;background:#111;border:1px solid #5A3A80;color:#eee;padding:3px;font-family:monospace;border-radius:3px">`;
@@ -288,14 +299,18 @@ export function renderBankUI(){
     const syn=pos.collateral==='spacebucks'?'alUSD':'alETH';
     const icon=pos.collateral==='spacebucks'?'🪙':'💀';
     const claimable=pos.debt<=0.001;
-    const interest=pos.interestAccrued||0;
-    const totalClaim=pos.deposited+interest;
-    const interestStr=interest>0?`<span style="color:#FFD700;font-size:.72rem"> + ${interest} ${icon} interest</span>`:'';
+    // pos.deposited is a float that grows via yield and shrinks via redemption each tick
+    const depositDisplay=pos.deposited.toFixed(2);
+    const claimAmt=Math.floor(pos.deposited);
+    const yRate=(G.yieldRate||0.002)*100;
+    const rRate=(G.redemptionRate||0.005)*100;
+    const netPctPerTick=claimable?`+${yRate.toFixed(1)}%/tick`:`${(yRate-rRate).toFixed(2)}%/tick net`;
+    const netColor=claimable?'#4CAF50':(yRate>=rRate?'#4CAF50':'#FF8800');
     posHTML+=`<div class="bank-pos">
-      <b>${colLabel}</b> deposited: ${pos.deposited} | borrowed: ${pos.borrowed.toFixed(2)} ${syn} | debt: ${pos.debt.toFixed(2)} ${syn}<br>
+      <b>${colLabel}</b> deposited: <span style="color:#4FC3F7">${depositDisplay}</span> <span style="color:${netColor};font-size:.7rem">(${netPctPerTick})</span> | borrowed: ${pos.borrowed.toFixed(2)} ${syn} | debt: <span style="color:${pos.debt>0.001?'#FF8800':'#4CAF50'}">${pos.debt.toFixed(2)}</span> ${syn}<br>
       <div class="bank-bar"><div class="bank-bar-fill" style="width:${pct}%"></div></div>
       <span style="font-size:.75rem">${pct}% repaid</span>
-      ${claimable?`${interestStr}<button onclick="claimBankPosition(${i})" style="background:#4CAF50;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${totalClaim} ${icon}</button>`:''}
+      ${claimable?`<button onclick="claimBankPosition(${i})" style="background:#4CAF50;color:#000;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:8px">✓ CLAIM ${claimAmt} ${icon}</button>`:''}
     </div>`;
   });
   const active=G.bankPositions.filter(p=>!p.claimed);
@@ -1476,11 +1491,12 @@ export const HELP_PAGES=[
   <ol style="margin:0;padding-left:18px">
     <li>Deposit <b>🪙 Spacebucks</b> as collateral → borrow up to <b>90%</b> as <b>◈ alUSD</b></li>
     <li>Deposit <b>💀 Schmeckles</b> as collateral → borrow up to <b>90%</b> as <b>⬡ alETH</b></li>
-    <li>Your debt automatically repays over time — no payments required from you</li>
+    <li>Your deposited collateral <b>grows</b> every tick (yield rate) and <b>shrinks</b> by a redemption slice sent to the transmuter while debt remains</li>
+    <li>Once debt is fully paid, only growth applies — your collateral compounds freely</li>
     <li>Once fully repaid, claim your collateral back from Banker Alyx</li>
   </ol>
 </div>
-<p>These are <b>self-repaying</b> loans — the debt shrinks on its own each game tick. You can never be liquidated.</p>
+<p>These are <b>self-repaying</b> loans. Each tick: your collateral grows by the <b style="color:#4FC3F7">yield rate</b>, then a <b style="color:#FF8800">redemption slice</b> is physically taken from your collateral and sent to the transmuter — reducing both your deposit and your debt by the same amount. Once debt reaches zero, only the yield applies: your collateral grows freely. You can never be liquidated.</p>
 <p style="color:#888;font-size:.78rem;margin-top:6px">💡 Use borrowed alUSD/alETH to buy gear in the Marketplace, deposit into the Transmuter for yield, or swap at the Exchange. The collateral stays locked until the loan is repaid.</p>
 `
   },

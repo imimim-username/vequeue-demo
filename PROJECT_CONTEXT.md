@@ -130,6 +130,47 @@ Key fields to know:
 
 ---
 
+## Bank & Transmuter Mechanic
+
+The bank and transmuter implement a simplified but faithful model of Alchemix v3's self-repaying loan system.
+
+### Bank (Banker Alyx NPC)
+- Player deposits **Spacebucks** or **Schmeckles** as collateral
+- Receives **alUSD** or **alETH** synthetics at 90% LTV (borrow = floor(deposit × 0.9))
+- Position stored as `{ collateral, deposited, borrowed, debt, claimed }`
+
+### Two-Rate Tick (every 5 minutes, server-side)
+
+Every tick, two rates act on **every unclaimed position**:
+
+| Rate | Value | When | Effect on `pos.deposited` |
+|------|-------|------|--------------------------|
+| **Yield rate** (`YIELD_RATE`) | 0.2%/tick (hardcoded) | Always | `deposited *= (1 + YIELD_RATE)` — grows |
+| **Redemption rate** (`REDEMPTION_RATE_LIVE`) | 0.5%/tick default (governance) | While `debt > 0` | `slice = min(REDEMPTION_RATE * deposited, debt)` taken from `deposited` and sent to transmuter — shrinks |
+
+**Key properties:**
+- `pos.deposited` is a **live float** — it grows and shrinks on every tick
+- `pos.debt` decreases by the same `slice` amount as `pos.deposited` (1:1 relationship)
+- Net change to `deposited` while repaying: `(YIELD_RATE − REDEMPTION_RATE) × deposited` per tick
+  - At defaults (0.2% yield, 0.5% redemption): **−0.3%/tick net** while debt exists
+- Once `debt = 0`: only yield applies — `deposited` compounds at +0.2%/tick
+- Claiming: player receives `Math.floor(pos.deposited)` collateral back
+
+### Transmuter (Transmuter Mira NPC)
+- Players deposit **alUSD** or **alETH** synthetics
+- Each tick, the collateral slices redeemed from bank positions flow into the transmuter pool
+- Transmuter depositors receive their **pro-rata share** of the pool each tick
+- 0.5% borrower redemption fee on each slice → goes to treasury
+- Early exit from transmuter: 10% fee on unconverted balance
+
+### Governance
+- Governance proposals change `REDEMPTION_RATE_LIVE` (0.1%–2.0%)
+- Higher redemption rate = faster debt payoff + more yield for transmuter depositors
+- Yield rate is hardcoded (not governance-controlled in v1)
+- Rate persisted in `governance.json` across server restarts
+
+---
+
 ## Item System
 
 ### Durability
@@ -175,6 +216,27 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 - Fast-exit button appears when in exit queue
 - `doFastExit(fee)` deducts ALCX, emits `queue_fast_exit`
 - 1-second interval refreshes countdown when served: `setInterval(…, 1000)`
+
+---
+
+## 2026-04-08 — `v=20260408a` — two-rate bank/transmuter mechanic + mobile input fix
+
+**Bank mechanic overhaul — yield rate + redemption rate:**
+- Replaced single `EARMARK_RATE_LIVE` (which reduced debt abstractly) with two distinct rates:
+  - **Yield rate** (0.2%/tick, hardcoded): `pos.deposited` grows every tick, always, even while debt exists
+  - **Redemption rate** (0.5%/tick default, governance-controlled): a physical slice of `pos.deposited` is taken and sent to the transmuter pool each tick while debt > 0. Both `pos.deposited` and `pos.debt` shrink by the same slice.
+- `pos.deposited` is now a live float — players see it changing each tick in the bank UI
+- `bank_claim` returns `Math.floor(pos.deposited)` — no separate `interestAccrued` field needed
+- Net effect during repayment: −0.3%/tick on deposit (at defaults). After payoff: +0.2%/tick compound growth
+- Transmuter distribution unchanged: redeemed collateral distributed pro-rata to all transmuter depositors each tick
+- Governance UI updated: shows both rates and net effect; proposal language changed from "earmark rate" to "redemption rate"
+- Bank position UI: shows live deposited float, yield/redemption rate labels, debt in orange/green
+- Admin panel: renamed "Earmark Rate" → "Redemption Rate", added Yield Rate stat card
+- `governance.json` now persists `redemptionRate` key (with `earmarkRate` as fallback for old data)
+
+**Mobile input fix:**
+- Global `keydown` listener now skips all game hotkeys when an `INPUT`/`TEXTAREA`/`SELECT` is focused
+- Fixes `e` and `t` keys being swallowed on iOS register/login screen
 
 ---
 
@@ -324,7 +386,7 @@ Tapping a bag item (slots 2–7) selects it (`G._bagMenuIdx = i`). An action she
 - [ ] World loot cleanup (server-side expiry for dropped items)
 - [ ] Raft/forest biome expansion (new map areas reachable only by water/forest)
 - [ ] Mobile HUD sizing pass (action sheet, shop, inventory on small screens)
-- [x] ~~Governance proposal voting mini-game~~ (implemented: ALCX-weighted vote, earmark rate proposals)
+- [x] ~~Governance proposal voting mini-game~~ (implemented: ALCX-weighted vote, redemption rate proposals)
 - [x] ~~Mobile layout polish~~ (battle buttons fixed, audio unlock fixed, Apr 2026)
 - [x] ~~Currency exchange~~ (implemented: Exchanger Rex, 0.3% fee, all token pairs)
 

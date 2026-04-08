@@ -43,7 +43,8 @@ export const G = {
   zoneSeniority:0,      // 5-min intervals spent in marketplace/treasury without leaving
   govProposals:[],      // active governance proposals
   govHistory:[],        // settled proposals (newest last)
-  earmarkRate:0.005,    // current earmark rate (from server)
+  redemptionRate:0.005, // % of deposited collateral sent to transmuter per tick (governance-controlled)
+  yieldRate:0.002,      // % by which deposited collateral grows per tick (hardcoded)
   alcxVoteLock:0,       // ALCX locked in active governance vote (inaccessible)
   govQuorum:50,         // quorum required for a valid proposal result
   battle:null,          // active battle state or null

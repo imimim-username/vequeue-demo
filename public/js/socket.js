@@ -151,10 +151,13 @@ export function initSocket(){
 
   // Global bank redemption: server updated our positions
   socket.on('bank_positions_updated',data=>{
+    const prevPositions=G.bankPositions||[];
     G.bankPositions=data.bankPositions;
-    G.bankPositions.forEach(pos=>{
-      if(pos.debt<=0.001&&!pos.claimed){
-        chatLog(`✨ Bank position fully repaid! Visit Banker Alyx to claim your ${pos.collateral==='spacebucks'?'Spacebucks':'Schmeckles'}.`,'#FFD700');
+    G.bankPositions.forEach((pos,i)=>{
+      const prev=prevPositions[i];
+      const justRepaid=pos.debt<=0.001&&!pos.claimed&&(prev?.debt>0.001);
+      if(justRepaid){
+        chatLog(`✨ Bank position fully repaid! Collateral is now growing at ${((G.yieldRate||0.002)*100).toFixed(1)}%/tick. Visit Banker Alyx to claim.`,'#FFD700');
         SFX.coin();
       }
     });
@@ -344,7 +347,8 @@ export function initSocket(){
     // ── Governance ────────────────────────────────────────────────────────────
     socket.on('gov_state',data=>{
       G.govProposals=data.proposals||[];
-      G.earmarkRate=data.earmarkRate||0.005;
+      G.redemptionRate=data.redemptionRate??data.earmarkRate??0.005; // earmarkRate fallback for old servers
+      G.yieldRate=data.yieldRate??0.002;
       if(data.quorum!=null)G.govQuorum=data.quorum;
       if(data.history!=null)G.govHistory=data.history;
       // Sync vote-committed amount from server on join/reconnect

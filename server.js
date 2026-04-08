@@ -90,9 +90,14 @@ let govHistory=(_govState.history||[]).slice(-20); // keep last 20 settled propo
 // Persist idSeq so proposal IDs are unique across server restarts
 let _govIdSeq=Math.max(1,(_govState.idSeq||1),(govProposals.reduce((m,p)=>Math.max(m,p.id||0),0)+1));
 function saveGov(){
-  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory,earmarkRate:EARMARK_RATE_LIVE}),'utf8');}catch(e){}
+  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory,redemptionRate:REDEMPTION_RATE_LIVE}),'utf8');}catch(e){}
 }
-let EARMARK_RATE_LIVE=_govState.earmarkRate||0.005; // persist across restarts
+// Redemption rate: % of deposited collateral physically sent to the transmuter each tick (while debt > 0).
+// Governance-controlled; persisted across restarts.
+let REDEMPTION_RATE_LIVE=_govState.redemptionRate||_govState.earmarkRate||0.005;
+// Yield rate: % by which deposited collateral grows every tick, always (even while debt exists).
+// Hardcoded — not governance-controlled in v1.
+const YIELD_RATE=0.002; // 0.2% per 5-min tick
 const VOTE_DURATION_MS=24*60*60*1000; // 24-hour voting epoch
 const VOTE_QUORUM=50; // minimum total ALCX weight for a valid result
 
@@ -111,7 +116,7 @@ function getAvailableAlcx(accountId){
   return Math.max(0,parseFloat((total-getVoteLocked(accountId)).toFixed(4)));
 }
 
-function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,history:govHistory});}
+function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,quorum:VOTE_QUORUM,history:govHistory});}
 // Check vote outcomes every 60s
 setInterval(()=>{
   const now=Date.now();let changed=false;
@@ -121,13 +126,13 @@ setInterval(()=>{
     let outcome,outcomeMsg;
     if(totalWeight<VOTE_QUORUM){
       p.passed=false;outcome='quorum_fail';
-      outcomeMsg=`❌ Proposal #${p.id} FAILED — quorum not reached (${totalWeight.toFixed(1)} / ${VOTE_QUORUM} ALCX). Earmark rate unchanged.`;
+      outcomeMsg=`❌ Proposal #${p.id} FAILED — quorum not reached (${totalWeight.toFixed(1)} / ${VOTE_QUORUM} ALCX). Redemption rate unchanged.`;
     }else if(p.yesWeight>p.noWeight){
-      p.passed=true;EARMARK_RATE_LIVE=p.value;outcome='passed';
-      outcomeMsg=`✅ Proposal #${p.id} PASSED (${totalWeight.toFixed(1)} ALCX)! Earmark rate → ${(p.value*100).toFixed(2)}% (proposed by ${p.proposerName})`;
+      p.passed=true;REDEMPTION_RATE_LIVE=p.value;outcome='passed';
+      outcomeMsg=`✅ Proposal #${p.id} PASSED (${totalWeight.toFixed(1)} ALCX)! Redemption rate → ${(p.value*100).toFixed(2)}% (proposed by ${p.proposerName})`;
     }else{
       p.passed=false;outcome='failed';
-      outcomeMsg=`❌ Proposal #${p.id} FAILED (${p.yesWeight.toFixed(1)} YES vs ${p.noWeight.toFixed(1)} NO). Earmark rate stays at ${(EARMARK_RATE_LIVE*100).toFixed(2)}%.`;
+      outcomeMsg=`❌ Proposal #${p.id} FAILED (${p.yesWeight.toFixed(1)} YES vs ${p.noWeight.toFixed(1)} NO). Redemption rate stays at ${(REDEMPTION_RATE_LIVE*100).toFixed(2)}%.`;
     }
     io.emit('chat',{nickname:'⚗ Governance',text:outcomeMsg});
     // Record in history for governance panel display
@@ -504,7 +509,7 @@ io.on('connection',socket=>{
       d.spacebucks=Math.floor((d.spacebucks||0)-amt);
       d.alUSD=parseFloat(((d.alUSD||0)+borrow).toFixed(2));
       d.bankPositions=d.bankPositions||[];
-      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
+      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,claimed:false});
       saveDb();
       socket.emit('bank_borrow_result',{ok:true,spacebucks:d.spacebucks,alUSD:d.alUSD,bankPositions:d.bankPositions});
     }else if(collateral==='schmeckles'){
@@ -513,7 +518,7 @@ io.on('connection',socket=>{
       d.schmeckles=Math.floor((d.schmeckles||0)-amt);
       d.alETH=parseFloat(((d.alETH||0)+borrow).toFixed(4));
       d.bankPositions=d.bankPositions||[];
-      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,earmarked:0,claimed:false});
+      d.bankPositions.push({collateral,deposited:amt,borrowed:borrow,debt:borrow,claimed:false});
       saveDb();
       socket.emit('bank_borrow_result',{ok:true,schmeckles:d.schmeckles,alETH:d.alETH,bankPositions:d.bankPositions});
     }else{
@@ -529,9 +534,9 @@ io.on('connection',socket=>{
     const idx=parseInt(data.idx);
     const pos=d.bankPositions[idx];
     if(!pos||pos.debt>0.001||pos.claimed)return socket.emit('bank_claim_result',{ok:false,error:'Position not claimable.'});
-    const interest=pos.interestAccrued||0;
-    const total=Math.floor(pos.deposited+interest);
-    pos.claimed=true;pos.interestAccrued=0;
+    // pos.deposited already reflects all yield growth from ticks — just floor for integer claim
+    const total=Math.floor(pos.deposited);
+    pos.claimed=true;
     if(pos.collateral==='spacebucks')d.spacebucks=Math.floor((d.spacebucks||0)+total);
     else d.schmeckles=Math.floor((d.schmeckles||0)+total);
     saveDb();
@@ -722,7 +727,7 @@ io.on('connection',socket=>{
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
-    socket.emit('gov_state',{proposals:govProposals,earmarkRate:EARMARK_RATE_LIVE,quorum:VOTE_QUORUM,history:govHistory,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
+    socket.emit('gov_state',{proposals:govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,quorum:VOTE_QUORUM,history:govHistory,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
     // Send active world event to new joiner
     if(worldEvent&&Date.now()<worldEvent.endsAt){
       socket.emit('world_event_start',worldEvent);
@@ -1025,7 +1030,7 @@ io.on('connection',socket=>{
       return socket.emit('gov_result',{ok:false,error:`Vote amount must be 1–${maxVote.toFixed(1)} (your uncommitted queue stake).`});
     acctData.alcxVoteLocks=acctData.alcxVoteLocks||{};
     const p={
-      id:_govIdSeq++,type:'earmark_rate',value:rate,
+      id:_govIdSeq++,type:'redemption_rate',value:rate,
       proposerName:pdb[socket.accountId].username||socket.accountId,
       yesWeight:voteAmt,noWeight:0,
       votes:{[socket.accountId]:{weight:voteAmt,choice:'yes'}},
@@ -1033,7 +1038,7 @@ io.on('connection',socket=>{
     };
     acctData.alcxVoteLocks[p.id]=voteAmt;
     govProposals.push(p);saveGov();saveDb();broadcastGovState();
-    io.emit('chat',{nickname:'⚗ Governance',text:`📜 ${p.proposerName} proposes earmark rate → ${(rate*100).toFixed(2)}% (${voteAmt.toFixed(1)} ALCX staked). 24h vote — need ${VOTE_QUORUM} ALCX quorum.`});
+    io.emit('chat',{nickname:'⚗ Governance',text:`📜 ${p.proposerName} proposes redemption rate → ${(rate*100).toFixed(2)}% (${voteAmt.toFixed(1)} ALCX staked). 24h vote — need ${VOTE_QUORUM} ALCX quorum.`});
     socket.emit('gov_result',{ok:true,proposed:true,proposalId:p.id,lockedAlcx:voteAmt});
   });
 
@@ -1138,58 +1143,75 @@ io.on('connection',socket=>{
   });
 });
 
-// ── Global Transmuter Redemption + Interest (every 5 min) ────────────────────
-// At default earmark rate 0.5%/tick: debt half-life ≈ 11 hours, full payoff ≈ 3 days.
-// POST_REPAY_INTEREST: 0.1%/tick accrued on deposited collateral once debt = 0.
+// ── Global Transmuter Redemption + Yield (every 5 min) ───────────────────────
+//
+// Two distinct rates govern each bank position each tick:
+//
+//   YIELD_RATE       (constant, 0.2%/tick):
+//     pos.deposited grows by this % every tick — always, regardless of debt.
+//     This represents the yield the collateral is earning.
+//
+//   REDEMPTION_RATE_LIVE  (governance-controlled, default 0.5%/tick):
+//     While debt > 0: a slice of pos.deposited is physically taken and sent
+//     to the transmuter pool. Both pos.deposited and pos.debt decrease by the
+//     same slice amount. Once debt = 0, redemption stops; only yield applies.
+//
+// Net effect on deposited while debt > 0:
+//   Δ deposited = (+YIELD_RATE − REDEMPTION_RATE_LIVE) × deposited per tick
+//   At defaults (0.2% yield, 0.5% redemption): net −0.3%/tick during repayment.
+//   After debt clears: net +0.2%/tick, compounding.
+//
+// What flows to the transmuter: the net slice (after 0.5% borrower fee) is
+// distributed pro-rata across all transmuter depositors that tick.
+//
 const TRANSMUTER_TICK_MS=5*60*1000; // 5 minutes
-const POST_REPAY_INTEREST=0.001;    // 0.1% of deposited per tick on paid-off positions
+
 setInterval(()=>{
-  // 1. Compute total system debt across all accounts
-  let totalDebt=0;
-  Object.values(pdb).forEach(acct=>{
-    (acct.data?.bankPositions||[]).forEach(p=>{if(!p.claimed&&p.debt>0.001)totalDebt+=p.debt;});
-  });
-
-  // 2. Earmark + redeem per position, collect collateral (only when debt exists)
   let sbRedeemed=0,ethRedeemed=0;
-  if(totalDebt>0){
-    Object.entries(pdb).forEach(([id,acct])=>{
-      if(!acct.data?.bankPositions)return;
-      acct.data.bankPositions.forEach(pos=>{
-        if(pos.claimed||pos.debt<=0.001)return;
-        const redeem=EARMARK_RATE_LIVE*pos.debt;
-        pos.debt=Math.max(0,pos.debt-redeem);
-        pos.earmarked=0;
-        const net=redeem*(1-0.005); // 0.5% borrower redemption fee
-        const redemptionFee=redeem-net;
-        if(pos.collateral==='spacebucks'){sbRedeemed+=net;treasury.alUSD=parseFloat((treasury.alUSD+redemptionFee).toFixed(2));}
-        else{ethRedeemed+=net;treasury.alETH=parseFloat((treasury.alETH+redemptionFee).toFixed(4));}
-        if(pos.debt<=0.001)pos.debt=0;
-      });
-      // Push updated positions to connected player (debt repayment pass)
-      const sid=socketsByAccount[id];
-      if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
-    });
-    if(sbRedeemed>0||ethRedeemed>0)broadcastTreasury();
-  }
 
-  // 3. Accrue interest on fully-repaid, unclaimed positions (runs every tick)
+  // ── Per-account: apply yield then redemption ──────────────────────────────
   Object.entries(pdb).forEach(([id,acct])=>{
     if(!acct.data?.bankPositions)return;
-    let accrued=false;
+    let changed=false;
+
     acct.data.bankPositions.forEach(pos=>{
-      if(pos.claimed||pos.debt>0.001)return; // skip active-debt and claimed positions
-      // Floor to whole units — collateral is always integer (Spacebucks/Schmeckles)
-      const interest=Math.floor(pos.deposited*POST_REPAY_INTEREST);
-      if(interest>0){pos.interestAccrued=(pos.interestAccrued||0)+interest;accrued=true;}
+      if(pos.claimed)return;
+
+      // 1. Yield: deposited grows every tick regardless of debt
+      pos.deposited=pos.deposited*(1+YIELD_RATE);
+      changed=true;
+
+      // 2. Redemption: only while debt remains
+      if(pos.debt>0.001){
+        // Slice is taken from the (now-grown) deposited amount, capped at debt
+        const slice=Math.min(REDEMPTION_RATE_LIVE*pos.deposited,pos.debt);
+        pos.deposited=Math.max(0,pos.deposited-slice);
+        pos.debt=Math.max(0,pos.debt-slice);
+
+        // 0.5% borrower redemption fee goes to treasury; rest to transmuter pool
+        const fee=slice*0.005;
+        const net=slice-fee;
+        if(pos.collateral==='spacebucks'){
+          sbRedeemed+=net;
+          treasury.alUSD=parseFloat((treasury.alUSD+fee).toFixed(2));
+        }else{
+          ethRedeemed+=net;
+          treasury.alETH=parseFloat((treasury.alETH+fee).toFixed(4));
+        }
+        if(pos.debt<=0.001)pos.debt=0;
+      }
     });
-    if(accrued){
+
+    // Push updated positions to the connected player every tick
+    if(changed){
       const sid=socketsByAccount[id];
       if(sid)io.to(sid).emit('bank_positions_updated',{bankPositions:acct.data.bankPositions});
     }
   });
 
-  // 4. Distribute pro-rata to transmuter depositors (only when collateral was redeemed)
+  if(sbRedeemed>0||ethRedeemed>0)broadcastTreasury();
+
+  // ── Distribute redeemed collateral pro-rata to transmuter depositors ──────
   if(sbRedeemed>0||ethRedeemed>0){
     let totalTrAlUSD=0,totalTrAlETH=0;
     Object.values(pdb).forEach(acct=>{
@@ -1204,11 +1226,11 @@ setInterval(()=>{
       acct.data.transmuterDeposits.forEach(dep=>{
         if(dep.type==='alUSD'&&dep.amount>0.001&&totalTrAlUSD>0){
           const recv=Math.min(dep.amount,sbRedeemed*(dep.amount/totalTrAlUSD));
-          dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); sbPayout+=recv;
+          dep.available=(dep.available||0)+recv;dep.amount=Math.max(0,dep.amount-recv);sbPayout+=recv;
         }
         if(dep.type==='alETH'&&dep.amount>0.001&&totalTrAlETH>0){
           const recv=Math.min(dep.amount,ethRedeemed*(dep.amount/totalTrAlETH));
-          dep.available=(dep.available||0)+recv; dep.amount=Math.max(0,dep.amount-recv); schmPayout+=recv;
+          dep.available=(dep.available||0)+recv;dep.amount=Math.max(0,dep.amount-recv);schmPayout+=recv;
         }
       });
       if(sbPayout>0||schmPayout>0){
@@ -1219,7 +1241,12 @@ setInterval(()=>{
   }
 
   saveDb();
-  if(totalDebt>0)console.log(`[Transmuter] Redeemed ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH from ${totalDebt.toFixed(2)} total system debt`);
+  const totalDebt=Object.values(pdb)
+    .flatMap(a=>a.data?.bankPositions||[])
+    .filter(p=>!p.claimed&&p.debt>0.001)
+    .reduce((s,p)=>s+p.debt,0);
+  if(sbRedeemed>0||ethRedeemed>0||totalDebt>0)
+    console.log(`[Transmuter] tick — yield:${(YIELD_RATE*100).toFixed(1)}%/tick redeem:${(REDEMPTION_RATE_LIVE*100).toFixed(1)}%/tick — sent ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH to transmuter — remaining system debt: ${totalDebt.toFixed(2)}`);
 },TRANSMUTER_TICK_MS);
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
@@ -1242,7 +1269,7 @@ function adminState(){
       kills:row.data?.kills||0,
     })).sort((a,b)=>b.online-a.online||a.username.localeCompare(b.username)),
     treasury,hallOfFame,
-    govProposals,earmarkRate:EARMARK_RATE_LIVE,
+    govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,
     lootTtlMin:Math.round(LOOT_TTL_MS/60000),
     snowballChance:SNOWBALL_SPAWN_CHANCE,
     whaleChance:WHALE_CHANCE,
@@ -1286,11 +1313,17 @@ adminNs.on('connection',socket=>{
     socket.emit('admin_msg',{ok:true,msg:'Broadcast sent.'});
   });
 
-  socket.on('admin_set_earmark',({rate})=>{
+  socket.on('admin_set_earmark',({rate})=>{ // legacy alias
     const r=parseFloat(rate);
     if(isNaN(r)||r<0.001||r>0.05)return socket.emit('admin_msg',{ok:false,msg:'Rate must be 0.1–5%.'});
-    EARMARK_RATE_LIVE=r;saveGov();broadcastGovState();
-    socket.emit('admin_msg',{ok:true,msg:`Earmark rate → ${(r*100).toFixed(2)}% (saved)`});
+    REDEMPTION_RATE_LIVE=r;saveGov();broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Redemption rate → ${(r*100).toFixed(2)}% (saved)`});
+  });
+  socket.on('admin_set_redemption',({rate})=>{
+    const r=parseFloat(rate);
+    if(isNaN(r)||r<0.001||r>0.05)return socket.emit('admin_msg',{ok:false,msg:'Rate must be 0.1–5%.'});
+    REDEMPTION_RATE_LIVE=r;saveGov();broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Redemption rate → ${(r*100).toFixed(2)}% (saved)`});
   });
 
   socket.on('admin_set_loot_ttl',({minutes})=>{
