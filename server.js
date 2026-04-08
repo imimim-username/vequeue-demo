@@ -661,11 +661,11 @@ io.on('connection',socket=>{
     const src=data?.source||'zone';
     if(src==='zone'){
       if(!['marketplace','treasury','gov_chamber'].includes(p.zone))return;
-      // Throttle: min 4s between zone yields (client fires every ~5s)
-      if(d._lastZoneYield&&now-d._lastZoneYield<4000)return;
+      // Throttle: min 5 min between zone yields — ALCX is scarce
+      if(d._lastZoneYield&&now-d._lastZoneYield<300000)return;
       d._lastZoneYield=now;
       const seniority=Math.max(0,parseInt(d.zoneSeniority||0));
-      const drip=1+Math.floor(seniority/3);
+      const drip=1+Math.floor(seniority/10); // seniority bonus much slower than before
       d.alcx=parseFloat(((d.alcx||0)+drip).toFixed(4));
       saveDb();
       socket.emit('alcx_yield',{amount:drip,seniority,source:'zone'});
@@ -673,7 +673,8 @@ io.on('connection',socket=>{
       // Queue patience yield: must actually be in a queue
       const inQ=QUEUE_ZONES.some(z=>queues[z].entry.entries.find(e=>e.id===socket.id)||queues[z].exit.entries.find(e=>e.id===socket.id));
       if(!inQ)return;
-      if(d._lastQueueYield&&now-d._lastQueueYield<8000)return;
+      // Throttle: min 2 min between queue yields
+      if(d._lastQueueYield&&now-d._lastQueueYield<120000)return;
       d._lastQueueYield=now;
       d.alcx=parseFloat(((d.alcx||0)+1).toFixed(4));
       saveDb();
@@ -707,7 +708,7 @@ io.on('connection',socket=>{
     // first save_character call cannot seed the account with free currency.
     const existing=pdb[socket.accountId].data||{};
     // Currencies & positions: use existing value OR a safe zero/empty default.
-    const CURRENCY_DEFAULTS={spacebucks:0,schmeckles:0,alUSD:0,alETH:0,alcx:0,lockedAlcx:0};
+    const CURRENCY_DEFAULTS={spacebucks:0,schmeckles:0,alUSD:0,alETH:0,alcx:10,lockedAlcx:0};
     const ARRAY_DEFAULTS={bankPositions:[],transmuterDeposits:[]};
     Object.keys(CURRENCY_DEFAULTS).forEach(f=>{data[f]=(f in existing)?existing[f]:CURRENCY_DEFAULTS[f];});
     Object.keys(ARRAY_DEFAULTS).forEach(f=>{data[f]=(f in existing)?existing[f]:ARRAY_DEFAULTS[f];});

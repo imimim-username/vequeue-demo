@@ -10,7 +10,7 @@ export const CFG = {
   SPEED:2.2,             // player speed px/frame
   START_SPACEBUCKS:100,
   START_ALUSD:50,
-  START_ALCX:50,
+  START_ALCX:10,
   MAX_HP:10,
   KONAMI:[38,38,40,40,37,39,37,39,66,65],
 };
@@ -156,13 +156,13 @@ export const ENEMIES = {
   },
   darkKnight: {
     type:'darkKnight', name:'Dark Knight', maxHp:28, atk:7, def:5, spd:2,
-    xp:40, drops:{schmeckles:2},
+    xp:40, drops:{schmeckles:1},
     physWeakness:1.0, magicWeakness:0.7, holyWeakness:1.5,  // holy punishes the corrupted
     msg:'A Dark Knight bars your path!',
   },
   lich: {
     type:'lich', name:'Ancient Lich', maxHp:80, atk:15, def:8, spd:1,
-    xp:500, drops:{schmeckles:10},
+    xp:500, drops:{schmeckles:4},
     physWeakness:0.5, magicWeakness:1.4, holyWeakness:2.0,  // very resistant to blades
     msg:'The Ancient Lich rises from its obsidian throne!',
   },
@@ -181,20 +181,20 @@ export const ENEMIES = {
   },
   specter: {
     type:'specter', name:'Wailing Specter', maxHp:14, atk:6, def:0, spd:5,
-    xp:24, drops:{schmeckles:1},
+    xp:24, drops:{spacebucks:16},
     physWeakness:0.3, magicWeakness:1.6, holyWeakness:1.8,  // blades pass through, magic harms
     msg:'A Wailing Specter tears through the stone — it cannot be reasoned with!',
   },
   ruinGuardian: {
     type:'ruinGuardian', name:'Ruin Guardian', maxHp:38, atk:9, def:6, spd:1,
-    xp:65, drops:{schmeckles:3},
+    xp:65, drops:{schmeckles:1},
     physWeakness:1.4, magicWeakness:0.6, holyWeakness:0.8,  // stone — bludgeon it
     msg:'A Ruin Guardian awakens from ages of slumber, its stone eyes blazing!',
   },
   // ── New magical enemies ──────────────────────────────────────────────────────
   wraith: {
     type:'wraith', name:'Shadow Wraith', maxHp:18, atk:8, def:0, spd:5,
-    xp:35, drops:{schmeckles:2, alUSD:8},
+    xp:35, drops:{schmeckles:1, alUSD:8},
     physWeakness:0.25, magicWeakness:1.7, holyWeakness:2.0,  // barely touched by blades
     msg:'A Shadow Wraith tears from the darkness — blades pass through it!',
   },
@@ -206,13 +206,13 @@ export const ENEMIES = {
   },
   stoneGolem: {
     type:'stoneGolem', name:'Stone Golem', maxHp:40, atk:7, def:10, spd:1,
-    xp:60, drops:{spacebucks:30, schmeckles:2},
+    xp:60, drops:{spacebucks:35},
     physWeakness:1.5, magicWeakness:0.4, holyWeakness:0.6,  // magic slides off stone
     msg:'The earth trembles as a Stone Golem tears free of the ground!',
   },
   shadowMage: {
     type:'shadowMage', name:'Shadow Mage', maxHp:24, atk:11, def:3, spd:4,
-    xp:55, drops:{schmeckles:3, alUSD:12},
+    xp:55, drops:{schmeckles:1, alUSD:12},
     physWeakness:0.6, magicWeakness:1.3, holyWeakness:1.6,
     msg:'A Shadow Mage emerges from the dark, eyes burning with void-fire!',
   },
@@ -231,7 +231,7 @@ export const ENEMIES = {
   },
   serpentine: {
     type:'serpentine', name:'River Serpent', maxHp:32, atk:9, def:2, spd:4,
-    xp:50, drops:{schmeckles:2, alUSD:10},
+    xp:50, drops:{alUSD:10},
     physWeakness:1.0, magicWeakness:1.2, holyWeakness:1.0,
     msg:'A massive river serpent uncoils and rears its head!',
   },
@@ -244,13 +244,13 @@ export const ENEMIES = {
   },
   forestWarden: {
     type:'forestWarden', name:'Forest Warden', maxHp:28, atk:8, def:5, spd:3,
-    xp:48, drops:{schmeckles:2, spacebucks:20},
+    xp:48, drops:{spacebucks:28},
     physWeakness:1.2, magicWeakness:0.9, holyWeakness:1.0,
     msg:'A Forest Warden drops from the canopy, guardian of these ancient woods!',
   },
   thornBeast: {
     type:'thornBeast', name:'Thorn Beast', maxHp:35, atk:10, def:6, spd:2,
-    xp:70, drops:{schmeckles:4, alUSD:15},
+    xp:70, drops:{schmeckles:2, alUSD:15},
     physWeakness:1.4, magicWeakness:0.6, holyWeakness:1.1,
     msg:'A Thorn Beast tears through the underbrush, hide bristling with spines!',
   },
