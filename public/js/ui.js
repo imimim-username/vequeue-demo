@@ -82,7 +82,7 @@ export function renderGovernanceUI(){
   html+=`<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:1px">`;
   html+=`<span style="color:#aaa">Net SCH while repaying</span><b style="color:${schNetColor}">${schNetRate>=0?'+':''}${schNetRate.toFixed(3)}%/tick</b>`;
   html+=`</div>`;
-  html+=`<div style="color:#555;font-size:.63rem;margin-top:4px">Yield rates drift independently each tick. If redemption rate > yield, deposit shrinks while debt is outstanding. Visit Actuary Venn in the Treasury to simulate your position.</div>`;
+  html+=`<div style="color:#555;font-size:.63rem;margin-top:4px">Yield rates drift independently each tick. If redemption rate > yield, deposit shrinks while debt is outstanding. Visit Actuary Venn in the Governance Hall to simulate your position.</div>`;
   html+=`</div>`;
 
   // Voting stake status panel

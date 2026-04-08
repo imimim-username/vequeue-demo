@@ -697,7 +697,7 @@ export const NPCS = {
         "It sounds simple, but you'd be amazed how revolutionary that idea actually is.",
       ]
     },
-    {type:'wizard',face:2,name:'Governance Board',x:14,y:6,
+    {type:'wizard',face:2,name:'Governance Board',x:8,y:7,
      dialog:[
        'You can read proposals and history here.',
        'To vote, you need ALCX locked while inside the veQueue district.',
