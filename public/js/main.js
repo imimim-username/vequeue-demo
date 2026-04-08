@@ -34,6 +34,8 @@ import {
   showHelp, helpNav, closeHelp,
   // HUD / menus
   togglePause,
+  // Simulator (Actuary Venn)
+  openSimulator, closeSimulator, simUpdate, simYieldChange, simRedeemChange, simReset,
   // Inventory stat buttons
 } from './ui.js';
 
@@ -65,4 +67,6 @@ Object.assign(window, {
   spendStat, refundStat,
   // Audio
   toggleMute, toggleMuteMusic,
+  // Simulator (Actuary Venn)
+  openSimulator, closeSimulator, simUpdate, simYieldChange, simRedeemChange, simReset,
 });

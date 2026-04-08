@@ -846,8 +846,17 @@ export const NPCS = {
       dialog:[
         "The Governance Chamber is just through the east door.",
         "Bring your queue-locked ALCX — vote weight equals how much you locked when you joined.",
-        "Current vote: earmark rate, which controls how quickly Alchemix loans self-repay.",
+        "Current vote: redemption rate, which controls how quickly Alchemix loans self-repay.",
       ]
+    },
+    { id:'actuary_venn', x:10, y:9, type:'wizard', face:0, name:'Actuary Venn',
+      dialog:[
+        "Ah, a curious soul! I model the flows of collateral through the Alchemix system.",
+        "The yield rate determines how fast your deposited collateral grows each tick.",
+        "The redemption rate determines how quickly a slice of your deposit is sent to the Transmuter, paying down your debt.",
+        "Talk to me again to open my collateral simulator — plug in some numbers and see how your position evolves.",
+      ],
+      simulator:true
     },
   ],
   gov_chamber:[
@@ -855,7 +864,7 @@ export const NPCS = {
       dialog:[
         'Cast your ALCX-weighted vote on protocol parameters.',
         'Your vote weight is the ALCX you locked when entering the veQueue.',
-        'Current vote: earmark rate — the % of debt repaid per 5-minute tick.',
+        'Current vote: redemption rate — the % of collateral sent to the Transmuter per tick.',
         'Quorum requires 50 ALCX total weight. Once met, the winning side sets the rate.',
       ],
       govBoard:true
@@ -864,7 +873,7 @@ export const NPCS = {
       dialog:[
         'Welcome to the Governance Chamber — the voting hall of the veQueue district.',
         'Only citizens with queue-locked ALCX may cast votes. Your lock amount is your voice.',
-        'Proposals set the earmark rate: the share of loan principal repaid each tick.',
+        'Proposals set the redemption rate: the % of collateral redirected to the Transmuter each tick.',
         'History of past votes is visible on the Governance Board.',
       ]
     },

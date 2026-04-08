@@ -111,28 +111,53 @@ textarea{background:#111;border:1px solid #5A3A80;color:#eee;padding:8px;border-
         <button class="btn btn-purple" onclick="setEarmark()">Set</button>
       </div>
       <div style="border:1px solid #2A1A40;border-radius:6px;padding:10px;margin-bottom:10px">
-        <div style="color:#4FC3F7;font-size:.8rem;font-weight:bold;margin-bottom:8px">📈 Yield Rate (YIELD_RATE_LIVE) — Variable</div>
+        <div style="color:#4FC3F7;font-size:.8rem;font-weight:bold;margin-bottom:8px">🪙 SB Yield Rate (SB_YIELD_RATE_LIVE) — Spacebucks / alUSD</div>
         <div class="config-row">
-          <label>Current Yield Rate</label>
-          <input type="number" id="cfg-yield-rate" min="0.01" max="2.0" step="0.01" value="0.20">
-          <span style="color:#888;font-size:.72rem">%/tick (0.01–2.0) — manual override</span>
-          <button class="btn btn-purple" onclick="setYieldRate()">Set</button>
+          <label>SB Current Rate</label>
+          <input type="number" id="cfg-sb-yield-rate" min="0.01" max="2.0" step="0.01" value="0.20">
+          <span style="color:#888;font-size:.72rem">%/tick — manual override</span>
+          <button class="btn btn-purple" onclick="setSbYieldRate()">Set</button>
         </div>
         <div class="config-row">
-          <label>Yield Min</label>
-          <input type="number" id="cfg-yield-min" min="0.01" max="1.0" step="0.01" value="0.05">
-          <span style="color:#888;font-size:.72rem">%/tick — floor for drift</span>
+          <label>SB Yield Min</label>
+          <input type="number" id="cfg-sb-yield-min" min="0.01" max="1.0" step="0.01" value="0.05">
+          <span style="color:#888;font-size:.72rem">%/tick — drift floor</span>
         </div>
         <div class="config-row">
-          <label>Yield Max</label>
-          <input type="number" id="cfg-yield-max" min="0.01" max="2.0" step="0.01" value="0.50">
-          <span style="color:#888;font-size:.72rem">%/tick — ceiling for drift</span>
+          <label>SB Yield Max</label>
+          <input type="number" id="cfg-sb-yield-max" min="0.01" max="2.0" step="0.01" value="0.50">
+          <span style="color:#888;font-size:.72rem">%/tick — drift ceiling</span>
         </div>
         <div class="config-row">
-          <label>Yield Drift / Tick</label>
-          <input type="number" id="cfg-yield-drift" min="0.001" max="0.2" step="0.001" value="0.020">
+          <label>SB Drift / Tick</label>
+          <input type="number" id="cfg-sb-yield-drift" min="0.001" max="0.2" step="0.001" value="0.020">
           <span style="color:#888;font-size:.72rem">%/tick max shift (±) each tick</span>
-          <button class="btn btn-purple" onclick="setYieldParams()">Set Params</button>
+          <button class="btn btn-purple" onclick="setSbYieldParams()">Set Params</button>
+        </div>
+      </div>
+      <div style="border:1px solid #2A1A40;border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="color:#9C27B0;font-size:.8rem;font-weight:bold;margin-bottom:8px">💀 SCH Yield Rate (SCH_YIELD_RATE_LIVE) — Schmeckles / alETH</div>
+        <div class="config-row">
+          <label>SCH Current Rate</label>
+          <input type="number" id="cfg-sch-yield-rate" min="0.01" max="2.0" step="0.01" value="0.10">
+          <span style="color:#888;font-size:.72rem">%/tick — manual override</span>
+          <button class="btn btn-purple" onclick="setSchYieldRate()">Set</button>
+        </div>
+        <div class="config-row">
+          <label>SCH Yield Min</label>
+          <input type="number" id="cfg-sch-yield-min" min="0.01" max="1.0" step="0.01" value="0.03">
+          <span style="color:#888;font-size:.72rem">%/tick — drift floor</span>
+        </div>
+        <div class="config-row">
+          <label>SCH Yield Max</label>
+          <input type="number" id="cfg-sch-yield-max" min="0.01" max="2.0" step="0.01" value="0.30">
+          <span style="color:#888;font-size:.72rem">%/tick — drift ceiling</span>
+        </div>
+        <div class="config-row">
+          <label>SCH Drift / Tick</label>
+          <input type="number" id="cfg-sch-yield-drift" min="0.001" max="0.2" step="0.001" value="0.010">
+          <span style="color:#888;font-size:.72rem">%/tick max shift (±) each tick</span>
+          <button class="btn btn-purple" onclick="setSchYieldParams()">Set Params</button>
         </div>
       </div>
       <div class="config-row">
@@ -222,8 +247,9 @@ function renderDashboard(){
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-card"><div class="lbl">Online Players</div><div class="val" style="color:#4CAF50">${s.onlineCount||0}</div></div>
     <div class="stat-card"><div class="lbl">Registered Accounts</div><div class="val">${s.accountCount||0}</div></div>
-    <div class="stat-card"><div class="lbl">Redemption Rate</div><div class="val" style="color:#FF8800">${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2)}%/tick</div></div>
-    <div class="stat-card"><div class="lbl">Yield Rate</div><div class="val" style="color:#4FC3F7">${((s.yieldRate||0.002)*100).toFixed(1)}%/tick</div></div>
+    <div class="stat-card"><div class="lbl">Redemption Rate</div><div class="val" style="color:#EF5350">${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(3)}%/tick</div></div>
+    <div class="stat-card"><div class="lbl">SB Yield</div><div class="val" style="color:#4FC3F7">${((s.sbYieldRate||0.002)*100).toFixed(3)}%/tick</div></div>
+    <div class="stat-card"><div class="lbl">SCH Yield</div><div class="val" style="color:#9C27B0">${((s.schYieldRate||0.001)*100).toFixed(3)}%/tick</div></div>
     <div class="stat-card"><div class="lbl">Loot TTL</div><div class="val" style="color:#FFD700">${s.lootTtlMin||10} min</div></div>
     <div class="stat-card"><div class="lbl">Snowball Chance</div><div class="val" style="color:#FF6030">${Math.round((s.snowballChance||0.4)*100)}%</div></div>
     <div class="stat-card"><div class="lbl">Whale Chance</div><div class="val" style="color:#60AAFF">${Math.round((s.whaleChance||0.35)*100)}%</div></div>
@@ -232,7 +258,7 @@ function renderDashboard(){
   document.getElementById('treasury-display').innerHTML =
     `alUSD collected: <b>$${(t.alUSD||0).toFixed(2)}</b> &nbsp;|&nbsp; alETH collected: <b>⟠${(t.alETH||0).toFixed(4)}</b>`;
   document.getElementById('config-display').innerHTML =
-    `Redemption Rate: ${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2)}%/tick &nbsp;·&nbsp; Yield Rate: ${((s.yieldRate||0.002)*100).toFixed(1)}%/tick &nbsp;·&nbsp; Loot TTL: ${s.lootTtlMin||10}m &nbsp;·&nbsp; Snowball: ${Math.round((s.snowballChance||0.4)*100)}% &nbsp;·&nbsp; Whale: ${Math.round((s.whaleChance||0.35)*100)}%`;
+    `Redemption: ${((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(3)}%/tick &nbsp;·&nbsp; SB Yield: ${((s.sbYieldRate||0.002)*100).toFixed(3)}%/tick &nbsp;·&nbsp; SCH Yield: ${((s.schYieldRate||0.001)*100).toFixed(3)}%/tick &nbsp;·&nbsp; Loot TTL: ${s.lootTtlMin||10}m &nbsp;·&nbsp; Snowball: ${Math.round((s.snowballChance||0.4)*100)}% &nbsp;·&nbsp; Whale: ${Math.round((s.whaleChance||0.35)*100)}%`;
 }
 
 function renderPlayers(){
@@ -286,11 +312,15 @@ function renderHof(){
 function syncConfigInputs(){
   const s = state;
   const v = (id, val) => { const el=document.getElementById(id); if(el&&document.activeElement!==el) el.value=val; };
-  v('cfg-earmark',    ((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2));
-  v('cfg-yield-rate', ((s.yieldRate||0.002)*100).toFixed(3));
-  v('cfg-yield-min',  ((s.yieldRateMin||0.0005)*100).toFixed(3));
-  v('cfg-yield-max',  ((s.yieldRateMax||0.005)*100).toFixed(3));
-  v('cfg-yield-drift',((s.yieldDriftPerTick||0.0002)*100).toFixed(3));
+  v('cfg-earmark',         ((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(3));
+  v('cfg-sb-yield-rate',  ((s.sbYieldRate||0.002)*100).toFixed(3));
+  v('cfg-sb-yield-min',   ((s.sbYieldRateMin||0.0005)*100).toFixed(3));
+  v('cfg-sb-yield-max',   ((s.sbYieldRateMax||0.005)*100).toFixed(3));
+  v('cfg-sb-yield-drift', ((s.sbYieldDrift||0.0002)*100).toFixed(3));
+  v('cfg-sch-yield-rate', ((s.schYieldRate||0.001)*100).toFixed(3));
+  v('cfg-sch-yield-min',  ((s.schYieldRateMin||0.0003)*100).toFixed(3));
+  v('cfg-sch-yield-max',  ((s.schYieldRateMax||0.003)*100).toFixed(3));
+  v('cfg-sch-yield-drift',((s.schYieldDrift||0.0001)*100).toFixed(3));
   v('cfg-loot-ttl', s.lootTtlMin||10);
   v('cfg-snowball', Math.round((s.snowballChance||0.4)*100));
   v('cfg-whale', Math.round((s.whaleChance||0.35)*100));
@@ -299,12 +329,20 @@ function syncConfigInputs(){
 function kickPlayer(id){ if(confirm('Kick this player?')) socket.emit('admin_kick',{socketId:id}); }
 function deleteUser(username){ if(confirm(`Delete account "${username}"? This is permanent.`)) socket.emit('admin_delete_user',{username}); }
 function setEarmark(){ socket.emit('admin_set_earmark',{rate:parseFloat(document.getElementById('cfg-earmark').value)/100}); }
-function setYieldRate(){ socket.emit('admin_set_yield',{rate:parseFloat(document.getElementById('cfg-yield-rate').value)/100}); }
-function setYieldParams(){
-  socket.emit('admin_set_yield_params',{
-    min:parseFloat(document.getElementById('cfg-yield-min').value)/100,
-    max:parseFloat(document.getElementById('cfg-yield-max').value)/100,
-    drift:parseFloat(document.getElementById('cfg-yield-drift').value)/100,
+function setSbYieldRate(){ socket.emit('admin_set_sb_yield',{rate:parseFloat(document.getElementById('cfg-sb-yield-rate').value)/100}); }
+function setSbYieldParams(){
+  socket.emit('admin_set_sb_yield_params',{
+    min:parseFloat(document.getElementById('cfg-sb-yield-min').value)/100,
+    max:parseFloat(document.getElementById('cfg-sb-yield-max').value)/100,
+    drift:parseFloat(document.getElementById('cfg-sb-yield-drift').value)/100,
+  });
+}
+function setSchYieldRate(){ socket.emit('admin_set_sch_yield',{rate:parseFloat(document.getElementById('cfg-sch-yield-rate').value)/100}); }
+function setSchYieldParams(){
+  socket.emit('admin_set_sch_yield_params',{
+    min:parseFloat(document.getElementById('cfg-sch-yield-min').value)/100,
+    max:parseFloat(document.getElementById('cfg-sch-yield-max').value)/100,
+    drift:parseFloat(document.getElementById('cfg-sch-yield-drift').value)/100,
   });
 }
 function setLootTtl(){ socket.emit('admin_set_loot_ttl',{minutes:parseInt(document.getElementById('cfg-loot-ttl').value)}); }

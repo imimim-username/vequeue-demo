@@ -20,7 +20,8 @@ export function closeGovernance(){G.paused=false;document.getElementById('govern
 export function renderGovernanceUI(){
   const el=document.getElementById('gov-content');if(!el)return;
   const redemptionRate=(G.redemptionRate||0.005)*100;
-  const yieldRate=(G.yieldRate||0.002)*100;
+  const sbYieldRate=(G.sbYieldRate||0.002)*100;
+  const schYieldRate=(G.schYieldRate||0.001)*100;
   const quorum=G.govQuorum||50;
   const prop=G.govProposals.find(p=>p.passed===null);
   // Voting stake = ALCX locked inside a veQueue zone (queue entry stake)
@@ -28,38 +29,60 @@ export function renderGovernanceUI(){
   const voteCommitted=G.alcxVoteLock||0;
   const voteAvailable=Math.max(0,parseFloat((queueStake-voteCommitted).toFixed(4)));
 
-  const yieldMin=(G.yieldRateMin||0.0005)*100;
-  const yieldMax=(G.yieldRateMax||0.005)*100;
-  const yieldDrift=(G.yieldDriftPerTick||0.0002)*100;
-  const netRate=yieldRate-redemptionRate;
-  const netColor=netRate>=0?'#4CAF50':'#FF8800';
-  // Yield rate bar: show position within min–max range
-  const yieldPct=yieldMax>yieldMin?Math.round(((yieldRate-yieldMin)/(yieldMax-yieldMin))*100):50;
+  const sbMin=(G.sbYieldRateMin||0.0005)*100;
+  const sbMax=(G.sbYieldRateMax||0.005)*100;
+  const sbDrift=(G.sbYieldDrift||0.0002)*100;
+  const schMin=(G.schYieldRateMin||0.0003)*100;
+  const schMax=(G.schYieldRateMax||0.003)*100;
+  const schDrift=(G.schYieldDrift||0.0001)*100;
+  const sbNetRate=sbYieldRate-redemptionRate;
+  const schNetRate=schYieldRate-redemptionRate;
+  const sbNetColor=sbNetRate>=0?'#4CAF50':'#FF8800';
+  const schNetColor=schNetRate>=0?'#4CAF50':'#FF8800';
+  // Yield rate bars: show position within min–max range
+  const sbYieldPct=sbMax>sbMin?Math.round(((sbYieldRate-sbMin)/(sbMax-sbMin))*100):50;
+  const schYieldPct=schMax>schMin?Math.round(((schYieldRate-schMin)/(schMax-schMin))*100):50;
   let html=`<div style="background:#0D0020;border:1px solid #3A2060;border-radius:4px;padding:8px;margin-bottom:8px;font-size:.75rem">`;
   html+=`<div style="color:#FFD700;font-weight:bold;margin-bottom:6px">⚗ Bank Rate Parameters</div>`;
-  // Yield rate row with live bar
+
+  // SB yield row
   html+=`<div style="margin-bottom:6px">`;
   html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">`;
-  html+=`<span style="color:#4FC3F7">📈 Yield rate <span style="color:#555;font-size:.68rem">(drifts each tick)</span></span>`;
-  html+=`<b style="color:#eee;font-size:.85rem">+${yieldRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+  html+=`<span style="color:#4FC3F7">🪙 SB yield (alUSD) <span style="color:#555;font-size:.68rem">(drifts each tick)</span></span>`;
+  html+=`<b style="color:#eee;font-size:.85rem">+${sbYieldRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
   html+=`</div>`;
-  // Range bar
-  html+=`<div style="position:relative;background:#111;border-radius:3px;height:6px;margin-bottom:2px">`;
-  html+=`<div style="position:absolute;left:${yieldPct}%;top:-1px;width:8px;height:8px;background:#4FC3F7;border-radius:50%;transform:translateX(-50%)"></div>`;
+  html+=`<div style="position:relative;background:#111;border-radius:3px;height:5px;margin-bottom:2px">`;
+  html+=`<div style="position:absolute;left:${sbYieldPct}%;top:-1px;width:7px;height:7px;background:#4FC3F7;border-radius:50%;transform:translateX(-50%)"></div>`;
   html+=`</div>`;
-  html+=`<div style="display:flex;justify-content:space-between;color:#444;font-size:.65rem"><span>${yieldMin.toFixed(3)}% min</span><span>±${yieldDrift.toFixed(3)}%/tick drift</span><span>${yieldMax.toFixed(3)}% max</span></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;color:#444;font-size:.65rem"><span>${sbMin.toFixed(3)}% min</span><span>±${sbDrift.toFixed(3)}% drift</span><span>${sbMax.toFixed(3)}% max</span></div>`;
   html+=`</div>`;
+
+  // SCH yield row
+  html+=`<div style="margin-bottom:6px">`;
+  html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">`;
+  html+=`<span style="color:#9C27B0">💀 SCH yield (alETH) <span style="color:#555;font-size:.68rem">(drifts each tick)</span></span>`;
+  html+=`<b style="color:#eee;font-size:.85rem">+${schYieldRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+  html+=`</div>`;
+  html+=`<div style="position:relative;background:#111;border-radius:3px;height:5px;margin-bottom:2px">`;
+  html+=`<div style="position:absolute;left:${schYieldPct}%;top:-1px;width:7px;height:7px;background:#9C27B0;border-radius:50%;transform:translateX(-50%)"></div>`;
+  html+=`</div>`;
+  html+=`<div style="display:flex;justify-content:space-between;color:#444;font-size:.65rem"><span>${schMin.toFixed(3)}% min</span><span>±${schDrift.toFixed(3)}% drift</span><span>${schMax.toFixed(3)}% max</span></div>`;
+  html+=`</div>`;
+
   // Redemption rate row
   html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">`;
-  html+=`<span style="color:#FF8800">🔻 Redemption rate <span style="color:#555;font-size:.68rem">(governance-controlled, while debt > 0)</span></span>`;
-  html+=`<b style="color:#eee;font-size:.85rem">${redemptionRate.toFixed(2)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+  html+=`<span style="color:#EF5350">🔻 Redemption rate <span style="color:#555;font-size:.68rem">(governance-controlled, while debt > 0)</span></span>`;
+  html+=`<b style="color:#eee;font-size:.85rem">${redemptionRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
   html+=`</div>`;
-  // Net row
-  html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #1A1030;padding-top:4px">`;
-  html+=`<span style="color:#aaa">Net effect on deposit while repaying</span>`;
-  html+=`<b style="color:${netColor}">${netRate>=0?'+':''}${netRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+
+  // Net rows
+  html+=`<div style="border-top:1px solid #1A1030;padding-top:4px;display:flex;justify-content:space-between;font-size:.73rem">`;
+  html+=`<span style="color:#aaa">Net SB while repaying</span><b style="color:${sbNetColor}">${sbNetRate>=0?'+':''}${sbNetRate.toFixed(3)}%/tick</b>`;
   html+=`</div>`;
-  html+=`<div style="color:#666;font-size:.65rem;margin-top:3px">The yield rate drifts ±${yieldDrift.toFixed(3)}% each tick. High redemption rate = faster payoff &amp; more transmuter yield, but raises the risk of net deposit erosion if yield dips low.</div>`;
+  html+=`<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:1px">`;
+  html+=`<span style="color:#aaa">Net SCH while repaying</span><b style="color:${schNetColor}">${schNetRate>=0?'+':''}${schNetRate.toFixed(3)}%/tick</b>`;
+  html+=`</div>`;
+  html+=`<div style="color:#555;font-size:.63rem;margin-top:4px">Yield rates drift independently each tick. If redemption rate > yield, deposit shrinks while debt is outstanding. Visit Actuary Venn in the Treasury to simulate your position.</div>`;
   html+=`</div>`;
 
   // Voting stake status panel
@@ -323,9 +346,9 @@ export function renderBankUI(){
     // pos.deposited is a float that grows via yield and shrinks via redemption each tick
     const depositDisplay=pos.deposited.toFixed(2);
     const claimAmt=Math.floor(pos.deposited);
-    const yRate=(G.yieldRate||0.002)*100;
+    const yRate=(pos.collateral==='spacebucks'?(G.sbYieldRate||0.002):(G.schYieldRate||0.001))*100;
     const rRate=(G.redemptionRate||0.005)*100;
-    const netPctPerTick=claimable?`+${yRate.toFixed(1)}%/tick`:`${(yRate-rRate).toFixed(2)}%/tick net`;
+    const netPctPerTick=claimable?`+${yRate.toFixed(3)}%/tick`:`${(yRate-rRate).toFixed(3)}%/tick net`;
     const netColor=claimable?'#4CAF50':(yRate>=rRate?'#4CAF50':'#FF8800');
     posHTML+=`<div class="bank-pos">
       <b>${colLabel}</b> deposited: <span style="color:#4FC3F7">${depositDisplay}</span> <span style="color:${netColor};font-size:.7rem">(${netPctPerTick})</span> | borrowed: ${pos.borrowed.toFixed(2)} ${syn} | debt: <span style="color:${pos.debt>0.001?'#FF8800':'#4CAF50'}">${pos.debt.toFixed(2)}</span> ${syn}<br>
@@ -753,6 +776,121 @@ export function closeChangelog(){
   const overlay=document.getElementById('changelog-overlay');
   if(overlay)overlay.style.display='none';
 }
+// ── COLLATERAL SIMULATOR (Actuary Venn) ────────────────────────────────────────
+export function openSimulator(){
+  G.paused=true;
+  const el=document.getElementById('simulator-ui');
+  if(!el)return;
+  el.style.display='flex';
+  // Seed sliders from live server rates
+  const collateral=document.getElementById('sim-collateral')?.value||'spacebucks';
+  const yr=collateral==='spacebucks'?(G.sbYieldRate||0.002):(G.schYieldRate||0.001);
+  const rr=G.redemptionRate||0.005;
+  const yrSlider=document.getElementById('sim-yield');
+  const rrSlider=document.getElementById('sim-redeem');
+  if(yrSlider){yrSlider.value=yr; document.getElementById('sim-yield-val').textContent=`${(yr*100).toFixed(3)}%`;}
+  if(rrSlider){rrSlider.value=rr; document.getElementById('sim-redeem-val').textContent=`${(rr*100).toFixed(3)}%`;}
+  simUpdate();
+}
+export function closeSimulator(){
+  G.paused=false;
+  const el=document.getElementById('simulator-ui');
+  if(el)el.style.display='none';
+}
+function _simRun(collateral,startDeposited,startDebt,yieldRate,redemptionRate,ticks){
+  const pts=[];
+  let dep=startDeposited, debt=startDebt;
+  pts.push({dep,debt});
+  for(let t=0;t<ticks;t++){
+    dep=dep*(1+yieldRate);
+    if(debt>0.001){
+      const slice=dep*redemptionRate;
+      dep=Math.max(0,dep-slice);
+      debt=Math.max(0,debt-slice);
+    }
+    pts.push({dep,debt});
+  }
+  return pts;
+}
+function _simDraw(pts,ticks){
+  const canvas=document.getElementById('sim-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  if(!pts.length)return;
+  const maxVal=Math.max(...pts.map(p=>Math.max(p.dep,p.debt)),1);
+  const px=i=>Math.round(i/ticks*(W-20)+10);
+  const py=v=>Math.round(H-10-(v/maxVal)*(H-20));
+  // Grid
+  ctx.strokeStyle='#1a2a3a'; ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y=py(maxVal*g/4);
+    ctx.beginPath();ctx.moveTo(10,y);ctx.lineTo(W-10,y);ctx.stroke();
+    ctx.fillStyle='#446'; ctx.font='9px monospace'; ctx.textAlign='right';
+    ctx.fillText((maxVal*g/4).toFixed(0),42,y+3);
+  }
+  // Deposited line (blue)
+  ctx.strokeStyle='#4FC3F7'; ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(px(i),py(p.dep)):ctx.lineTo(px(i),py(p.dep)));
+  ctx.stroke();
+  // Debt line (red)
+  ctx.strokeStyle='#EF5350'; ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(px(i),py(p.debt)):ctx.lineTo(px(i),py(p.debt)));
+  ctx.stroke();
+  // Legend
+  ctx.font='10px monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#4FC3F7'; ctx.fillText('── deposited',W-130,18);
+  ctx.fillStyle='#EF5350'; ctx.fillText('── debt',W-130,30);
+}
+// Called from inline HTML event handlers (window scope via main.js)
+export function simUpdate(){
+  const collateral=document.getElementById('sim-collateral')?.value||'spacebucks';
+  const startDep=parseFloat(document.getElementById('sim-collateral-amt')?.value)||1000;
+  const startDebt=parseFloat(document.getElementById('sim-debt')?.value)||500;
+  const ticks=Math.min(2000,parseInt(document.getElementById('sim-ticks')?.value)||500);
+  const yr=parseFloat(document.getElementById('sim-yield')?.value)||(collateral==='spacebucks'?0.002:0.001);
+  const rr=parseFloat(document.getElementById('sim-redeem')?.value)||0.005;
+  const pts=_simRun(collateral,startDep,startDebt,yr,rr,ticks);
+  _simDraw(pts,ticks);
+  // Update yield slider label with the collateral-appropriate live rate hint
+  const liveYr=(collateral==='spacebucks'?(G.sbYieldRate||0.002):(G.schYieldRate||0.001));
+  const liveYrEl=document.getElementById('sim-yield-val');
+  if(liveYrEl)liveYrEl.textContent=`${(yr*100).toFixed(3)}%${Math.abs(yr-liveYr)<0.00005?' ✓ (live)':''}`;
+  // Summary
+  const last=pts[pts.length-1];
+  const paidOff=last.debt<=0.001;
+  const growth=last.dep-startDep;
+  const summaryEl=document.getElementById('sim-summary');
+  if(summaryEl){
+    const gainLoss=growth>=0?`<span style="color:#4CAF50">+${growth.toFixed(2)} gained</span>`:`<span style="color:#EF5350">${growth.toFixed(2)} lost</span>`;
+    const debtMsg=paidOff?`<span style="color:#4CAF50">✓ Debt paid off</span>`:`<span style="color:#FF8800">Debt remaining: ${last.debt.toFixed(2)}</span>`;
+    summaryEl.innerHTML=`After ${ticks} ticks: deposited = <b>${last.dep.toFixed(2)}</b> · ${gainLoss} · ${debtMsg}`;
+  }
+}
+export function simYieldChange(){
+  const yr=parseFloat(document.getElementById('sim-yield')?.value)||0.002;
+  const el=document.getElementById('sim-yield-val');
+  if(el)el.textContent=`${(yr*100).toFixed(3)}%`;
+  simUpdate();
+}
+export function simRedeemChange(){
+  const rr=parseFloat(document.getElementById('sim-redeem')?.value)||0.005;
+  const el=document.getElementById('sim-redeem-val');
+  if(el)el.textContent=`${(rr*100).toFixed(3)}%`;
+  simUpdate();
+}
+export function simReset(){
+  const collateral=document.getElementById('sim-collateral')?.value||'spacebucks';
+  const yr=collateral==='spacebucks'?(G.sbYieldRate||0.002):(G.schYieldRate||0.001);
+  const rr=G.redemptionRate||0.005;
+  const yrSlider=document.getElementById('sim-yield');
+  const rrSlider=document.getElementById('sim-redeem');
+  if(yrSlider){yrSlider.value=yr; document.getElementById('sim-yield-val').textContent=`${(yr*100).toFixed(3)}%`;}
+  if(rrSlider){rrSlider.value=rr; document.getElementById('sim-redeem-val').textContent=`${(rr*100).toFixed(3)}%`;}
+  simUpdate();
+}
+
 // Show NEW badge if player hasn't seen the latest version
 (function initChangelogBadge(){
   const seen=localStorage.getItem(CL_KEY);
@@ -1285,6 +1423,11 @@ export function renderGovernancePanel(ctx){
     {label:'alUSD', val:`$${(G.livePrices.alUSD||1).toFixed(4)}`,           color:G.livePrices.alUSD<0.98?'#FF4444':'#4CAF50'},
     {label:'alETH (ETH)',val:`$${(G.livePrices.alETH||0).toLocaleString()}`,color:'#7B68EE'},
     {label:'ALCX',  val:`$${(G.livePrices.alcx||0).toFixed(2)}`,            color:'#FF9800'},
+    {label:'', val:'', color:'#333'},
+    {label:'── BANK RATES ──', val:'', color:'#FFD700'},
+    {label:'SB yield (alUSD)',  val:`+${((G.sbYieldRate||0.002)*100).toFixed(3)}%/tick`,   color:'#4FC3F7'},
+    {label:'SCH yield (alETH)', val:`+${((G.schYieldRate||0.001)*100).toFixed(3)}%/tick`,  color:'#9C27B0'},
+    {label:'Redemption rate',   val:`-${((G.redemptionRate||0.005)*100).toFixed(3)}%/tick`,color:'#EF5350'},
   ];
   const h=pad*2+lines.length*lh+4;
   const x=W-w-pad, y=80;
@@ -1568,8 +1711,8 @@ export const HELP_PAGES=[
 <p style="color:#4FC3F7;font-weight:bold;margin:0 0 6px">Vote on Protocol Policy with Your ALCX</p>
 <p>Enter <b>Governance Hall</b> (north-east of Town Square) and talk to the <b>Governance Board</b>.</p>
 <div style="background:#0a1520;border:1px solid #1a3a5a;border-radius:6px;padding:10px;margin:8px 0">
-  <p style="margin:0 0 6px;color:#FFD700">The earmark rate:</p>
-  <p style="margin:0">A percentage of all bank loan repayments is <b>earmarked</b> and routed through the transmuter. Governance proposals set this rate (0.1%–2.0%). Higher rates = faster transmuter yield for depositors.</p>
+  <p style="margin:0 0 6px;color:#FFD700">The redemption rate:</p>
+  <p style="margin:0">Each tick, a percentage of a borrower's deposited collateral is physically redirected to the Transmuter, simultaneously reducing their debt. Governance proposals set this rate (0.1%–2.0%). Higher rates = faster loan payoff and more transmuter yield, but raise the risk of deposit erosion if yield dips below the redemption rate.</p>
 </div>
 <p style="color:#FFD700;font-weight:bold;margin:8px 0 4px">How to vote:</p>
 <ol style="margin:0;padding-left:18px">
@@ -1641,7 +1784,7 @@ export const HELP_PAGES=[
   </tr>
   <tr>
     <td style="padding:5px 0;color:#FFD700">🗳 Governance Board</td>
-    <td style="padding:5px 0">Governance Hall — vote on earmark rate</td>
+    <td style="padding:5px 0">Governance Hall — vote on redemption rate</td>
   </tr>
 </table>
 <p style="color:#888;font-size:.78rem;margin-top:8px">💡 Press <b>Escape → 📖 HOW TO PLAY</b> any time to re-open this guide.</p>

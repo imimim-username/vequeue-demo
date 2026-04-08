@@ -44,10 +44,14 @@ export const G = {
   govProposals:[],      // active governance proposals
   govHistory:[],        // settled proposals (newest last)
   redemptionRate:0.005,      // % of deposited collateral sent to transmuter per tick (governance-controlled)
-  yieldRate:0.002,           // current yield rate — drifts each tick (variable)
-  yieldRateMin:0.0005,       // yield rate floor
-  yieldRateMax:0.005,        // yield rate ceiling
-  yieldDriftPerTick:0.0002,  // max yield shift per tick
+  sbYieldRate:0.002,         // Spacebucks/alUSD yield rate — drifts each tick
+  sbYieldRateMin:0.0005,     // SB yield floor
+  sbYieldRateMax:0.005,      // SB yield ceiling
+  sbYieldDrift:0.0002,       // max SB yield shift per tick
+  schYieldRate:0.001,        // Schmeckles/alETH yield rate — usually lower than SB
+  schYieldRateMin:0.0003,    // SCH yield floor
+  schYieldRateMax:0.003,     // SCH yield ceiling
+  schYieldDrift:0.0001,      // max SCH yield shift per tick
   alcxVoteLock:0,       // ALCX locked in active governance vote (inaccessible)
   govQuorum:50,         // quorum required for a valid proposal result
   battle:null,          // active battle state or null

@@ -7,7 +7,7 @@ import { buildTileCache, TILE_CACHE, WATER_FRAMES, drawBackground, renderCeiling
 import { socket, others, G_accountId, initSocket, saveToServer, updateOnlineCount, joinGameServer } from './socket.js';
 import { KEYS, handleEsc } from './input.js';
 import { checkEncounter, checkBossEncounter, checkSubZoneEncounter, checkSubZoneBoss, checkWaterEncounter, checkForestEncounter, renderBattleScreen, doBattleAction, xpForLevel, checkLevelUp, doEnemyTurn, endBattle, triggerSnowballBattle } from './combat.js';
-import { renderHUD, renderGovernancePanel, renderInventoryScreen, renderTileLayer, renderFgLayer, renderSpriteLayer, renderMinimap, renderBuildingSigns, openGovernance, openShop, openBank, openTransmuter, openMarket, openExchange, openInvUpgrade, doInvUpgrade, showHallOfFame, distributeTransmuterPool, togglePause, openChangelog, closeChangelog, showHelp } from './ui.js';
+import { renderHUD, renderGovernancePanel, renderInventoryScreen, renderTileLayer, renderFgLayer, renderSpriteLayer, renderMinimap, renderBuildingSigns, openGovernance, openShop, openBank, openTransmuter, openMarket, openExchange, openInvUpgrade, doInvUpgrade, showHallOfFame, distributeTransmuterPool, togglePause, openChangelog, closeChangelog, showHelp, openSimulator } from './ui.js';
 
 // ── Canvas contexts + dimensions (exported so other modules can reference them) ──
 export let W = CFG.W, H = CFG.H;
@@ -301,6 +301,7 @@ export function tryInteract(){
   if(nearest.invUpgrade){ openInvUpgrade(); return; }
   if(nearest.exchange){ openExchange(); return; }
   if(nearest.hallOfFame){ showHallOfFame(); return; }
+  if(nearest.simulator){ openSimulator(); return; }
   G.npcDialog={npc:nearest,lineIdx:0,dialog:getQuestDialog(nearest)};
   G.paused=true;
   showNpcDialog();

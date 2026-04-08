@@ -157,7 +157,7 @@ export function initSocket(){
       const prev=prevPositions[i];
       const justRepaid=pos.debt<=0.001&&!pos.claimed&&(prev?.debt>0.001);
       if(justRepaid){
-        chatLog(`✨ Bank position fully repaid! Collateral is now growing at ${((G.yieldRate||0.002)*100).toFixed(1)}%/tick. Visit Banker Alyx to claim.`,'#FFD700');
+        chatLog(`✨ Bank position fully repaid! Collateral is now growing freely. Visit Banker Alyx to claim.`,'#FFD700');
         SFX.coin();
       }
     });
@@ -348,10 +348,15 @@ export function initSocket(){
     socket.on('gov_state',data=>{
       G.govProposals=data.proposals||[];
       G.redemptionRate=data.redemptionRate??data.earmarkRate??0.005; // earmarkRate fallback for old servers
-      G.yieldRate=data.yieldRate??0.002;
-      if(data.yieldRateMin!=null)G.yieldRateMin=data.yieldRateMin;
-      if(data.yieldRateMax!=null)G.yieldRateMax=data.yieldRateMax;
-      if(data.yieldDriftPerTick!=null)G.yieldDriftPerTick=data.yieldDriftPerTick;
+      // Split yield rates: SB (Spacebucks/alUSD) and SCH (Schmeckles/alETH)
+      if(data.sbYieldRate!=null)G.sbYieldRate=data.sbYieldRate;
+      if(data.sbYieldRateMin!=null)G.sbYieldRateMin=data.sbYieldRateMin;
+      if(data.sbYieldRateMax!=null)G.sbYieldRateMax=data.sbYieldRateMax;
+      if(data.sbYieldDrift!=null)G.sbYieldDrift=data.sbYieldDrift;
+      if(data.schYieldRate!=null)G.schYieldRate=data.schYieldRate;
+      if(data.schYieldRateMin!=null)G.schYieldRateMin=data.schYieldRateMin;
+      if(data.schYieldRateMax!=null)G.schYieldRateMax=data.schYieldRateMax;
+      if(data.schYieldDrift!=null)G.schYieldDrift=data.schYieldDrift;
       if(data.quorum!=null)G.govQuorum=data.quorum;
       if(data.history!=null)G.govHistory=data.history;
       // Sync vote-committed amount from server on join/reconnect

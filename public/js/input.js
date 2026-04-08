@@ -3,7 +3,7 @@ import { CFG, T } from './data.js';
 import { toggleMute } from './audio.js';
 // Circular imports — safe, used inside function bodies
 import { chatLog, _dismissConfirm, advanceDialog, tryInteract, declineOrAbandonQuest, resetMmCanvas } from './game.js';
-import { closeHelp, closeChangelog, closeExchange, closeMarket, closeGovernance, closeShop, closeBank, closeTransmuter, togglePause } from './ui.js';
+import { closeHelp, closeChangelog, closeExchange, closeMarket, closeGovernance, closeShop, closeBank, closeTransmuter, closeSimulator, togglePause } from './ui.js';
 
 // ── INPUT ─────────────────────────────────────────────────────────────────────
 export const KEYS={};
@@ -59,6 +59,7 @@ if(window.matchMedia('(pointer:coarse)').matches)document.body.classList.add('to
 
 // ── handleEsc: shared logic for keyboard ESC and mobile ESC button ────────────
 export function handleEsc(){
+  if(document.getElementById('simulator-ui')?.style.display!=='none'){closeSimulator();return;}
   if(document.getElementById('bank-ui').style.display!=='none'){closeBank();return;}
   if(document.getElementById('transmuter-ui').style.display!=='none'){closeTransmuter();return;}
   if(document.getElementById('market-ui').style.display!=='none'){closeMarket();return;}
