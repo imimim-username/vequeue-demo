@@ -59,6 +59,8 @@ if(window.matchMedia('(pointer:coarse)').matches)document.body.classList.add('to
 
 // ── handleEsc: shared logic for keyboard ESC and mobile ESC button ────────────
 export function handleEsc(){
+  // Queue/shop confirm dialogs: Escape = decline (No)
+  if(G._pendingConfirm&&!G._pendingConfirm._info){ _dismissConfirm(false); return; }
   if(document.getElementById('simulator-ui')?.style.display!=='none'){closeSimulator();return;}
   if(document.getElementById('bank-ui').style.display!=='none'){closeBank();return;}
   if(document.getElementById('transmuter-ui').style.display!=='none'){closeTransmuter();return;}

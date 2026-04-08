@@ -1609,8 +1609,8 @@ export const HELP_PAGES=[
 <ul style="margin:4px 0;padding-left:18px">
   <li>🍺 <b>The Tavern</b> (north-west) — quests, gear, and rumours</li>
   <li>🏛 <b>Governance Hall</b> (north-east) — vote on protocol policy</li>
-  <li>🛒 <b>Marketplace</b> (east gate) — buy/sell items with other players</li>
-  <li>🏦 <b>Treasury</b> (south gate) — deposit alUSD/alETH into the transmuter</li>
+  <li>🛒 <b>Marketplace</b> (south-west gate) — buy/sell items with other players</li>
+  <li>🏦 <b>Treasury</b> (south-east gate) — deposit alUSD/alETH into the transmuter</li>
   <li>🗡 <b>Dungeons & Wilds</b> — combat zones reachable through portals</li>
 </ul>
 <p style="color:#888;font-size:.78rem;margin-top:6px">💡 Walk up to any glowing NPC and press <b>E</b> to talk. Doors automatically open when you step on them.</p>
@@ -1699,8 +1699,8 @@ export const HELP_PAGES=[
 </div>
 <p style="color:#9C27B0;font-weight:bold;margin:8px 0 4px">While you wait, you earn ALCX:</p>
 <ul style="margin:0;padding-left:18px">
-  <li>+1 ALCX every few seconds just for being in the queue</li>
-  <li>More ALCX per yield tick once inside the zone (seniority bonus)</li>
+  <li>+1 ALCX every 2 minutes while waiting in queue</li>
+  <li>+1 ALCX every 5 minutes once inside the zone (seniority bonus grows slowly)</li>
 </ul>
 <p style="margin-top:8px"><b>Fast-exit fee:</b> Need to leave before your turn? You pay <b>2.5 ALCX per position</b> you're jumping. That fee goes to the patient waiters ahead of you.</p>
 <p style="color:#888;font-size:.78rem;margin-top:6px">💡 ALCX locked for the queue stays locked for your entire veQueue district visit. It's returned when you exit the district. While locked, it counts as your governance vote weight — head to the Governance Chamber to vote!</p>

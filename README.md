@@ -213,7 +213,7 @@ All data lives in JSON files loaded into memory at startup and written to disk o
 | `auth_register` | Creates account. Username 2–20 chars, PIN 4+ digits. PIN is SHA-256 hashed with salt `vq2026:`. Duplicate usernames rejected. |
 | `auth_login` | Returns `savedData` on success. If another session exists for this account, it is disconnected. Returns all server-authoritative fields (currencies, bank positions, etc.) which the client cannot forge. |
 
-New accounts are created with all currencies set to 0 server-side, regardless of what the client sends on its first `save_character`.
+New accounts are created with all currencies set to 0 server-side (except ALCX, which starts at 10), regardless of what the client sends on its first `save_character`.
 
 ### Economy: Five Currencies
 
@@ -272,19 +272,28 @@ The bank implements Alchemix's core mechanic: deposit collateral, borrow a synth
 
 Example: Deposit 100 spacebucks → borrow up to 90 alUSD. Server deducts spacebucks and credits alUSD atomically.
 
-#### Debt Repayment (Earmark Ticks)
+#### Debt Repayment (Yield + Redemption Ticks)
 
-Every **5 minutes**, the server runs a debt reduction tick for all open bank positions:
+Every **15 minutes**, the server runs two passes for all open bank positions:
 
+**Yield pass** (collateral earns while loan is outstanding):
 ```
-earmarkAmount = debt × earmarkRate   (default 0.5%)
-redemptionFee = earmarkAmount × 0.005
-redeemed      = earmarkAmount − redemptionFee
+SB/alUSD positions:  yieldAmount = debt × 0.002   (0.2% per tick)
+SCH/alETH positions: yieldAmount = debt × 0.001   (0.1% per tick)
+debt -= yieldAmount
 ```
 
-- `earmarkRate` is set by governance vote (range 0.1%–2.0%)
+**Redemption pass** (governance-controlled repayment):
+```
+redemptionAmount = debt × redemptionRate   (default 0.5%)
+redemptionFee    = redemptionAmount × 0.005
+redeemed         = redemptionAmount − redemptionFee
+debt -= redeemed
+```
+
+- `redemptionRate` is set by governance vote (range 0.1%–2.0%)
 - The redemption fee goes to treasury
-- At 0.5% per tick, debt half-life is ~11 hours; full repayment ~3 days
+- At 0.5% redemption + 0.2% yield per 15-min tick, a SB/alUSD debt half-life is ~8 hours
 
 #### Post-Repay Interest
 
@@ -352,13 +361,13 @@ When a player joins a queue, their free ALCX wallet is locked:
 lockedAlcx += G.alcx
 G.alcx      = 0
 ```
-This locked ALCX is their governance weight. On leaving the queue, free ALCX is restored (minus any vote locks for active proposals).
+This locked ALCX is their governance weight. The lock persists for the **entire veQueue district visit** (Marketplace, Treasury, and Governance Chamber). Free ALCX is restored (minus any vote locks for active proposals) only when the player leaves the district entirely.
 
 #### Patience Yield
 
 Players earn ALCX while waiting:
-- **Queue patience:** +1 ALCX every ~8 seconds in queue
-- **Zone seniority:** +1 ALCX every 5 minutes spent inside a zone without leaving (0.3% per minute)
+- **Queue patience:** +1 ALCX every ~2 minutes while waiting in queue
+- **Zone seniority:** +1 ALCX every 5 minutes spent inside a zone (seniority bonus grows slowly over time)
 
 These yields are granted server-side via `alcx_yield_request` to prevent client forgery.
 
@@ -379,13 +388,13 @@ Randomly, the server spawns a "whale" player with a large ALCX queue lock. This 
 
 ### Governance
 
-Players vote with their **queue-locked ALCX** (not free wallet ALCX) to set the bank earmark rate.
+Players vote with their **queue-locked ALCX** (not free wallet ALCX) to set the bank redemption rate.
 
 **Events:** `governance_propose`, `governance_vote`
 
 #### Proposal Lifecycle
 
-1. Any player in a queue submits a proposal: `{ rate: 0.008, amount: 50 }` (rate in decimal, e.g. 0.8%)
+1. Any player with locked ALCX submits a proposal: `{ rate: 0.008, amount: 50 }` (rate in decimal, e.g. 0.8%)
 2. Proposal is active for **24 hours**
 3. Other players vote YES or NO with their locked ALCX: `{ proposalId, choice: 'yes'|'no', amount }`
 4. Voted ALCX is frozen (locked) until proposal settles
@@ -398,7 +407,7 @@ Players vote with their **queue-locked ALCX** (not free wallet ALCX) to set the 
 
 | Parameter | Default | Governance-adjustable |
 |-----------|---------|----------------------|
-| Earmark rate | 0.5% per tick | Yes (0.1%–2.0%) |
+| Redemption rate | 0.5% per tick | Yes (0.1%–2.0%) |
 | Quorum | 50 ALCX | No |
 | Proposal duration | 24 hours | No |
 
@@ -515,7 +524,7 @@ The protocol treasury accumulates fees from all economic activity:
 | Source | Rate |
 |--------|------|
 | Currency exchange | 0.3% of all swaps |
-| Bank earmark | 0.5% of each repayment |
+| Bank redemption | 0.5% of each redemption tick |
 | Transmuter early exit | 10% of withdrawn amount |
 | Marketplace commission | 5% of all sales |
 
@@ -557,7 +566,7 @@ The treasury balance is tracked per-currency (alUSD and alETH) and displayed in 
 | Event | Payload | Response |
 |-------|---------|----------|
 | `queue_join` | `{zone, queueType, locked}` | `queue_joined`; periodic `queue_state` |
-| `queue_leave` | `{zone, queueType}` | queue advances |
+| `queue_leave` | `{zone, queueType, passingThrough?}` | queue advances; `passingThrough:true` skips ALCX refund (gate transit) |
 | `queue_auction_bid` | `{zone, queueType, alcx}` | `auction_result` |
 | `queue_fast_exit` | `{zone, queueType}` | `queue_served` |
 
@@ -615,7 +624,7 @@ G.transmuterDeposits[] // active transmuter deposits
 
 // Governance
 G.govProposals[], G.govHistory[]
-G.earmarkRate, G.govQuorum
+G.redemptionRate, G.govQuorum
 
 // World
 G.worldLoot[]         // visible loot on the ground

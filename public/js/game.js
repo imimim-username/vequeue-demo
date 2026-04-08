@@ -1,5 +1,5 @@
 import { G } from './state.js';
-import { T, CFG, TS, TW, TH, WORLD_W, WORLD_H, TOWN_OX, TOWN_OY, SOLID_TILES, WORLD_SOLID, RESPAWN_TX, RESPAWN_TY, QUEST_DEFS, PLAYER_COLORS, HAIR_COLORS, SKIN_TONES, SPECIES, CLASSES, RARITY_COLOR, BATTLE_BTNS } from './data.js';
+import { T, CFG, TS, TW, TH, WORLD_W, WORLD_H, TOWN_OX, TOWN_OY, EW_B, SOLID_TILES, WORLD_SOLID, RESPAWN_TX, RESPAWN_TY, QUEST_DEFS, PLAYER_COLORS, HAIR_COLORS, SKIN_TONES, SPECIES, CLASSES, RARITY_COLOR, BATTLE_BTNS } from './data.js';
 // Re-export canvas logical dimensions (from CFG) so other modules (ui.js etc.) can import W/H from game.js
 import { MAP_W, MAP_H, ZONES, NPCS, ZONE_DOORS, ZONE_MAPS, WORLD_MAP, TOWN_MAP } from './maps.js';
 import { SFX, musPlay } from './audio.js';
@@ -460,8 +460,10 @@ export function joinQueue(zone,type){
   }
 
   // Called when player explicitly selects No — suppress re-prompting on same tile
+  // and nudge back to the E-W road so the player isn't trapped inside the building fence
   function _onDecline(){
     G._queueDeclinedTile={tx:_declineTx,ty:_declineTy};
+    if(G.zone==='world') G.y=(EW_B+0.5)*TS;
   }
 
   // Step 2: confirm ALCX lock (or skip if no lock)
