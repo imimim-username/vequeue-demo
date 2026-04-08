@@ -769,6 +769,21 @@ io.on('connection',socket=>{
 
   socket.on('zone_change',data=>{
     const p=players[socket.id];if(!p)return;
+    // Leaving the veQueue district → refund queue-locked ALCX (minus any vote-committed portion)
+    const VEQUEUE_DISTRICT=['marketplace','treasury','gov_chamber'];
+    if(VEQUEUE_DISTRICT.includes(p.zone)&&!VEQUEUE_DISTRICT.includes(data.zone)){
+      if(socket.accountId&&pdb[socket.accountId]?.data){
+        const d=pdb[socket.accountId].data;
+        const voteLocked=getVoteLocked(socket.accountId);
+        const refund=Math.max(0,parseFloat(((d.lockedAlcx||0)-voteLocked).toFixed(4)));
+        if(refund>0){
+          d.alcx=parseFloat(((d.alcx||0)+refund).toFixed(4));
+          d.lockedAlcx=voteLocked;
+          saveDb();
+          // Client mirrors this in changeZone(); no separate event needed
+        }
+      }
+    }
     socket.leave(p.zone);socket.to(p.zone).emit('player_left',socket.id);
     p.zone=data.zone;p.x=data.x;p.y=data.y;
     socket.join(p.zone);
@@ -805,15 +820,16 @@ io.on('connection',socket=>{
   });
 
   socket.on('queue_leave',data=>{
-    const{zone,queueType}=data;
+    const{zone,queueType,passingThrough}=data;
     if(!QUEUE_ZONES.includes(zone)||!['entry','exit'].includes(queueType))return;
     const side=queues[zone][queueType];
     const idx=side.entries.findIndex(e=>e.id===socket.id);
     if(idx<0)return;
     side.entries.splice(idx,1);
-    // Refund queue-locked ALCX minus any portion committed to an active vote
-    // (vote-committed portion stays locked until the proposal settles)
-    if(socket.accountId&&pdb[socket.accountId]?.data){
+    // Refund queue-locked ALCX only when the player is ABANDONING the queue
+    // (passingThrough=true means they stepped through a zone gate and ALCX stays locked
+    //  for the duration of their veQueue district visit; refund happens on zone_change exit)
+    if(!passingThrough&&socket.accountId&&pdb[socket.accountId]?.data){
       const d=pdb[socket.accountId].data;
       const voteLocked=getVoteLocked(socket.accountId);
       const lockedNow=parseFloat(d.lockedAlcx||0);
@@ -1043,7 +1059,7 @@ io.on('connection',socket=>{
     const acctData=pdb[socket.accountId].data;
     const queueLocked=parseFloat(acctData?.lockedAlcx||0);
     if(queueLocked<=0)
-      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to propose. Join the Marketplace or Treasury entry queue first.'});
+      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to propose. Join the Marketplace or Treasury entry queue and stay inside the district to lock ALCX.'});
     const voteAmt=parseFloat(data.amount)||queueLocked; // client may specify partial amount
     const maxVote=parseFloat((queueLocked-getVoteLocked(socket.accountId)).toFixed(4));
     if(voteAmt<=0||voteAmt>maxVote)
@@ -1073,7 +1089,7 @@ io.on('connection',socket=>{
     const acctData=pdb[socket.accountId].data;
     const queueLocked=parseFloat(acctData?.lockedAlcx||0);
     if(queueLocked<=0)
-      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to vote. Join the Marketplace or Treasury entry queue first.'});
+      return socket.emit('gov_result',{ok:false,error:'You must have ALCX locked in a veQueue zone to vote. Join the Marketplace or Treasury entry queue and stay inside the district to lock ALCX.'});
     const alreadyCommitted=getVoteLocked(socket.accountId);
     const maxVote=parseFloat((queueLocked-alreadyCommitted).toFixed(4));
     if(maxVote<=0)
@@ -1184,7 +1200,7 @@ io.on('connection',socket=>{
 // What flows to the transmuter: the net slice (after 0.5% borrower fee) is
 // distributed pro-rata across all transmuter depositors that tick.
 //
-const TRANSMUTER_TICK_MS=5*60*1000; // 5 minutes
+const TRANSMUTER_TICK_MS=15*60*1000; // 15 minutes
 
 setInterval(()=>{
   // ── Drift both yield rates independently ─────────────────────────────────

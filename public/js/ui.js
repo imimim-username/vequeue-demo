@@ -1702,7 +1702,7 @@ export const HELP_PAGES=[
   <li>More ALCX per yield tick once inside the zone (seniority bonus)</li>
 </ul>
 <p style="margin-top:8px"><b>Fast-exit fee:</b> Need to leave before your turn? You pay <b>2.5 ALCX per position</b> you're jumping. That fee goes to the patient waiters ahead of you.</p>
-<p style="color:#888;font-size:.78rem;margin-top:6px">💡 ALCX locked for the queue is returned when you enter or leave. It stays locked during the wait — you can't spend it elsewhere while committed.</p>
+<p style="color:#888;font-size:.78rem;margin-top:6px">💡 ALCX locked for the queue stays locked for your entire veQueue district visit. It's returned when you exit the district. While locked, it counts as your governance vote weight — head to the Governance Chamber to vote!</p>
 `
   },
   {

@@ -396,13 +396,12 @@ function handleQueueDoor(key,door){
     joinQueue(qi.zone,qi.type);
   } else if(G.queueState.zone===qi.zone&&G.queueState.type===qi.type){
     if(G.queueState.served){
-      // Served — pass through
-      socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type});
+      // Served — pass through the gate
+      // passingThrough:true tells the server not to refund ALCX yet —
+      // it stays locked for the whole district visit; changeZone() returns it on exit.
+      socket?.emit('queue_leave',{zone:qi.zone,queueType:qi.type,passingThrough:true});
       clearTimeout(G._queueServTimer);G._queueServExpiry=null;
-      // Return only non-vote-committed portion; vote-lock stays until proposal settles
-      const _refund=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
-      G.alcx=parseFloat((G.alcx+_refund).toFixed(4));
-      G.lockedAlcx=G.alcxVoteLock;
+      // Do NOT refund G.lockedAlcx here — ALCX stays locked until player leaves the district.
       G.queueState=null;
       updateQueuePanel();renderHUD();
       changeZone(door.to,door.sx,door.sy);
@@ -581,6 +580,18 @@ export function updateQueuePanel(){
 }
 
 export function changeZone(zone,sx,sy){
+  // Leaving the veQueue district → return queue-locked ALCX client-side
+  // (server mirrors this in the zone_change handler)
+  const VEQUEUE_DISTRICT=['marketplace','treasury','gov_chamber'];
+  if(VEQUEUE_DISTRICT.includes(G.zone)&&!VEQUEUE_DISTRICT.includes(zone)&&G.lockedAlcx>0){
+    const _vqRefund=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
+    if(_vqRefund>0){
+      G.alcx=parseFloat((G.alcx+_vqRefund).toFixed(4));
+      G.lockedAlcx=G.alcxVoteLock;
+      chatLog(`⚗ ${_vqRefund} ALCX returned — you've left the veQueue district.`,'#FFD700');
+      renderHUD();
+    }
+  }
   // alert()/confirm() dialogs swallow keyup events — clear stale key state
   // so the character doesn't walk on its own after zone transitions
   Object.keys(KEYS).forEach(k=>delete KEYS[k]);
@@ -1185,10 +1196,10 @@ document.getElementById('btn-start').addEventListener('click',()=>{
 document.getElementById('queue-enter-btn')?.addEventListener('click',()=>{
   if(!G.queueState?.served)return;
   const{zone,type}=G.queueState;
-  socket?.emit('queue_leave',{zone,queueType:type});
+  // passingThrough:true — ALCX stays locked for district visit; returned on exit
+  socket?.emit('queue_leave',{zone,queueType:type,passingThrough:true});
   clearTimeout(G._queueServTimer);G._queueServExpiry=null;
-  const _r2=Math.max(0,parseFloat((G.lockedAlcx-G.alcxVoteLock).toFixed(4)));
-  G.alcx=parseFloat((G.alcx+_r2).toFixed(4));G.lockedAlcx=G.alcxVoteLock;
+  // Do NOT refund G.lockedAlcx — changeZone() will return it when leaving the district.
   G.queueState=null;updateQueuePanel();renderHUD();
   const key=type==='entry'?`world_${zone}`:`${zone}_exit`;
   const door=ZONE_DOORS[key];
