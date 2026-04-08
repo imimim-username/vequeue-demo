@@ -1697,8 +1697,17 @@ export function renderInventoryScreen(){
       <div style="font-size:1rem">${icon}</div>
       <div style="font-weight:bold;font-size:.62rem">${boundMark}${name}</div>
       <div style="color:#8BC34A;font-size:.6rem">${stat} ${typeTag}</div>
-      ${rarLabel}
-      ${item&&!item.bound?`<button onclick="(${onUnequip.toString()})()" style="margin-top:3px;font-size:.55rem;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:2px;padding:1px 4px;cursor:pointer;width:100%">UNEQUIP</button>`:''}`;
+      ${rarLabel}`;
+    // Attach UNEQUIP button via addEventListener — never serialize closures into
+    // inline onclick strings; Vite renames closure variables during minification
+    // and they won't resolve in global scope.
+    if(item&&!item.bound){
+      const uBtn=document.createElement('button');
+      uBtn.textContent='UNEQUIP';
+      uBtn.style.cssText='margin-top:3px;font-size:.55rem;background:#1a1a1a;color:#888;border:1px solid #333;border-radius:2px;padding:1px 4px;cursor:pointer;width:100%';
+      uBtn.addEventListener('click',onUnequip);
+      d.appendChild(uBtn);
+    }
     return d;
   };
 
