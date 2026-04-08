@@ -848,17 +848,9 @@ function drawHideoutCeiling(ctx,W,tick){
 }
 
 export function renderCeiling(ctx,zone,W,H,tick){
+  // Ceiling art is disabled — the ceiling strips obscure north-wall doors
+  // and top-row tile details in interior zones. All rooms are open to view.
   ctx.clearRect(0,0,W,H);
-  if(zone==='world')return;
-  if(zone==='tavern')          drawTavernCeiling(ctx,W,tick);
-  else if(zone==='governance') drawGovernanceCeiling(ctx,W,tick);
-  else if(zone==='marketplace')drawMarketplaceCeiling(ctx,W,tick);
-  else if(zone==='treasury')   drawTreasuryCeiling(ctx,W,tick);
-  else if(zone==='dungeon')    drawDungeonCeiling(ctx,W,tick);
-  else if(zone==='cavern')     drawCavernCeiling(ctx,W,tick);
-  else if(zone==='hideout')    drawHideoutCeiling(ctx,W,tick);
-  else if(zone==='ruins')      { /* ruins are open-air — no ceiling */ }
-  else if(zone==='village')    { /* village is open-air — no ceiling */ }
 }
 
 // ── INTERIOR BG ROUTER (cv-bg — solid zone color, behind tiles) ───────────────

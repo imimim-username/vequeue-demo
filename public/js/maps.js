@@ -524,8 +524,9 @@ function makeGovernance(){
   // exit queue at back
   fill(11,7,11,12,T.QUEUE_OUT);
   // ── Chamber shortcut door (north wall) ───────────────────────────────────
-  // Velvet carpet leads to the locked door at the back of the hall
-  fill(1,8,1,11,T.VELVET);
+  // Velvet carpet path leads the eye from the main floor to the chamber door
+  fill(1,8,1,11,T.VELVET);  // row 1 narrows into the doorway
+  fill(2,8,2,11,T.VELVET);  // row 2 extension — connects carpet to the path
   // The door itself — locked for non-veQueue members, shortcut for members
   m[0][9]=T.DOOR_O;m[0][10]=T.DOOR_O;
   return m;
@@ -694,7 +695,7 @@ export const NPCS = {
     },
   ],
   governance:[
-    { id:'chamber_warden_hall', x:13, y:2, type:'guard', face:2, name:'Chamber Warden',
+    { id:'chamber_warden_hall', x:10, y:2, type:'guard', face:2, name:'Chamber Warden',
       dialog:[
         'This door leads to the Governance Chamber — the veQueue voting floor.',
         'Only citizens with ALCX locked inside the veQueue district may pass.',
