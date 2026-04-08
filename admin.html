@@ -110,6 +110,31 @@ textarea{background:#111;border:1px solid #5A3A80;color:#eee;padding:8px;border-
         <span style="color:#888;font-size:.72rem">% of deposited/tick (0.1–5.0) — sent to transmuter while debt > 0</span>
         <button class="btn btn-purple" onclick="setEarmark()">Set</button>
       </div>
+      <div style="border:1px solid #2A1A40;border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="color:#4FC3F7;font-size:.8rem;font-weight:bold;margin-bottom:8px">📈 Yield Rate (YIELD_RATE_LIVE) — Variable</div>
+        <div class="config-row">
+          <label>Current Yield Rate</label>
+          <input type="number" id="cfg-yield-rate" min="0.01" max="2.0" step="0.01" value="0.20">
+          <span style="color:#888;font-size:.72rem">%/tick (0.01–2.0) — manual override</span>
+          <button class="btn btn-purple" onclick="setYieldRate()">Set</button>
+        </div>
+        <div class="config-row">
+          <label>Yield Min</label>
+          <input type="number" id="cfg-yield-min" min="0.01" max="1.0" step="0.01" value="0.05">
+          <span style="color:#888;font-size:.72rem">%/tick — floor for drift</span>
+        </div>
+        <div class="config-row">
+          <label>Yield Max</label>
+          <input type="number" id="cfg-yield-max" min="0.01" max="2.0" step="0.01" value="0.50">
+          <span style="color:#888;font-size:.72rem">%/tick — ceiling for drift</span>
+        </div>
+        <div class="config-row">
+          <label>Yield Drift / Tick</label>
+          <input type="number" id="cfg-yield-drift" min="0.001" max="0.2" step="0.001" value="0.020">
+          <span style="color:#888;font-size:.72rem">%/tick max shift (±) each tick</span>
+          <button class="btn btn-purple" onclick="setYieldParams()">Set Params</button>
+        </div>
+      </div>
       <div class="config-row">
         <label>Loot TTL</label>
         <input type="number" id="cfg-loot-ttl" min="1" max="60" step="1" value="10">
@@ -261,7 +286,11 @@ function renderHof(){
 function syncConfigInputs(){
   const s = state;
   const v = (id, val) => { const el=document.getElementById(id); if(el&&document.activeElement!==el) el.value=val; };
-  v('cfg-earmark', ((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2));
+  v('cfg-earmark',    ((s.redemptionRate||s.earmarkRate||0.005)*100).toFixed(2));
+  v('cfg-yield-rate', ((s.yieldRate||0.002)*100).toFixed(3));
+  v('cfg-yield-min',  ((s.yieldRateMin||0.0005)*100).toFixed(3));
+  v('cfg-yield-max',  ((s.yieldRateMax||0.005)*100).toFixed(3));
+  v('cfg-yield-drift',((s.yieldDriftPerTick||0.0002)*100).toFixed(3));
   v('cfg-loot-ttl', s.lootTtlMin||10);
   v('cfg-snowball', Math.round((s.snowballChance||0.4)*100));
   v('cfg-whale', Math.round((s.whaleChance||0.35)*100));
@@ -270,6 +299,14 @@ function syncConfigInputs(){
 function kickPlayer(id){ if(confirm('Kick this player?')) socket.emit('admin_kick',{socketId:id}); }
 function deleteUser(username){ if(confirm(`Delete account "${username}"? This is permanent.`)) socket.emit('admin_delete_user',{username}); }
 function setEarmark(){ socket.emit('admin_set_earmark',{rate:parseFloat(document.getElementById('cfg-earmark').value)/100}); }
+function setYieldRate(){ socket.emit('admin_set_yield',{rate:parseFloat(document.getElementById('cfg-yield-rate').value)/100}); }
+function setYieldParams(){
+  socket.emit('admin_set_yield_params',{
+    min:parseFloat(document.getElementById('cfg-yield-min').value)/100,
+    max:parseFloat(document.getElementById('cfg-yield-max').value)/100,
+    drift:parseFloat(document.getElementById('cfg-yield-drift').value)/100,
+  });
+}
 function setLootTtl(){ socket.emit('admin_set_loot_ttl',{minutes:parseInt(document.getElementById('cfg-loot-ttl').value)}); }
 function setSnowball(){ socket.emit('admin_set_snowball',{chance:parseFloat(document.getElementById('cfg-snowball').value)/100}); }
 function setWhale(){ socket.emit('admin_set_whale',{chance:parseFloat(document.getElementById('cfg-whale').value)/100}); }

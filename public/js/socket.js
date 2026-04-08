@@ -349,6 +349,9 @@ export function initSocket(){
       G.govProposals=data.proposals||[];
       G.redemptionRate=data.redemptionRate??data.earmarkRate??0.005; // earmarkRate fallback for old servers
       G.yieldRate=data.yieldRate??0.002;
+      if(data.yieldRateMin!=null)G.yieldRateMin=data.yieldRateMin;
+      if(data.yieldRateMax!=null)G.yieldRateMax=data.yieldRateMax;
+      if(data.yieldDriftPerTick!=null)G.yieldDriftPerTick=data.yieldDriftPerTick;
       if(data.quorum!=null)G.govQuorum=data.quorum;
       if(data.history!=null)G.govHistory=data.history;
       // Sync vote-committed amount from server on join/reconnect

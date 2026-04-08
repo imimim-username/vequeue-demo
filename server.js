@@ -90,14 +90,24 @@ let govHistory=(_govState.history||[]).slice(-20); // keep last 20 settled propo
 // Persist idSeq so proposal IDs are unique across server restarts
 let _govIdSeq=Math.max(1,(_govState.idSeq||1),(govProposals.reduce((m,p)=>Math.max(m,p.id||0),0)+1));
 function saveGov(){
-  try{fs.writeFileSync(GOV_FILE,JSON.stringify({proposals:govProposals,idSeq:_govIdSeq,history:govHistory,redemptionRate:REDEMPTION_RATE_LIVE}),'utf8');}catch(e){}
+  try{fs.writeFileSync(GOV_FILE,JSON.stringify({
+    proposals:govProposals,idSeq:_govIdSeq,history:govHistory,
+    redemptionRate:REDEMPTION_RATE_LIVE,
+    yieldRate:YIELD_RATE_LIVE,
+    yieldRateMin:YIELD_RATE_MIN,
+    yieldRateMax:YIELD_RATE_MAX,
+    yieldDriftPerTick:YIELD_DRIFT_PER_TICK,
+  }),'utf8');}catch(e){}
 }
 // Redemption rate: % of deposited collateral physically sent to the transmuter each tick (while debt > 0).
 // Governance-controlled; persisted across restarts.
 let REDEMPTION_RATE_LIVE=_govState.redemptionRate||_govState.earmarkRate||0.005;
 // Yield rate: % by which deposited collateral grows every tick, always (even while debt exists).
-// Hardcoded — not governance-controlled in v1.
-const YIELD_RATE=0.002; // 0.2% per 5-min tick
+// Drifts slowly each tick (random walk within bounds). Admin-adjustable. Persisted across restarts.
+let YIELD_RATE_LIVE   = _govState.yieldRate        ?? 0.002;  // current yield rate (default 0.2%/tick)
+let YIELD_RATE_MIN    = _govState.yieldRateMin      ?? 0.0005; // floor: 0.05%/tick
+let YIELD_RATE_MAX    = _govState.yieldRateMax      ?? 0.005;  // ceiling: 0.5%/tick
+let YIELD_DRIFT_PER_TICK = _govState.yieldDriftPerTick ?? 0.0002; // max shift per tick (±0.02%)
 const VOTE_DURATION_MS=24*60*60*1000; // 24-hour voting epoch
 const VOTE_QUORUM=50; // minimum total ALCX weight for a valid result
 
@@ -116,7 +126,15 @@ function getAvailableAlcx(accountId){
   return Math.max(0,parseFloat((total-getVoteLocked(accountId)).toFixed(4)));
 }
 
-function broadcastGovState(){io.emit('gov_state',{proposals:govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,quorum:VOTE_QUORUM,history:govHistory});}
+function broadcastGovState(){io.emit('gov_state',{
+  proposals:govProposals,
+  redemptionRate:REDEMPTION_RATE_LIVE,
+  yieldRate:YIELD_RATE_LIVE,
+  yieldRateMin:YIELD_RATE_MIN,
+  yieldRateMax:YIELD_RATE_MAX,
+  yieldDriftPerTick:YIELD_DRIFT_PER_TICK,
+  quorum:VOTE_QUORUM,history:govHistory,
+});}
 // Check vote outcomes every 60s
 setInterval(()=>{
   const now=Date.now();let changed=false;
@@ -727,7 +745,7 @@ io.on('connection',socket=>{
     socket.emit('graffiti_state',{graffiti});
     socket.emit('hall_of_fame',hallOfFame);
     socket.emit('snowball_init',{enemies:snowballEnemies});
-    socket.emit('gov_state',{proposals:govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,quorum:VOTE_QUORUM,history:govHistory,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
+    socket.emit('gov_state',{proposals:govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE_LIVE,yieldRateMin:YIELD_RATE_MIN,yieldRateMax:YIELD_RATE_MAX,yieldDriftPerTick:YIELD_DRIFT_PER_TICK,quorum:VOTE_QUORUM,history:govHistory,myVoteLocked:socket.accountId?getVoteLocked(socket.accountId):0});
     // Send active world event to new joiner
     if(worldEvent&&Date.now()<worldEvent.endsAt){
       socket.emit('world_event_start',worldEvent);
@@ -1167,6 +1185,13 @@ io.on('connection',socket=>{
 const TRANSMUTER_TICK_MS=5*60*1000; // 5 minutes
 
 setInterval(()=>{
+  // ── Drift yield rate (gradual random walk within bounds) ──────────────────
+  const prevYield=YIELD_RATE_LIVE;
+  const drift=(Math.random()*2-1)*YIELD_DRIFT_PER_TICK;
+  YIELD_RATE_LIVE=parseFloat(Math.max(YIELD_RATE_MIN,Math.min(YIELD_RATE_MAX,YIELD_RATE_LIVE+drift)).toFixed(6));
+  if(YIELD_RATE_LIVE!==prevYield)broadcastGovState(); // push updated rate to all clients
+  saveGov(); // persist new yield rate
+
   let sbRedeemed=0,ethRedeemed=0;
 
   // ── Per-account: apply yield then redemption ──────────────────────────────
@@ -1177,8 +1202,8 @@ setInterval(()=>{
     acct.data.bankPositions.forEach(pos=>{
       if(pos.claimed)return;
 
-      // 1. Yield: deposited grows every tick regardless of debt
-      pos.deposited=pos.deposited*(1+YIELD_RATE);
+      // 1. Yield: deposited grows every tick regardless of debt (at current drifted rate)
+      pos.deposited=pos.deposited*(1+YIELD_RATE_LIVE);
       changed=true;
 
       // 2. Redemption: only while debt remains
@@ -1246,7 +1271,7 @@ setInterval(()=>{
     .filter(p=>!p.claimed&&p.debt>0.001)
     .reduce((s,p)=>s+p.debt,0);
   if(sbRedeemed>0||ethRedeemed>0||totalDebt>0)
-    console.log(`[Transmuter] tick — yield:${(YIELD_RATE*100).toFixed(1)}%/tick redeem:${(REDEMPTION_RATE_LIVE*100).toFixed(1)}%/tick — sent ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH to transmuter — remaining system debt: ${totalDebt.toFixed(2)}`);
+    console.log(`[Transmuter] tick — yield:${(YIELD_RATE_LIVE*100).toFixed(3)}%/tick redeem:${(REDEMPTION_RATE_LIVE*100).toFixed(2)}%/tick net:${((YIELD_RATE_LIVE-REDEMPTION_RATE_LIVE)*100).toFixed(3)}%/tick — sent ${sbRedeemed.toFixed(2)} SB + ${ethRedeemed.toFixed(4)} ETH to transmuter — remaining system debt: ${totalDebt.toFixed(2)}`);
 },TRANSMUTER_TICK_MS);
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
@@ -1269,7 +1294,7 @@ function adminState(){
       kills:row.data?.kills||0,
     })).sort((a,b)=>b.online-a.online||a.username.localeCompare(b.username)),
     treasury,hallOfFame,
-    govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE,
+    govProposals,redemptionRate:REDEMPTION_RATE_LIVE,yieldRate:YIELD_RATE_LIVE,yieldRateMin:YIELD_RATE_MIN,yieldRateMax:YIELD_RATE_MAX,yieldDriftPerTick:YIELD_DRIFT_PER_TICK,
     lootTtlMin:Math.round(LOOT_TTL_MS/60000),
     snowballChance:SNOWBALL_SPAWN_CHANCE,
     whaleChance:WHALE_CHANCE,
@@ -1311,6 +1336,24 @@ adminNs.on('connection',socket=>{
     const text=String(msg||'').trim().slice(0,200);if(!text)return;
     io.emit('chat',{nickname:'📢 Admin',text});
     socket.emit('admin_msg',{ok:true,msg:'Broadcast sent.'});
+  });
+
+  // Yield rate admin controls
+  socket.on('admin_set_yield',({rate})=>{
+    const r=parseFloat(rate);
+    if(isNaN(r)||r<0.0001||r>0.02)return socket.emit('admin_msg',{ok:false,msg:'Yield rate must be 0.01–2.0%.'});
+    YIELD_RATE_LIVE=r;saveGov();broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Yield rate set → ${(r*100).toFixed(3)}%/tick`});
+  });
+  socket.on('admin_set_yield_params',({min,max,drift})=>{
+    const mn=parseFloat(min),mx=parseFloat(max),dr=parseFloat(drift);
+    if(isNaN(mn)||mn<0.0001||mn>0.01)return socket.emit('admin_msg',{ok:false,msg:'Min must be 0.01–1.0%.'});
+    if(isNaN(mx)||mx<mn||mx>0.02)return socket.emit('admin_msg',{ok:false,msg:'Max must be >= min and <= 2.0%.'});
+    if(isNaN(dr)||dr<0.00001||dr>0.002)return socket.emit('admin_msg',{ok:false,msg:'Drift must be 0.001–0.2%/tick.'});
+    YIELD_RATE_MIN=mn;YIELD_RATE_MAX=mx;YIELD_DRIFT_PER_TICK=dr;
+    YIELD_RATE_LIVE=Math.max(YIELD_RATE_MIN,Math.min(YIELD_RATE_MAX,YIELD_RATE_LIVE)); // clamp if needed
+    saveGov();broadcastGovState();
+    socket.emit('admin_msg',{ok:true,msg:`Yield params: min ${(mn*100).toFixed(3)}% max ${(mx*100).toFixed(3)}% drift ±${(dr*100).toFixed(3)}%/tick`});
   });
 
   socket.on('admin_set_earmark',({rate})=>{ // legacy alias

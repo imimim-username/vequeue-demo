@@ -28,17 +28,38 @@ export function renderGovernanceUI(){
   const voteCommitted=G.alcxVoteLock||0;
   const voteAvailable=Math.max(0,parseFloat((queueStake-voteCommitted).toFixed(4)));
 
-  // Rate summary box showing both rates and net effect
+  const yieldMin=(G.yieldRateMin||0.0005)*100;
+  const yieldMax=(G.yieldRateMax||0.005)*100;
+  const yieldDrift=(G.yieldDriftPerTick||0.0002)*100;
   const netRate=yieldRate-redemptionRate;
   const netColor=netRate>=0?'#4CAF50':'#FF8800';
+  // Yield rate bar: show position within min–max range
+  const yieldPct=yieldMax>yieldMin?Math.round(((yieldRate-yieldMin)/(yieldMax-yieldMin))*100):50;
   let html=`<div style="background:#0D0020;border:1px solid #3A2060;border-radius:4px;padding:8px;margin-bottom:8px;font-size:.75rem">`;
-  html+=`<div style="color:#FFD700;font-weight:bold;margin-bottom:4px">⚗ Bank Rate Parameters</div>`;
-  html+=`<div style="display:flex;gap:16px;flex-wrap:wrap">`;
-  html+=`<div><span style="color:#4FC3F7">Yield rate:</span> <b style="color:#eee">+${yieldRate.toFixed(1)}%</b><span style="color:#555;font-size:.68rem">/tick</span> <span style="color:#888;font-size:.68rem">(collateral grows, always)</span></div>`;
-  html+=`<div><span style="color:#FF8800">Redemption rate:</span> <b style="color:#eee">${redemptionRate.toFixed(2)}%</b><span style="color:#555;font-size:.68rem">/tick</span> <span style="color:#888;font-size:.68rem">(collateral sent to transmuter while debt > 0)</span></div>`;
-  html+=`<div><span style="color:#aaa">Net while repaying:</span> <b style="color:${netColor}">${netRate>=0?'+':''}${netRate.toFixed(2)}%</b><span style="color:#555;font-size:.68rem">/tick</span></div>`;
+  html+=`<div style="color:#FFD700;font-weight:bold;margin-bottom:6px">⚗ Bank Rate Parameters</div>`;
+  // Yield rate row with live bar
+  html+=`<div style="margin-bottom:6px">`;
+  html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">`;
+  html+=`<span style="color:#4FC3F7">📈 Yield rate <span style="color:#555;font-size:.68rem">(drifts each tick)</span></span>`;
+  html+=`<b style="color:#eee;font-size:.85rem">+${yieldRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
   html+=`</div>`;
-  html+=`<div style="color:#888;font-size:.68rem;margin-top:4px">Governance controls the redemption rate (0.1–2.0%). Higher = faster debt repayment &amp; more transmuter yield for depositors.</div>`;
+  // Range bar
+  html+=`<div style="position:relative;background:#111;border-radius:3px;height:6px;margin-bottom:2px">`;
+  html+=`<div style="position:absolute;left:${yieldPct}%;top:-1px;width:8px;height:8px;background:#4FC3F7;border-radius:50%;transform:translateX(-50%)"></div>`;
+  html+=`</div>`;
+  html+=`<div style="display:flex;justify-content:space-between;color:#444;font-size:.65rem"><span>${yieldMin.toFixed(3)}% min</span><span>±${yieldDrift.toFixed(3)}%/tick drift</span><span>${yieldMax.toFixed(3)}% max</span></div>`;
+  html+=`</div>`;
+  // Redemption rate row
+  html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">`;
+  html+=`<span style="color:#FF8800">🔻 Redemption rate <span style="color:#555;font-size:.68rem">(governance-controlled, while debt > 0)</span></span>`;
+  html+=`<b style="color:#eee;font-size:.85rem">${redemptionRate.toFixed(2)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+  html+=`</div>`;
+  // Net row
+  html+=`<div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #1A1030;padding-top:4px">`;
+  html+=`<span style="color:#aaa">Net effect on deposit while repaying</span>`;
+  html+=`<b style="color:${netColor}">${netRate>=0?'+':''}${netRate.toFixed(3)}%<span style="color:#555;font-size:.68rem">/tick</span></b>`;
+  html+=`</div>`;
+  html+=`<div style="color:#666;font-size:.65rem;margin-top:3px">The yield rate drifts ±${yieldDrift.toFixed(3)}% each tick. High redemption rate = faster payoff &amp; more transmuter yield, but raises the risk of net deposit erosion if yield dips low.</div>`;
   html+=`</div>`;
 
   // Voting stake status panel
